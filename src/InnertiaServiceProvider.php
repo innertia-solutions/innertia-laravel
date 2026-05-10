@@ -37,10 +37,15 @@ class InnertiaServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+        $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
 
         $this->publishes([
-            __DIR__ . '/../config/innertia.php' => config_path('innertia.php'),
+            __DIR__ . '/../config/innertia.php'    => config_path('innertia.php'),
         ], 'innertia-config');
+
+        $this->publishes([
+            __DIR__ . '/../resources/views'        => resource_path('views/vendor/innertia'),
+        ], 'innertia-mail-views');
     }
 
     protected function configureTenancy(): void
