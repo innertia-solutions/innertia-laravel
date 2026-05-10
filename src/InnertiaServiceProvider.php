@@ -2,9 +2,13 @@
 
 namespace Innertia;
 
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Innertia\Auth\AuthServiceProvider;
 use Innertia\DataTable\DataTableService;
+use Innertia\Platform\Events\DomainEvent;
+use Innertia\Platform\Listeners\DomainEventRouter;
+use Innertia\Webhook\WebhookService;
 use Innertia\Services\ActivityLogService;
 use Innertia\Services\EntityHistoryService;
 use Innertia\Settings\AppSettingsService;
@@ -32,6 +36,7 @@ class InnertiaServiceProvider extends ServiceProvider
         }
 
         $this->app->register(AuthServiceProvider::class);
+        $this->app->singleton(WebhookService::class);
     }
 
     public function boot(): void
@@ -51,6 +56,8 @@ class InnertiaServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom($migrations);
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
+
+        Event::listen(DomainEvent::class, DomainEventRouter::class);
 
         $this->publishes([
             __DIR__ . '/../config/innertia.php'    => config_path('innertia.php'),
