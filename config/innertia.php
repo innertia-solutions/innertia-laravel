@@ -43,4 +43,32 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Auth Settings
+    |--------------------------------------------------------------------------
+    |
+    | Controls the built-in Innertia auth layer (JWT + OTP + 2FA).
+    |
+    */
+
+    'auth' => [
+        'otp' => [
+            // Send a one-time code via email before issuing the JWT
+            'enabled' => false,
+            // Minutes the OTP code remains valid
+            'ttl' => 10,
+        ],
+
+        '2fa' => [
+            // Allow users to enrol in TOTP-based two-factor auth
+            'enabled' => false,
+        ],
+
+        'sessions' => [
+            // Invalidate older sessions when a new login occurs from a different device
+            'restrict_concurrent' => false,
+        ],
+    ],
+
 ];

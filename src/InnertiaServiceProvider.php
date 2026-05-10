@@ -3,6 +3,7 @@
 namespace Innertia;
 
 use Illuminate\Support\ServiceProvider;
+use Innertia\Auth\AuthServiceProvider;
 use Innertia\DataTable\DataTableService;
 use Innertia\Services\ActivityLogService;
 use Innertia\Services\EntityHistoryService;
@@ -29,6 +30,8 @@ class InnertiaServiceProvider extends ServiceProvider
         if ($isSaas) {
             $this->configureTenancy();
         }
+
+        $this->app->register(AuthServiceProvider::class);
     }
 
     public function boot(): void
