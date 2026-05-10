@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class Session extends Model
 {
-    protected $table = 'innertia_sessions';
+    protected $table = 'user_sessions';
 
     protected $fillable = [
         'tenant_id',

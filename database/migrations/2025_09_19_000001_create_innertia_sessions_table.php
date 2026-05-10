@@ -8,7 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('innertia_sessions', function (Blueprint $table) {
+        Schema::create('user_sessions', function (Blueprint $table) {
             $table->id();
             $table->string('tenant_id')->nullable()->index();
             $table->string('user_id')->index();
@@ -23,6 +23,6 @@ return new class extends Migration
 
     public function down(): void
     {
-        Schema::dropIfExists('innertia_sessions');
+        Schema::dropIfExists('user_sessions');
     }
 };
