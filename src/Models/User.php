@@ -33,16 +33,20 @@ abstract class User extends Authenticatable implements JWTSubject
         'email',
         'password',
         'seen_at',
+        'two_factor_secret',
+        'two_factor_enabled',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'two_factor_secret',
     ];
 
     protected $casts = [
-        'seen_at'    => 'datetime',
-        'email_verified_at' => 'datetime',
+        'seen_at'            => 'datetime',
+        'email_verified_at'  => 'datetime',
+        'two_factor_enabled' => 'boolean',
     ];
 
     /* ── JWTSubject ── */
