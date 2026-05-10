@@ -1,0 +1,52 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Bump version and tag
+        run: |
+          # Get latest tag, default to v0.0.0 if none
+          LATEST=$(git tag --sort=-v:refname | grep '^v' | head -1)
+          CURRENT="${LATEST:-v0.0.0}"
+          CURRENT="${CURRENT#v}"
+
+          IFS='.' read -r MAJOR MINOR PATCH <<< "$CURRENT"
+
+          if [ "${{ inputs.bump }}" = "major" ]; then
+            NEW="$((MAJOR+1)).0.0"
+          elif [ "${{ inputs.bump }}" = "minor" ]; then
+            NEW="${MAJOR}.$((MINOR+1)).0"
+          else
+            NEW="${MAJOR}.${MINOR}.$((PATCH+1))"
+          fi
+
+          echo "Releasing v${NEW} (was ${CURRENT})"
+
+          git tag "v${NEW}" -m "Release v${NEW}"
+          git push origin "v${NEW}"
