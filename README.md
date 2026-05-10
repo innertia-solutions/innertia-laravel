@@ -34,9 +34,10 @@ return [
     ],
 
     'auth' => [
-        'otp'      => ['enabled' => false, 'ttl' => 10],
-        '2fa'      => ['enabled' => false],
-        'sessions' => ['restrict_concurrent' => false],
+        'email_verification' => ['enabled' => false],
+        'otp'                => ['enabled' => false, 'ttl' => 10],
+        '2fa'                => ['enabled' => false],
+        'sessions'           => ['restrict_concurrent' => false],
     ],
 ];
 ```
@@ -53,22 +54,6 @@ Drop-in JWT auth layer. Register routes from `routes/api.php`:
 \Innertia\Auth\AuthManager::routes(prefix: 'v1/auth', middleware: ['throttle:10,1']);
 ```
 
-Routes registered:
-
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/auth/login` | Email + password → JWT (or OTP challenge) |
-| POST | `/auth/otp/send` | Send OTP code |
-| POST | `/auth/otp/verify` | Verify OTP → JWT (or 2FA challenge) |
-| POST | `/auth/2fa/verify` | Verify TOTP code → JWT |
-| GET  | `/auth/me` | Authenticated user |
-| POST | `/auth/refresh` | Refresh JWT |
-| POST | `/auth/logout` | Invalidate token |
-| POST | `/auth/2fa/enable` | Enrol in 2FA (returns QR code URL) |
-| POST | `/auth/2fa/disable` | Disable 2FA |
-
-Protected routes use the `Innertia\Auth\Middleware\Authenticate` middleware.
-
 Configure `config/auth.php` to use the JWT guard:
 
 ```php
@@ -76,6 +61,142 @@ Configure `config/auth.php` to use the JWT guard:
     'api' => ['driver' => 'jwt', 'provider' => 'users'],
 ],
 ```
+
+Protected routes use the `Innertia\Auth\Middleware\Authenticate` middleware.
+
+### Sessions
+
+Every successful login is recorded in the `user_sessions` table with `user_id`, `tenant_id` (saas only), `token_hash`, `device_id` (from `X-Device-Id` header), `ip`, `browser`, and `expires_at`. With `sessions.restrict_concurrent = true`, older sessions from other devices are invalidated on each new login.
+
+### Routes
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| POST | `/auth/login` | — | Credentials → token or challenge |
+| POST | `/auth/otp/send` | — | Send OTP to user's email |
+| POST | `/auth/otp/verify` | — | Verify OTP → token or next challenge |
+| POST | `/auth/2fa/verify` | — | Verify TOTP code → token |
+| POST | `/auth/email/verify/send` | — | Send email verification OTP |
+| POST | `/auth/email/verify` | — | Verify email OTP → token or next challenge |
+| POST | `/auth/password/change` | — | Change password after force_password_change (post-OTP) |
+| POST | `/auth/password/set` | — | Set password from invitation flow (post-OTP) |
+| GET  | `/auth/me` | ✓ | Authenticated user |
+| POST | `/auth/refresh` | ✓ | Refresh JWT |
+| POST | `/auth/logout` | ✓ | Invalidate token + session |
+| POST | `/auth/2fa/enable` | ✓ | Enrol in 2FA (returns QR code URL) |
+| POST | `/auth/2fa/disable` | ✓ | Disable 2FA |
+
+### Login check order
+
+On every login attempt the following checks run in strict order. The first match returns a challenge instead of a token:
+
+```
+1. Invalid credentials              → 422
+
+2. force_password_change = true     → OTP always sent (proves email ownership)
+                                    → { requires_password_change: true, user_id }
+
+3. email_verified_at = null
+   + email_verification.enabled     → { requires_email_verification: true, user_id }
+
+4. otp.enabled                      → OTP sent
+                                    → { requires_otp: true, user_id }
+
+5. user.two_factor_enabled = true   → { requires_2fa: true, user_id }
+
+6.                                  → { token, user }
+```
+
+`force_password_change` OTP implicitly covers email verification — completing the password change marks `email_verified_at` as well, so a second OTP is never sent.
+
+### Flow A — Standard login
+
+```
+POST /auth/login
+→ { token, user }
+```
+
+### Flow B — OTP enabled
+
+```
+POST /auth/login
+→ { requires_otp: true, user_id }
+
+POST /auth/otp/verify  { user_id, code }
+→ { token, user }
+  | { requires_2fa: true, user_id }      ← if user has 2FA enrolled
+
+POST /auth/2fa/verify  { user_id, code }
+→ { token, user }
+```
+
+### Flow C — force_password_change (admin set a temporary password)
+
+OTP is **always** sent on login regardless of `otp.enabled`. Completing the flow also marks the email as verified.
+
+```
+POST /auth/login  { email, password }
+→ OTP sent automatically
+→ { requires_password_change: true, user_id }
+
+POST /auth/otp/verify  { user_id, code }
+→ { otp_verified: true, user_id }         ← no token yet
+
+POST /auth/password/change  { user_id, new_password }
+→ clears force_password_change
+→ marks email_verified_at
+→ { token, user }
+  | { requires_2fa: true, user_id }
+
+POST /auth/2fa/verify  { user_id, code }
+→ { token, user }
+```
+
+### Flow D — Email verification enabled, no password on user creation (invitation)
+
+Used when `email_verification.enabled = true` and the user is created without a password (invitation flow).
+
+```
+POST /auth/email/verify/send  { email }
+→ OTP sent  (action: email_verification)
+
+POST /auth/otp/verify  { user_id, code }
+→ { requires_password_set: true, user_id }
+
+POST /auth/password/set  { user_id, new_password }
+→ marks email_verified_at
+→ { token, user }
+  | { requires_2fa: true, user_id }
+
+POST /auth/2fa/verify  { user_id, code }
+→ { token, user }
+```
+
+### Flow E — force_password_change + email_verification enabled
+
+Collapses into Flow C — the OTP from `force_password_change` covers email verification. No second OTP is sent.
+
+### Flow F — All features active (email verified, OTP + 2FA enabled)
+
+```
+POST /auth/login
+→ { requires_otp: true, user_id }
+
+POST /auth/otp/verify  { user_id, code }
+→ { requires_2fa: true, user_id }
+
+POST /auth/2fa/verify  { user_id, code }
+→ { token, user }
+```
+
+### User flags
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `email_verified_at` | timestamp nullable | Set when email is verified |
+| `force_password_change` | boolean | Forces password change + OTP on next login |
+| `two_factor_secret` | text nullable | Encrypted TOTP secret |
+| `two_factor_enabled` | boolean | Whether 2FA is active for this user |
 
 ---
 
