@@ -36,7 +36,20 @@ class InnertiaServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
+        $isSaas = config('innertia.mode') === 'saas';
+
+        $migrations = [__DIR__ . '/../database/migrations'];
+
+        if (! $isSaas) {
+            // Exclude tenants/domains tables in single-app mode
+            $migrations = array_filter(
+                glob(__DIR__ . '/../database/migrations/*.php'),
+                fn ($f) => ! str_contains($f, 'create_tenants_table')
+                        && ! str_contains($f, 'create_domains_table')
+            );
+        }
+
+        $this->loadMigrationsFrom($migrations);
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
 
         $this->publishes([
