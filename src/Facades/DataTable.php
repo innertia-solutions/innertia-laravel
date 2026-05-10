@@ -2,7 +2,7 @@
 
 namespace Innertia\Facades;
 
-use Innertia\DataTable\Services\DataTableService;
+use Innertia\DataTable\DataTableService;
 use Illuminate\Support\Facades\Facade;
 
 /**
