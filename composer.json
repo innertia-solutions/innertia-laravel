@@ -1,6 +1,6 @@
 {
     "name": "innertia-solutions/laravel-kit",
-    "description": "Innertia Solutions — shared Laravel utilities: DataTable, History, Audit, Traits",
+    "description": "Innertia Solutions — shared Laravel utilities: DataTable, History, Audit, Traits, Olimpo SDK",
     "type": "library",
     "license": "MIT",
     "keywords": ["laravel", "datatable", "audit", "history", "traits"],
