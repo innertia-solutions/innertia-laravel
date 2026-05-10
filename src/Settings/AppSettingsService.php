@@ -2,6 +2,7 @@
 
 namespace Innertia\Settings;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
 use Innertia\Models\Setting;
 
@@ -18,7 +19,7 @@ class AppSettingsService
         $cacheKey = $this->cacheKey($key, $tenantId);
 
         $value = Cache::rememberForever($cacheKey, function () use ($key, $tenantId) {
-            return Setting::where('tenant_id', $tenantId)
+            return $this->scopeTenant(Setting::query(), $tenantId)
                 ->where('key', $key)
                 ->first()
                 ?->value;
@@ -30,27 +31,32 @@ class AppSettingsService
     public function getGroup(string $group): array
     {
         $tenantId = $this->tenantId();
-        $prefix = rtrim($group, '.') . '.';
+        $prefix   = rtrim($group, '.') . '.';
 
-        return Setting::where('tenant_id', $tenantId)
+        return $this->scopeTenant(Setting::query(), $tenantId)
             ->where('key', 'like', $prefix . '%')
             ->get()
-            ->mapWithKeys(fn(Setting $s) => [substr($s->key, strlen($prefix)) => $s->value])
+            ->mapWithKeys(fn (Setting $s) => [substr($s->key, strlen($prefix)) => $s->value])
             ->all();
     }
 
     public function set(string $key, mixed $value, string $type = 'string', bool $encrypted = false): Setting
     {
         $tenantId = $this->tenantId();
+        $isSaas   = config('innertia.mode') === 'saas';
 
-        $setting = Setting::where('tenant_id', $tenantId)->where('key', $key)->firstOrNew([
-            'tenant_id' => $tenantId,
-            'key'       => $key,
-        ]);
+        $attributes = ['key' => $key];
+        if ($isSaas) {
+            $attributes['tenant_id'] = $tenantId;
+        }
 
-        $setting->value_type  = $type;
+        $setting = $this->scopeTenant(Setting::query(), $tenantId)
+            ->where('key', $key)
+            ->firstOrNew($attributes);
+
+        $setting->value_type   = $type;
         $setting->is_encrypted = $encrypted;
-        $setting->value       = $value;
+        $setting->value        = $value;
         $setting->save();
 
         return $setting;
@@ -59,9 +65,20 @@ class AppSettingsService
     public function forget(string $key): bool
     {
         $tenantId = $this->tenantId();
-        $setting  = Setting::where('tenant_id', $tenantId)->where('key', $key)->first();
+        $setting  = $this->scopeTenant(Setting::query(), $tenantId)
+            ->where('key', $key)
+            ->first();
 
         return $setting ? (bool) $setting->delete() : false;
+    }
+
+    protected function scopeTenant(Builder $query, mixed $tenantId): Builder
+    {
+        if (config('innertia.mode') !== 'saas') {
+            return $query;
+        }
+
+        return $query->where('tenant_id', $tenantId);
     }
 
     protected function cacheKey(string $key, mixed $tenantId): string

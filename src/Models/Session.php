@@ -10,7 +10,6 @@ class Session extends Model
     protected $table = 'user_sessions';
 
     protected $fillable = [
-        'tenant_id',
         'user_id',
         'token_hash',
         'device_id',
@@ -18,6 +17,17 @@ class Session extends Model
         'browser',
         'expires_at',
     ];
+
+    public function getFillable(): array
+    {
+        $fillable = parent::getFillable();
+
+        if (config('innertia.mode') === 'saas') {
+            array_unshift($fillable, 'tenant_id');
+        }
+
+        return $fillable;
+    }
 
     protected $casts = [
         'expires_at' => 'datetime',

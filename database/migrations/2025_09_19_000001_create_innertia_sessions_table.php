@@ -8,9 +8,13 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('user_sessions', function (Blueprint $table) {
+        $isSaas = config('innertia.mode') === 'saas';
+
+        Schema::create('user_sessions', function (Blueprint $table) use ($isSaas) {
             $table->id();
-            $table->string('tenant_id')->nullable()->index();
+            if ($isSaas) {
+                $table->string('tenant_id')->nullable()->index();
+            }
             $table->string('user_id')->index();
             $table->string('token_hash')->unique();
             $table->string('device_id')->nullable();

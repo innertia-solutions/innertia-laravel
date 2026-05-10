@@ -17,15 +17,15 @@ class WebhookService
             '_timestamp' => now()->toIso8601String(),
         ]);
 
-        Webhook::query()
-            ->where('active', true)
-            ->where(function ($q) use ($tenantId) {
-                $q->whereNull('tenant_id');
-                if ($tenantId !== null) {
-                    $q->orWhere('tenant_id', $tenantId);
-                }
-            })
-            ->get()
+        $query = Webhook::query()->where('active', true);
+
+        if (config('innertia.mode') === 'saas') {
+            $query->where(function ($q) use ($tenantId) {
+                $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId);
+            });
+        }
+
+        $query->get()
             ->filter(fn (Webhook $w) => $w->matchesEvent($eventKey))
             ->each(fn (Webhook $w) => DispatchWebhookJob::dispatch($w, $eventKey, $payload));
     }

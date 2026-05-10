@@ -8,13 +8,17 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('webhooks', function (Blueprint $table) {
+        $isSaas = config('innertia.mode') === 'saas';
+
+        Schema::create('webhooks', function (Blueprint $table) use ($isSaas) {
             $table->id();
-            $table->string('tenant_id')->nullable()->index();
+            if ($isSaas) {
+                $table->string('tenant_id')->nullable()->index();
+            }
             $table->string('url');
             $table->string('description')->nullable();
-            $table->json('events')->default('["*"]');   // ['*'] or ['order.shipped', ...]
-            $table->string('secret');                   // HMAC signing key
+            $table->json('events')->default('["*"]');
+            $table->string('secret');
             $table->boolean('active')->default(true);
             $table->timestamps();
         });

@@ -8,13 +8,23 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 class Webhook extends Model
 {
     protected $fillable = [
-        'tenant_id',
         'url',
         'description',
         'events',
         'secret',
         'active',
     ];
+
+    public function getFillable(): array
+    {
+        $fillable = parent::getFillable();
+
+        if (config('innertia.mode') === 'saas') {
+            array_unshift($fillable, 'tenant_id');
+        }
+
+        return $fillable;
+    }
 
     protected $hidden = ['secret'];
 

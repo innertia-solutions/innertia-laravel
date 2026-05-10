@@ -8,16 +8,21 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('settings', function (Blueprint $table) {
+        $isSaas = config('innertia.mode') === 'saas';
+
+        Schema::create('settings', function (Blueprint $table) use ($isSaas) {
             $table->id();
-            $table->string('tenant_id')->nullable()->index();
+            if ($isSaas) {
+                $table->string('tenant_id')->nullable()->index();
+                $table->unique(['tenant_id', 'key']);
+            } else {
+                $table->unique('key');
+            }
             $table->string('key');
             $table->string('value_type')->default('string');
             $table->text('value')->nullable();
             $table->boolean('is_encrypted')->default(false);
             $table->timestamps();
-
-            $table->unique(['tenant_id', 'key']);
         });
     }
 

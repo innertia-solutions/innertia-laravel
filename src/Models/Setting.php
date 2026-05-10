@@ -10,7 +10,6 @@ use Illuminate\Support\Facades\Crypt;
 class Setting extends Model
 {
     protected $fillable = [
-        'tenant_id',
         'key',
         'value_type',
         'value',
@@ -20,6 +19,31 @@ class Setting extends Model
     protected $casts = [
         'is_encrypted' => 'boolean',
     ];
+
+    public function getFillable(): array
+    {
+        $fillable = parent::getFillable();
+
+        if (config('innertia.mode') === 'saas') {
+            $fillable[] = 'tenant_id';
+        }
+
+        return $fillable;
+    }
+
+    protected static function booted(): void
+    {
+        $invalidate = function (self $setting) {
+            $key = ! empty($setting->tenant_id)
+                ? "innertia_settings_tenant_{$setting->tenant_id}_{$setting->key}"
+                : "innertia_settings_platform_{$setting->key}";
+
+            Cache::forget($key);
+        };
+
+        static::saved($invalidate);
+        static::deleted($invalidate);
+    }
 
     protected function value(): Attribute
     {
@@ -51,19 +75,5 @@ class Setting extends Model
                 return $this->is_encrypted ? Crypt::encryptString($raw) : $raw;
             }
         );
-    }
-
-    protected static function booted(): void
-    {
-        $invalidate = function (self $setting) {
-            $key = $setting->tenant_id === null
-                ? "innertia_settings_platform_{$setting->key}"
-                : "innertia_settings_tenant_{$setting->tenant_id}_{$setting->key}";
-
-            Cache::forget($key);
-        };
-
-        static::saved($invalidate);
-        static::deleted($invalidate);
     }
 }

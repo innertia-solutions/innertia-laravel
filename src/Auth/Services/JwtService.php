@@ -73,21 +73,32 @@ class JwtService
         $request = request();
         $ttl     = now()->addMinutes(config('jwt.ttl', 60));
 
-        Session::create([
-            'tenant_id'   => $this->resolveTenantId(),
-            'user_id'     => $user->getAuthIdentifier(),
-            'token_hash'  => $this->hash($token),
-            'device_id'   => $request->header('X-Device-Id'),
-            'ip'          => $request->ip(),
-            'browser'     => $request->userAgent(),
-            'expires_at'  => $ttl,
-        ]);
+        $isSaas = config('innertia.mode') === 'saas';
+
+        $sessionData = [
+            'user_id'    => $user->getAuthIdentifier(),
+            'token_hash' => $this->hash($token),
+            'device_id'  => $request->header('X-Device-Id'),
+            'ip'         => $request->ip(),
+            'browser'    => $request->userAgent(),
+            'expires_at' => $ttl,
+        ];
+
+        if ($isSaas) {
+            $sessionData['tenant_id'] = $this->resolveTenantId();
+        }
+
+        Session::create($sessionData);
 
         if (Settings::get('auth.sessions.restrict_concurrent', config('innertia.auth.sessions.restrict_concurrent', false))) {
-            Session::where('user_id', $user->getAuthIdentifier())
-                ->where('tenant_id', $this->resolveTenantId())
-                ->where('token_hash', '!=', $this->hash($token))
-                ->delete();
+            $query = Session::where('user_id', $user->getAuthIdentifier())
+                ->where('token_hash', '!=', $this->hash($token));
+
+            if ($isSaas) {
+                $query->where('tenant_id', $this->resolveTenantId());
+            }
+
+            $query->delete();
         }
     }
 
