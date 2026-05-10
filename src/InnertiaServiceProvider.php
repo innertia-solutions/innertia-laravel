@@ -46,7 +46,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $isMulti  = ($saas['db_strategy'] ?? 'single') === 'multi';
 
         $tenantModel = $saas['tenant_model']
-            ?? 'Stancl\\Tenancy\\Database\\Models\\Tenant';
+            ?? \Innertia\Models\Tenant::class;
 
         $bootstrappers = [
             \Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
