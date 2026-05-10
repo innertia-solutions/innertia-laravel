@@ -2,9 +2,10 @@
 
 namespace Innertia\Models;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Contracts\Auth\Authenticatable;
+use Innertia\Facades\Settings;
 
 class UserOtp extends Model
 {
@@ -53,7 +54,7 @@ class UserOtp extends Model
 
     public static function generate(Authenticatable $user, string $action, int $ttlMinutes = null): self
     {
-        $ttl = $ttlMinutes ?? config('innertia.auth.otp.ttl', 15);
+        $ttl = $ttlMinutes ?? Settings::get('auth.otp.ttl', config('innertia.auth.otp.ttl', 10));
 
         static::where('user_id', $user->getAuthIdentifier())
             ->where('action', $action)

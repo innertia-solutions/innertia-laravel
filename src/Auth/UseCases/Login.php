@@ -5,6 +5,7 @@ namespace Innertia\Auth\UseCases;
 use Illuminate\Support\Facades\Hash;
 use Innertia\Auth\Services\JwtService;
 use Innertia\Auth\Services\OtpService;
+use Innertia\Facades\Settings;
 use Innertia\Platform\Contracts\UseCase;
 
 class Login extends UseCase
@@ -27,7 +28,7 @@ class Login extends UseCase
         }
 
         // OTP required before issuing token
-        if (config('innertia.auth.otp.enabled', false)) {
+        if (Settings::get('auth.otp.enabled', config('innertia.auth.otp.enabled', false))) {
             $this->otp->send($user, 'login');
 
             return ['requires_otp' => true, 'user_id' => $user->getAuthIdentifier()];

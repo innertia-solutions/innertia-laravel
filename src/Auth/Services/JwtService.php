@@ -4,6 +4,7 @@ namespace Innertia\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Cache;
+use Innertia\Facades\Settings;
 use Innertia\Models\Session;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Facades\JWTFactory;
@@ -82,7 +83,7 @@ class JwtService
             'expires_at'  => $ttl,
         ]);
 
-        if (config('innertia.auth.sessions.restrict_concurrent', false)) {
+        if (Settings::get('auth.sessions.restrict_concurrent', config('innertia.auth.sessions.restrict_concurrent', false))) {
             Session::where('user_id', $user->getAuthIdentifier())
                 ->where('tenant_id', $this->resolveTenantId())
                 ->where('token_hash', '!=', $this->hash($token))

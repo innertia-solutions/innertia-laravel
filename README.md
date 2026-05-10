@@ -64,6 +64,22 @@ Configure `config/auth.php` to use the JWT guard:
 
 Protected routes use the `Innertia\Auth\Middleware\Authenticate` middleware.
 
+### Auth settings are stored in the database
+
+All auth feature flags are read from the **Settings system** at runtime, not from `config/innertia.php`. This means each app (or each tenant in saas mode) can have its own auth configuration without a deployment.
+
+Set them via `Settings::set()` — typically from an admin panel or via the Olimpo API:
+
+```php
+Settings::set('auth.email_verification.enabled', true);
+Settings::set('auth.otp.enabled', true);
+Settings::set('auth.otp.ttl', 10);           // minutes
+Settings::set('auth.2fa.enabled', true);
+Settings::set('auth.sessions.restrict_concurrent', true);
+```
+
+The values in `config/innertia.php` under `auth` are fallback defaults used only when no DB value has been set.
+
 ### Sessions
 
 Every successful login is recorded in the `user_sessions` table with `user_id`, `tenant_id` (saas only), `token_hash`, `device_id` (from `X-Device-Id` header), `ip`, `browser`, and `expires_at`. With `sessions.restrict_concurrent = true`, older sessions from other devices are invalidated on each new login.

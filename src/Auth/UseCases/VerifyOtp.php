@@ -5,6 +5,7 @@ namespace Innertia\Auth\UseCases;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Innertia\Auth\Services\JwtService;
 use Innertia\Auth\Services\OtpService;
+use Innertia\Facades\Settings;
 use Innertia\Platform\Contracts\UseCase;
 
 class VerifyOtp extends UseCase
@@ -24,7 +25,7 @@ class VerifyOtp extends UseCase
         }
 
         // If 2FA is enabled, require second factor before issuing token
-        if (config('innertia.auth.2fa.enabled', false) && method_exists($user, 'hasTwoFactorEnabled') && $user->hasTwoFactorEnabled()) {
+        if (Settings::get('auth.2fa.enabled', config('innertia.auth.2fa.enabled', false)) && $user->two_factor_enabled) {
             return ['requires_2fa' => true, 'user_id' => $user->getAuthIdentifier()];
         }
 
