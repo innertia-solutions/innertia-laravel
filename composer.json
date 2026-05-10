@@ -40,7 +40,8 @@
             "aliases": {
                 "DataTable": "Innertia\\Facades\\DataTable",
                 "ActivityLogger": "Innertia\\Facades\\ActivityLogger",
-                "EntityHistory": "Innertia\\Facades\\EntityHistory"
+                "EntityHistory": "Innertia\\Facades\\EntityHistory",
+                "Settings": "Innertia\\Facades\\Settings"
             }
         }
     },
