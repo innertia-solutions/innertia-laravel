@@ -20,8 +20,8 @@ return [
     | SaaS / Tenancy Settings
     |--------------------------------------------------------------------------
     |
-    | Only relevant when mode = 'saas'. These values are used to configure
-    | stancl/tenancy programmatically — no need to publish config/tenancy.php.
+    | Only relevant when mode = 'saas'. Configures stancl/tenancy
+    | programmatically — no need to publish config/tenancy.php.
     |
     */
 
@@ -29,7 +29,11 @@ return [
         // Eloquent model representing a tenant
         'tenant_model' => null, // defaults to Stancl\Tenancy\Database\Models\Tenant
 
-        // Tenant database name: {prefix}{tenant_id}
+        // 'single' — all tenants share one database, models use BelongsToTenant + TenantScope
+        // 'multi'  — each tenant gets its own database (requires db_prefix)
+        'db_strategy' => 'single',
+
+        // Only used when db_strategy = 'multi'. Tenant DB name: {prefix}{tenant_id}
         'db_prefix' => 'tenant_',
 
         // Domains that host the central (landlord) application

@@ -42,28 +42,36 @@ class InnertiaServiceProvider extends ServiceProvider
 
     protected function configureTenancy(): void
     {
-        $saas = config('innertia.saas', []);
+        $saas     = config('innertia.saas', []);
+        $isMulti  = ($saas['db_strategy'] ?? 'single') === 'multi';
 
         $tenantModel = $saas['tenant_model']
             ?? 'Stancl\\Tenancy\\Database\\Models\\Tenant';
 
+        $bootstrappers = [
+            \Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
+            \Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper::class,
+            \Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper::class,
+        ];
+
+        if ($isMulti) {
+            // Switch DB connection per tenant
+            array_unshift($bootstrappers, \Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper::class);
+        }
+
         config([
-            'tenancy.tenant_model'   => $tenantModel,
-            'tenancy.id_generator'   => null,
+            'tenancy.tenant_model'    => $tenantModel,
+            'tenancy.id_generator'    => null,
             'tenancy.central_domains' => $saas['central_domains'] ?? ['localhost', '127.0.0.1'],
 
-            'tenancy.bootstrappers' => [
-                \Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
-                \Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper::class,
-                \Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper::class,
-            ],
+            'tenancy.bootstrappers' => $bootstrappers,
 
             'tenancy.database' => [
-                'central_connection'        => 'pgsql',
+                'central_connection'         => 'pgsql',
                 'template_tenant_connection' => null,
-                'prefix'                    => $saas['db_prefix'] ?? 'tenant_',
-                'suffix'                    => '',
-                'managers'                  => [
+                'prefix'                     => $saas['db_prefix'] ?? 'tenant_',
+                'suffix'                     => '',
+                'managers'                   => [
                     'pgsql' => \Stancl\Tenancy\TenantDatabaseManagers\PostgreSQLDatabaseManager::class,
                 ],
             ],
@@ -84,7 +92,7 @@ class InnertiaServiceProvider extends ServiceProvider
             ],
 
             'tenancy.redis' => [
-                'prefix_base'         => 'tenant',
+                'prefix_base'          => 'tenant',
                 'prefixed_connections' => [],
             ],
 
