@@ -34,7 +34,7 @@ return [
         'db_strategy' => 'single',
 
         // Only used when db_strategy = 'multi'. Tenant DB name: {prefix}{tenant_id}
-        'db_prefix' => 'tenant_',
+        // 'db_prefix' => 'tenant_',
 
         // Domains that host the central (landlord) application
         'central_domains' => [
