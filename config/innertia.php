@@ -63,6 +63,7 @@ return [
     'auth' => [
         'email_verification' => [
             'enabled' => false,
+            'ttl'     => 60,           // minutes
         ],
 
         'otp' => [

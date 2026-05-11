@@ -128,17 +128,17 @@ On every login attempt the following checks run in strict order. The first match
 ### Flow A — Standard login
 
 ```
-POST /auth/login
+POST /auth/login  { email, password, app }
 → { token, user }
 ```
 
 ### Flow B — OTP enabled
 
 ```
-POST /auth/login
+POST /auth/login  { email, password, app }
 → { requires_otp: true, user_id }
 
-POST /auth/otp/verify  { user_id, code }
+POST /auth/otp/verify  { user_id, code, action: "login", app }
 → { token, user }
   | { requires_2fa: true, user_id }      ← if user has 2FA enrolled
 
@@ -151,16 +151,15 @@ POST /auth/2fa/verify  { user_id, code }
 OTP is **always** sent on login regardless of `otp.enabled`. Completing the flow also marks the email as verified.
 
 ```
-POST /auth/login  { email, password }
+POST /auth/login  { email, password, app }
 → OTP sent automatically
 → { requires_password_change: true, user_id }
 
-POST /auth/otp/verify  { user_id, code }
-→ { otp_verified: true, user_id }         ← no token yet
+POST /auth/otp/verify  { user_id, code, action: "login", app }
+→ { requires_password_change: true, user_id }   ← force_password_change still active
 
-POST /auth/password/change  { user_id, new_password }
-→ clears force_password_change
-→ marks email_verified_at
+POST /auth/password/change  { user_id, password, password_confirmation, app }
+→ clears force_password_change, marks email_verified_at
 → { token, user }
   | { requires_2fa: true, user_id }
 
@@ -173,13 +172,21 @@ POST /auth/2fa/verify  { user_id, code }
 Used when `email_verification.enabled = true` and the user is created without a password (invitation flow).
 
 ```
-POST /auth/email/verify/send  { email }
-→ OTP sent  (action: email_verification)
+POST /auth/email/verify/send  { user_id }
+→ signed email link sent (action: email_verification)
 
-POST /auth/otp/verify  { user_id, code }
-→ { requires_password_set: true, user_id }
+GET /auth/email/verify?user_id=...&signature=...&app=...
+→ marks email_verified_at
+→ { token, user }
+  | { requires_otp: true, user_id }   ← if otp.enabled
+  | { requires_2fa: true, user_id }   ← if 2fa.enabled
 
-POST /auth/password/set  { user_id, new_password }
+── Invitation (user has no password yet) ──
+
+POST /auth/otp/verify  { user_id, code, action: "login", app }
+→ { requires_password_set: true, user_id }   ← user has no password
+
+POST /auth/password/set  { user_id, password, password_confirmation, app }
 → marks email_verified_at
 → { token, user }
   | { requires_2fa: true, user_id }
@@ -195,10 +202,10 @@ Collapses into Flow C — the OTP from `force_password_change` covers email veri
 ### Flow F — All features active (email verified, OTP + 2FA enabled)
 
 ```
-POST /auth/login
+POST /auth/login  { email, password, app }
 → { requires_otp: true, user_id }
 
-POST /auth/otp/verify  { user_id, code }
+POST /auth/otp/verify  { user_id, code, action: "login", app }
 → { requires_2fa: true, user_id }
 
 POST /auth/2fa/verify  { user_id, code }

@@ -3,16 +3,14 @@
 namespace Innertia\Auth\UseCases;
 
 use Innertia\Auth\Services\JwtService;
-use Innertia\Auth\Services\OtpService;
+use Innertia\Exceptions\ForbiddenException;
 use Innertia\Facades\Settings;
 use Innertia\Platform\Contracts\UseCase;
 
-class VerifyOtp extends UseCase
+class VerifyEmail extends UseCase
 {
     public function __construct(
         public readonly string $userId,
-        public readonly string $code,
-        public readonly string $action,
         public readonly string $app,
     ) {}
 
@@ -21,16 +19,15 @@ class VerifyOtp extends UseCase
         $model = config('auth.providers.users.model');
         $user  = $model::findOrFail($this->userId);
 
-        if (! app(OtpService::class)->verify($user, $this->code, $this->action)) {
-            throw new \Illuminate\Validation\ValidationException(
-                validator([], []),
-                response()->json(['message' => 'Invalid or expired OTP.'], 422)
-            );
+        if (! $user->email_verified_at) {
+            $user->update(['email_verified_at' => now()]);
         }
 
-        // force_password_change OTP → user must set new password before getting a token
-        if ($user->force_password_change) {
-            return ['requires_password_change' => true, 'user_id' => $user->getAuthIdentifier()];
+        // After verification, proceed to OTP or 2FA if enabled
+        if (Settings::get('auth.otp.enabled', config('innertia.auth.otp.enabled', false))) {
+            app(\Innertia\Auth\Services\OtpService::class)->send($user, 'login');
+
+            return ['requires_otp' => true, 'user_id' => $user->getAuthIdentifier()];
         }
 
         if (

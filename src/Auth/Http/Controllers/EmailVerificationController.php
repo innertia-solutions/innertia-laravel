@@ -5,39 +5,35 @@ namespace Innertia\Auth\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Innertia\Auth\UseCases\SendOtp;
-use Innertia\Auth\UseCases\VerifyOtp;
+use Innertia\Auth\UseCases\SendEmailVerification;
+use Innertia\Auth\UseCases\VerifyEmail;
 
-class OtpController extends Controller
+class EmailVerificationController extends Controller
 {
     public function send(Request $request): JsonResponse
     {
         $data = $request->validate([
             'user_id' => 'required',
-            'action'  => 'required|string',
         ]);
 
-        (new SendOtp(
-            userId: $data['user_id'],
-            action: $data['action'],
-        ))->execute();
+        (new SendEmailVerification(userId: $data['user_id']))->execute();
 
-        return response()->json(['message' => 'OTP sent.']);
+        return response()->json(['message' => 'Verification email sent.']);
     }
 
     public function verify(Request $request): JsonResponse
     {
         $data = $request->validate([
             'user_id' => 'required',
-            'code'    => 'required|string|size:6',
-            'action'  => 'required|string',
             'app'     => 'required|string',
         ]);
 
-        $result = (new VerifyOtp(
+        if (! $request->hasValidSignature()) {
+            return response()->json(['message' => 'Invalid or expired verification link.'], 403);
+        }
+
+        $result = (new VerifyEmail(
             userId: $data['user_id'],
-            code:   $data['code'],
-            action: $data['action'],
             app:    $data['app'],
         ))->execute();
 

@@ -8,7 +8,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Innertia\Traits\Auditable;
 use Innertia\Traits\HasApps;
 use Innertia\Traits\HasHistory;
-use Innertia\Traits\HasNanoId;
+use Innertia\Traits\HasUuid;
 use Spatie\Permission\Traits\HasPermissions;
 use Spatie\Permission\Traits\HasRoles;
 use Tymon\JWTAuth\Contracts\JWTSubject;
@@ -27,13 +27,14 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
  */
 abstract class User extends Authenticatable implements JWTSubject
 {
-    use Auditable, HasApps, HasFactory, HasHistory, HasNanoId, HasPermissions, HasRoles, SoftDeletes;
+    use Auditable, HasApps, HasFactory, HasHistory, HasUuid, HasPermissions, HasRoles, SoftDeletes;
 
     protected $fillable = [
         'name',
         'email',
         'password',
         'seen_at',
+        'force_password_change',
         'two_factor_secret',
         'two_factor_enabled',
     ];
@@ -45,9 +46,10 @@ abstract class User extends Authenticatable implements JWTSubject
     ];
 
     protected $casts = [
-        'seen_at'            => 'datetime',
-        'email_verified_at'  => 'datetime',
-        'two_factor_enabled' => 'boolean',
+        'seen_at'               => 'datetime',
+        'email_verified_at'     => 'datetime',
+        'force_password_change' => 'boolean',
+        'two_factor_enabled'    => 'boolean',
     ];
 
     /* ── JWTSubject ── */

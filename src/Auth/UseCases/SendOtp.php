@@ -2,16 +2,21 @@
 
 namespace Innertia\Auth\UseCases;
 
-use Illuminate\Contracts\Auth\Authenticatable;
 use Innertia\Auth\Services\OtpService;
 use Innertia\Platform\Contracts\UseCase;
 
 class SendOtp extends UseCase
 {
-    public function __construct(protected OtpService $otp) {}
+    public function __construct(
+        public readonly string $userId,
+        public readonly string $action,
+    ) {}
 
-    public function execute(Authenticatable $user, string $action): void
+    public function execute(): void
     {
-        $this->otp->send($user, $action);
+        $model = config('auth.providers.users.model');
+        $user  = $model::findOrFail($this->userId);
+
+        app(OtpService::class)->send($user, $this->action);
     }
 }

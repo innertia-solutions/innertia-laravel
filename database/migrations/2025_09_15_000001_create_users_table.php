@@ -9,7 +9,7 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('users', function (Blueprint $table) {
-            $table->string('id')->primary();          // NanoId — no auto-increment
+            $table->uuid('id')->primary();
 
             $table->string('name');
             $table->string('email')->unique();
@@ -17,6 +17,8 @@ return new class extends Migration
 
             $table->timestamp('email_verified_at')->nullable();
             $table->timestamp('seen_at')->nullable();
+
+            $table->boolean('force_password_change')->default(false);
 
             // 2FA (TOTP via pragmarx/google2fa)
             $table->text('two_factor_secret')->nullable();
