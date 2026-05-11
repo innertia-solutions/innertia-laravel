@@ -5,12 +5,14 @@ namespace Innertia;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Innertia\Auth\AuthServiceProvider;
+use Innertia\Console\Commands\SyncPermissionsCommand;
 use Innertia\DataTable\DataTableService;
 use Innertia\Platform\Events\DomainEvent;
 use Innertia\Platform\Listeners\DomainEventRouter;
 use Innertia\Webhook\WebhookService;
 use Innertia\Services\ActivityLogService;
 use Innertia\Services\EntityHistoryService;
+use Innertia\Services\PermissionsService;
 use Innertia\Settings\AppSettingsService;
 use Innertia\Settings\SaasSettingsService;
 
@@ -23,6 +25,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->singleton(DataTableService::class);
         $this->app->singleton(ActivityLogService::class);
         $this->app->singleton(EntityHistoryService::class);
+        $this->app->singleton(PermissionsService::class);
 
         $isSaas = config('innertia.mode') === 'saas';
 
@@ -56,6 +59,10 @@ class InnertiaServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom($migrations);
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
+
+        if ($this->app->runningInConsole()) {
+            $this->commands([SyncPermissionsCommand::class]);
+        }
 
         Event::listen(DomainEvent::class, DomainEventRouter::class);
 

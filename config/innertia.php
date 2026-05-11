@@ -60,6 +60,31 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Permissions
+    |--------------------------------------------------------------------------
+    |
+    | Define your application permissions grouped by category. Run:
+    |   php artisan innertia:permissions          — create missing permissions
+    |   php artisan innertia:permissions --prune  — also delete removed ones
+    |
+    | Each permission key is the Spatie permission name (e.g. 'users.view').
+    | The value is a human-readable description shown in role management UIs.
+    |
+    */
+
+    'permissions' => [
+        // [
+        //     'category'       => 'users',
+        //     'category_alias' => 'Usuarios',
+        //     'permissions'    => [
+        //         'users.view'   => 'Ver lista de usuarios',
+        //         'users.manage' => 'Crear, editar y eliminar usuarios',
+        //     ],
+        // ],
+    ],
+
     'auth' => [
         'email_verification' => [
             'enabled' => false,
