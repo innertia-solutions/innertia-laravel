@@ -16,12 +16,14 @@ class AuthController extends Controller
         $data = $request->validate([
             'email'    => 'required|email',
             'password' => 'required|string',
+            'app'      => 'required|string',
         ]);
 
         $result = (new Login(
-            app(\Innertia\Auth\Services\JwtService::class),
-            app(\Innertia\Auth\Services\OtpService::class),
-        ))->execute($data['email'], $data['password']);
+            email:    $data['email'],
+            password: $data['password'],
+            app:      $data['app'],
+        ))->execute();
 
         return response()->json($result);
     }

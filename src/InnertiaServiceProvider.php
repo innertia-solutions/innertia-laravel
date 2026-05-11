@@ -46,11 +46,11 @@ class InnertiaServiceProvider extends ServiceProvider
         $migrations = [__DIR__ . '/../database/migrations'];
 
         if (! $isSaas) {
-            // Exclude tenants/domains tables in single-app mode
+            // Exclude saas-only tables in single-app mode
             $migrations = array_filter(
                 glob(__DIR__ . '/../database/migrations/*.php'),
                 fn ($f) => ! str_contains($f, 'create_tenants_table')
-                        && ! str_contains($f, 'create_domains_table')
+                        && ! str_contains($f, 'create_tenant_apps_table')
             );
         }
 

@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Innertia\Traits\Auditable;
+use Innertia\Traits\HasApps;
 use Innertia\Traits\HasHistory;
 use Innertia\Traits\HasNanoId;
 use Spatie\Permission\Traits\HasPermissions;
@@ -26,7 +27,7 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
  */
 abstract class User extends Authenticatable implements JWTSubject
 {
-    use Auditable, HasFactory, HasHistory, HasNanoId, HasPermissions, HasRoles, SoftDeletes;
+    use Auditable, HasApps, HasFactory, HasHistory, HasNanoId, HasPermissions, HasRoles, SoftDeletes;
 
     protected $fillable = [
         'name',

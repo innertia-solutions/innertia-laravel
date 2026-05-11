@@ -3,6 +3,7 @@
 namespace Innertia\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Innertia\Traits\HasApps;
 use Stancl\Tenancy\Contracts\Tenant as TenantContract;
 use Stancl\Tenancy\Database\Concerns\HasDomains;
 use Stancl\Tenancy\Events\TenantCreated;
@@ -20,7 +21,7 @@ use Stancl\Tenancy\Events\TenantUpdated;
  */
 class Tenant extends Model implements TenantContract
 {
-    use HasDomains;
+    use HasApps, HasDomains;
 
     protected $fillable = [
         'key',
