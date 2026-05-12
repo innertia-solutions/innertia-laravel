@@ -103,6 +103,21 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Exports
+    |--------------------------------------------------------------------------
+    |
+    | Storage disk used for tenant data exports (compliance / GDPR).
+    | Defaults to the cloud disk (R2/S3). Exports are stored as encrypted ZIPs
+    | at exports/{tenant_id}/{year}/{month}/{timestamp}.zip
+    |
+    */
+
+    'exports' => [
+        'disk' => env('EXPORT_DISK', env('FILESYSTEM_CLOUD', 'local')),
+    ],
+
     'mail' => [
         'logo_url'    => env('MAIL_LOGO_URL', null),
         'brand_color' => env('MAIL_BRAND_COLOR', '#6366f1'),

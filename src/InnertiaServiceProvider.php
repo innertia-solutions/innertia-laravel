@@ -15,6 +15,7 @@ use Innertia\Console\Commands\Tenant\DeleteTenantCommand;
 use Innertia\Console\Commands\Tenant\ListTenantsCommand;
 use Innertia\Console\Commands\Tenant\ShowTenantCommand;
 use Innertia\DataTable\DataTableService;
+use Innertia\Exports\ExportPipeline;
 use Innertia\Platform\Events\DomainEvent;
 use Innertia\Platform\Listeners\DomainEventRouter;
 use Innertia\Webhook\WebhookService;
@@ -33,6 +34,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->configureAuth();
 
         $this->app->singleton(DataTableService::class);
+        $this->app->singleton(ExportPipeline::class);
         $this->app->singleton(ActivityLogService::class);
         $this->app->singleton(EntityHistoryService::class);
         $this->app->singleton(PermissionsService::class);
