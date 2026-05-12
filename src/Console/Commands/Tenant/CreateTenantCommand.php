@@ -3,6 +3,8 @@
 namespace Innertia\Console\Commands\Tenant;
 
 use Illuminate\Console\Command;
+use Innertia\Exceptions\ConflictException;
+use Innertia\Tenants\UseCases\CreateTenant;
 
 class CreateTenantCommand extends Command
 {
@@ -17,29 +19,17 @@ class CreateTenantCommand extends Command
 
     public function handle(): int
     {
-        $model = config('innertia.saas.tenant_model', \Innertia\Models\Tenant::class);
+        $key      = $this->argument('key');
+        $name     = $this->argument('name');
+        $status   = $this->option('status');
+        $trialDays = (int) $this->option('trial-days');
 
-        $key    = $this->argument('key');
-        $name   = $this->argument('name');
-        $status = $this->option('status');
-
-        // Validate key is unique
-        if ($model::findByKey($key)) {
-            $this->error("A tenant with key \"{$key}\" already exists.");
+        try {
+            $tenant = (new CreateTenant($key, $name, $status, $trialDays))->execute();
+        } catch (ConflictException $e) {
+            $this->error($e->getMessage());
             return self::FAILURE;
         }
-
-        $data = [
-            'key'    => $key,
-            'name'   => $name,
-            'status' => $status,
-        ];
-
-        if ($status === 'trial' && $this->option('trial-days')) {
-            $data['trial_ends_at'] = now()->addDays((int) $this->option('trial-days'));
-        }
-
-        $tenant = $model::create($data);
 
         if ($domain = $this->option('domain')) {
             $tenant->domains()->create(['domain' => $domain]);

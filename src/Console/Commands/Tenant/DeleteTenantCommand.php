@@ -3,6 +3,8 @@
 namespace Innertia\Console\Commands\Tenant;
 
 use Illuminate\Console\Command;
+use Innertia\Exceptions\NotFoundException;
+use Innertia\Tenants\UseCases\DeleteTenant;
 
 class DeleteTenantCommand extends Command
 {
@@ -14,10 +16,11 @@ class DeleteTenantCommand extends Command
 
     public function handle(): int
     {
-        $model = config('innertia.saas.tenant_model', \Innertia\Models\Tenant::class);
+        $key = $this->argument('key');
 
-        $key    = $this->argument('key');
-        $tenant = $model::findByKey($key);
+        // Resolve tenant for confirmation prompt before deleting
+        $model  = config('innertia.saas.tenant_model', \Innertia\Models\Tenant::class);
+        $tenant = $model::where('key', $key)->first();
 
         if (! $tenant) {
             $this->error("Tenant \"{$key}\" not found.");
@@ -36,7 +39,12 @@ class DeleteTenantCommand extends Command
             }
         }
 
-        $tenant->delete();
+        try {
+            (new DeleteTenant($key))->execute();
+        } catch (NotFoundException $e) {
+            $this->error($e->getMessage());
+            return self::FAILURE;
+        }
 
         $this->info("Tenant \"{$key}\" deleted.");
 
