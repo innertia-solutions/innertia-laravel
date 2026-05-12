@@ -85,6 +85,29 @@ return [
         // ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Mail / Email Branding
+    |--------------------------------------------------------------------------
+    |
+    | Customise the appearance of transactional emails sent by the package
+    | (OTP codes, email verification, etc.).
+    |
+    | logo_url    — Full URL to your logo image (PNG/SVG recommended, ~40px tall).
+    |               If null, the app name is rendered as text instead.
+    | brand_color — Primary hex color used for buttons, OTP codes, and accents.
+    |               Override via env MAIL_BRAND_COLOR.
+    |
+    | Apps can also publish and fully override the Blade templates:
+    |   php artisan vendor:publish --tag=innertia-mail-views
+    |
+    */
+
+    'mail' => [
+        'logo_url'    => env('MAIL_LOGO_URL', null),
+        'brand_color' => env('MAIL_BRAND_COLOR', '#6366f1'),
+    ],
+
     'auth' => [
         'email_verification' => [
             'enabled' => false,

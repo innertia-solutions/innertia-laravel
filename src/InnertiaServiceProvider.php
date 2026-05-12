@@ -2,6 +2,7 @@
 
 namespace Innertia;
 
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Innertia\Auth\AuthServiceProvider;
@@ -63,6 +64,9 @@ class InnertiaServiceProvider extends ServiceProvider
 
         $this->loadMigrationsFrom($migrations);
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
+
+        // Register anonymous Blade components under the <x-innertia::mail.*> namespace
+        Blade::anonymousComponentPath(__DIR__ . '/../resources/views/components', 'innertia');
 
         if ($this->app->runningInConsole()) {
             $commands = [SyncPermissionsCommand::class];
