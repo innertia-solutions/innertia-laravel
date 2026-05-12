@@ -106,6 +106,9 @@ return [
     'mail' => [
         'logo_url'    => env('MAIL_LOGO_URL', null),
         'brand_color' => env('MAIL_BRAND_COLOR', '#6366f1'),
+
+        // Path appended to APP_URL to build the login button in emails (e.g. /login)
+        'login_path'  => env('MAIL_LOGIN_PATH', '/login'),
     ],
 
     'auth' => [

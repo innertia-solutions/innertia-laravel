@@ -3,6 +3,8 @@
 namespace Innertia\Auth\UseCases;
 
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
+use Innertia\Auth\Mailables\PasswordChangedMail;
 use Innertia\Auth\Services\JwtService;
 use Innertia\Exceptions\UnprocessableException;
 use Innertia\Platform\Contracts\UseCase;
@@ -32,6 +34,8 @@ class ChangePassword extends UseCase
             'password'              => Hash::make($this->password),
             'force_password_change' => false,
         ]);
+
+        Mail::to($user->email)->queue(new PasswordChangedMail($user));
 
         $token = app(JwtService::class)->generateToken($user, ['app' => $this->app]);
 
