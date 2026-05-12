@@ -6,6 +6,9 @@ use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Innertia\Auth\AuthServiceProvider;
+use Innertia\Console\Commands\Make\MakeControllerCommand;
+use Innertia\Console\Commands\Make\MakeModelCommand;
+use Innertia\Console\Commands\Make\MakeUseCaseCommand;
 use Innertia\Console\Commands\SyncPermissionsCommand;
 use Innertia\Console\Commands\Tenant\CreateTenantCommand;
 use Innertia\Console\Commands\Tenant\DeleteTenantCommand;
@@ -69,7 +72,12 @@ class InnertiaServiceProvider extends ServiceProvider
         Blade::anonymousComponentPath(__DIR__ . '/../resources/views/components', 'innertia');
 
         if ($this->app->runningInConsole()) {
-            $commands = [SyncPermissionsCommand::class];
+            $commands = [
+                SyncPermissionsCommand::class,
+                MakeModelCommand::class,
+                MakeUseCaseCommand::class,
+                MakeControllerCommand::class,
+            ];
 
             if ($isSaas) {
                 $commands = array_merge($commands, [
