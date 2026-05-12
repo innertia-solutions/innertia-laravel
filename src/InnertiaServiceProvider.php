@@ -6,6 +6,10 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\ServiceProvider;
 use Innertia\Auth\AuthServiceProvider;
 use Innertia\Console\Commands\SyncPermissionsCommand;
+use Innertia\Console\Commands\Tenant\CreateTenantCommand;
+use Innertia\Console\Commands\Tenant\DeleteTenantCommand;
+use Innertia\Console\Commands\Tenant\ListTenantsCommand;
+use Innertia\Console\Commands\Tenant\ShowTenantCommand;
 use Innertia\DataTable\DataTableService;
 use Innertia\Platform\Events\DomainEvent;
 use Innertia\Platform\Listeners\DomainEventRouter;
@@ -61,7 +65,18 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
 
         if ($this->app->runningInConsole()) {
-            $this->commands([SyncPermissionsCommand::class]);
+            $commands = [SyncPermissionsCommand::class];
+
+            if ($isSaas) {
+                $commands = array_merge($commands, [
+                    ListTenantsCommand::class,
+                    ShowTenantCommand::class,
+                    CreateTenantCommand::class,
+                    DeleteTenantCommand::class,
+                ]);
+            }
+
+            $this->commands($commands);
         }
 
         Event::listen(DomainEvent::class, DomainEventRouter::class);
