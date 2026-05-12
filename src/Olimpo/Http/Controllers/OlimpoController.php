@@ -23,9 +23,23 @@ class OlimpoController extends Controller
         return response()->json([
             'status'    => 'ok',
             'timestamp' => now()->toISOString(),
-            'app'       => $appHealth,
-            'metrics'   => SystemMetrics::collect(),
-            'logs'      => $logs,
+
+            // Product identity — Olimpo uses this to match the backend
+            // to its registered product + environment.
+            'product' => [
+                'name'        => config('app.name'),
+                'mode'        => config('innertia.mode', 'app'), // 'app' | 'saas'
+                'environment' => app()->environment(),            // 'local' | 'staging' | 'production'
+                'version'     => config('app.version', null),
+                'url'         => config('app.url'),
+                'debug'       => config('app.debug', false),
+                'laravel'     => app()->version(),
+                'php'         => PHP_VERSION,
+            ],
+
+            'app'     => $appHealth,
+            'metrics' => SystemMetrics::collect(),
+            'logs'    => $logs,
         ]);
     }
 
