@@ -19,7 +19,7 @@ class DomainEventRouter
 
     public function handle(DomainEvent $event): void
     {
-        $channels = $event->channels();
+        $channels = $event->resolveChannels();
 
         if (in_array('webhook', $channels, true)) {
             $this->webhooks->dispatchForEvent($event);

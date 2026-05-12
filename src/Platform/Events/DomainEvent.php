@@ -59,6 +59,12 @@ abstract class DomainEvent implements ShouldBroadcast
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     /**
+     * Runtime channel override set via dispatch($model, channels: [...]).
+     * Null means "use the event's own channels() definition".
+     */
+    public ?array $channelsOverride = null;
+
+    /**
      * Delivery channels for this event.
      * Supported: 'realtime', 'webhook', 'mail'
      */
@@ -67,15 +73,46 @@ abstract class DomainEvent implements ShouldBroadcast
         return [];
     }
 
+    /**
+     * Channels resolved at runtime.
+     * Always use this instead of channels() inside the framework internals.
+     */
+    public function resolveChannels(): array
+    {
+        return $this->channelsOverride ?? $this->channels();
+    }
+
+    /**
+     * Dispatch the event with an optional channel override.
+     *
+     *   OrderShipped::dispatch($order);                        // all channels
+     *   OrderShipped::dispatch($order, channels: ['mail']);     // mail only
+     *   OrderShipped::dispatch($order, channels: ['webhook']);  // webhook only
+     */
+    public static function dispatch(mixed ...$arguments): mixed
+    {
+        $channels = isset($arguments['channels']) ? $arguments['channels'] : null;
+        unset($arguments['channels']);
+
+        /** @var static $event */
+        $event = new static(...$arguments);
+
+        if ($channels !== null) {
+            $event->channelsOverride = $channels;
+        }
+
+        return event($event);
+    }
+
     // ── Realtime ──────────────────────────────────────────────────────────────
 
     /**
-     * Returns empty array when 'realtime' is not in channels() — no broadcast.
-     * Override broadcastOn() to customise the channel.
+     * Returns empty array when 'realtime' is not active — no broadcast.
+     * Override channel() to customise the broadcast channel.
      */
     final public function broadcastOn(): array
     {
-        if (! in_array('realtime', $this->channels(), true)) {
+        if (! in_array('realtime', $this->resolveChannels(), true)) {
             return [];
         }
 
