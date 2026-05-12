@@ -62,25 +62,29 @@ abstract class TenantExport
     abstract public function entities(): array;
 
     /**
-     * Run the export synchronously and return the result.
+     * Run the export synchronously.
+     * Returns the record (status = completed | failed) — same shape as queue().
      */
-    public function run(Model $tenant): ExportResult
+    public function run(Model $tenant): TenantExportRecord
     {
         $record = TenantExportRecord::create([
             'tenant_id' => $tenant->getKey(),
             'status'    => 'pending',
         ]);
 
-        return app(ExportPipeline::class)->run(
+        app(ExportPipeline::class)->run(
             entities: $this->entities(),
             tenantId: (string) $tenant->getKey(),
             record:   $record,
         );
+
+        return $record->fresh();
     }
 
     /**
      * Dispatch the export as a background job.
-     * The TenantExportRecord is created immediately; the pipeline runs async.
+     * Returns the record immediately (status = pending) with the backup_id.
+     * Poll GET /exports/{id} to check status.
      */
     public function queue(Model $tenant): TenantExportRecord
     {

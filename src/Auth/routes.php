@@ -9,6 +9,7 @@ use Innertia\Auth\Http\Controllers\SocialAuthController;
 use Innertia\Auth\Http\Controllers\SocialSettingsController;
 use Innertia\Auth\Http\Controllers\TwoFactorController;
 use Innertia\Auth\Middleware\Authenticate;
+use Innertia\Exports\ExportController;
 use Innertia\Platform\Http\Controllers\SubscriptionController;
 
 Route::prefix('auth')->group(function () {
@@ -38,6 +39,12 @@ Route::prefix('auth')->group(function () {
         Route::post('2fa/disable',      [TwoFactorController::class, 'disable']);
     });
 
+});
+
+// Exports — tenant data exports (compliance / GDPR)
+Route::middleware(Authenticate::class)->prefix('exports')->group(function () {
+    Route::get('/',      [ExportController::class, 'index']);
+    Route::get('{id}',   [ExportController::class, 'show']);
 });
 
 // Subscriptions — authenticated user manages their own subscriptions
