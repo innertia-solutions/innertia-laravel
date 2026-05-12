@@ -11,6 +11,7 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Str;
 use Innertia\Mail\InnertiaMailable;
+use Innertia\Mail\NotificationMail;
 
 /**
  * Base class for all domain events. Define which channels the event delivers to.
@@ -32,7 +33,17 @@ use Innertia\Mail\InnertiaMailable;
  *
  *       public function toMail(): InnertiaMailable
  *       {
+ *           // Option A — dedicated mailable class
  *           return new OrderShippedMail($this->order);
+ *
+ *           // Option B — generic fluent builder (no separate class needed)
+ *           return NotificationMail::make()
+ *               ->withSubject('Tu pedido fue enviado')
+ *               ->title('¡Pedido en camino!')
+ *               ->line('Tu pedido #' . $this->order->id . ' fue enviado.')
+ *               ->table(['Campo', 'Valor'], [['Estado', 'Enviado']])
+ *               ->action('Ver pedido', url('/orders/' . $this->order->id))
+ *               ->panel('Entrega estimada: 2-3 días hábiles.', 'info');
  *       }
  *
  *       public function subscribable(): Model
