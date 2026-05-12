@@ -3,11 +3,15 @@
 namespace Innertia\Auth;
 
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Innertia\Auth\Guards\JwtGuard;
 use Innertia\Auth\Services\JwtService;
 use Innertia\Auth\Services\OtpService;
+use Innertia\Auth\Social\ConfigureSocialite;
+use SocialiteProviders\Manager\SocialiteWasCalled;
+use SocialiteProviders\MicrosoftAzure\MicrosoftAzureExtendSocialite;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -15,12 +19,14 @@ class AuthServiceProvider extends ServiceProvider
     {
         $this->app->singleton(JwtService::class);
         $this->app->singleton(OtpService::class);
+        $this->app->singleton(ConfigureSocialite::class);
     }
 
     public function boot(): void
     {
         $this->registerJwtGuard();
         $this->registerSuperAdminGate();
+        $this->registerMicrosoftSocialiteDriver();
     }
 
     protected function registerJwtGuard(): void
@@ -41,5 +47,11 @@ class AuthServiceProvider extends ServiceProvider
                 return true;
             }
         });
+    }
+
+    protected function registerMicrosoftSocialiteDriver(): void
+    {
+        // socialiteproviders/microsoft-azure registers its driver via an event
+        Event::listen(SocialiteWasCalled::class, MicrosoftAzureExtendSocialite::class);
     }
 }

@@ -16,7 +16,9 @@
         "hidehalo/nanoid-php": "^1.1",
         "pragmarx/google2fa": "^8.0",
         "spatie/laravel-permission": "^7.0",
-        "tymon/jwt-auth": "^2.1"
+        "tymon/jwt-auth": "^2.1",
+        "laravel/socialite": "^5.0",
+        "socialiteproviders/microsoft-azure": "^5.0"
     },
     "suggest": {
         "stancl/tenancy": "Required when using mode = saas"

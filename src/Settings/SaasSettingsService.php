@@ -39,4 +39,14 @@ class SaasSettingsService extends AppSettingsService
             protected function tenantId(): mixed { return null; }
         };
     }
+
+    public function tenant(?string $tenantId = null): AppSettingsService
+    {
+        $id = $tenantId ?? $this->tenantId();
+
+        return new class($id) extends AppSettingsService {
+            public function __construct(private readonly mixed $id) {}
+            protected function tenantId(): mixed { return $this->id; }
+        };
+    }
 }
