@@ -9,6 +9,7 @@ use Innertia\Auth\Http\Controllers\SocialAuthController;
 use Innertia\Auth\Http\Controllers\SocialSettingsController;
 use Innertia\Auth\Http\Controllers\TwoFactorController;
 use Innertia\Auth\Middleware\Authenticate;
+use Innertia\Platform\Http\Controllers\SubscriptionController;
 
 Route::prefix('auth')->group(function () {
 
@@ -39,11 +40,19 @@ Route::prefix('auth')->group(function () {
 
 });
 
+// Subscriptions — authenticated user manages their own subscriptions
+Route::middleware(Authenticate::class)->prefix('subscriptions')->group(function () {
+    Route::get('/',         [SubscriptionController::class, 'index']);
+    Route::post('/',        [SubscriptionController::class, 'store']);
+    Route::patch('{id}',    [SubscriptionController::class, 'update']);
+    Route::delete('{id}',   [SubscriptionController::class, 'destroy']);
+});
+
 // Admin: social provider settings (protected)
 Route::middleware(Authenticate::class)->prefix('admin/auth')->group(function () {
-    Route::get('settings',                       [SocialSettingsController::class, 'index']);
-    Route::get('{provider}/settings',            [SocialSettingsController::class, 'show'])
+    Route::get('settings',              [SocialSettingsController::class, 'index']);
+    Route::get('{provider}/settings',   [SocialSettingsController::class, 'show'])
         ->where('provider', 'google|microsoft|github');
-    Route::put('{provider}/settings',            [SocialSettingsController::class, 'update'])
+    Route::put('{provider}/settings',   [SocialSettingsController::class, 'update'])
         ->where('provider', 'google|microsoft|github');
 });
