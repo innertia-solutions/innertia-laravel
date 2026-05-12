@@ -112,6 +112,19 @@ return [
     ],
 
     'auth' => [
+        /*
+        |----------------------------------------------------------------------
+        | User Model
+        |----------------------------------------------------------------------
+        |
+        | The Eloquent model used for authentication. Innertia wires this into
+        | auth.providers.users automatically — no need to touch config/auth.php.
+        | Override here if your User model lives outside app/Models/User.php.
+        |
+        */
+
+        'user_model' => \App\Models\User::class,
+
         'email_verification' => [
             'enabled' => false,
             'ttl'     => 60,           // minutes

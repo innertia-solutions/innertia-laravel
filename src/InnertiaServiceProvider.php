@@ -30,6 +30,8 @@ class InnertiaServiceProvider extends ServiceProvider
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/innertia.php', 'innertia');
 
+        $this->configureAuth();
+
         $this->app->singleton(DataTableService::class);
         $this->app->singleton(ActivityLogService::class);
         $this->app->singleton(EntityHistoryService::class);
@@ -100,6 +102,35 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->publishes([
             __DIR__ . '/../resources/views'        => resource_path('views/vendor/innertia'),
         ], 'innertia-mail-views');
+    }
+
+    protected function configureAuth(): void
+    {
+        $userModel = config('innertia.auth.user_model', \App\Models\User::class);
+
+        config([
+            'auth.defaults.guard'     => 'api',
+            'auth.defaults.passwords' => 'users',
+
+            'auth.guards.api' => [
+                'driver'   => 'jwt',
+                'provider' => 'users',
+            ],
+
+            'auth.providers.users' => [
+                'driver' => 'eloquent',
+                'model'  => $userModel,
+            ],
+
+            'auth.passwords.users' => [
+                'provider' => 'users',
+                'table'    => 'password_reset_tokens',
+                'expire'   => 60,
+                'throttle' => 60,
+            ],
+
+            'auth.password_timeout' => 10800,
+        ]);
     }
 
     protected function configureTenancy(): void
