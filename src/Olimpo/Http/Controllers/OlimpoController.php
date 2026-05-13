@@ -6,7 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Innertia\Exports\TenantExport;
-use Innertia\Models\TenantExportRecord;
+use Innertia\Models\Process;
 use Innertia\Olimpo\Contracts\OlimpoHandler;
 use Innertia\Olimpo\Logging\OlimpoLogHandler;
 use Innertia\Olimpo\Metrics\SystemMetrics;
@@ -99,21 +99,25 @@ class OlimpoController extends Controller
      */
     public function getTenantBackups(string $id): JsonResponse
     {
-        $records = TenantExportRecord::where('tenant_id', $id)
+        $processes = Process::where('type', 'export')
+            ->whereJsonContains('metadata->tenant_id', $id)
             ->orderByDesc('created_at')
             ->get()
-            ->map(fn (TenantExportRecord $r) => [
-                'id'           => $r->id,
-                'status'       => $r->status,
-                'size_mb'      => $r->sizeMb(),
-                'checksum'     => $r->checksum,
-                'error'        => $r->error,
-                'completed_at' => $r->completed_at?->toISOString(),
-                'created_at'   => $r->created_at->toISOString(),
+            ->map(fn (Process $p) => [
+                'id'           => $p->id,
+                'status'       => $p->status,
+                'category'     => $p->category,
+                'size_mb'      => $p->metadata['size_mb'] ?? null,
+                'checksum'     => $p->metadata['checksum'] ?? null,
+                'rows_exported'=> $p->metadata['rows_exported'] ?? null,
+                'file_id'      => $p->metadata['file_id'] ?? null,
+                'error'        => $p->metadata['error'] ?? null,
+                'completed_at' => $p->completed_at?->toISOString(),
+                'created_at'   => $p->created_at->toISOString(),
             ]);
 
-        if ($records->isNotEmpty()) {
-            return response()->json($records);
+        if ($processes->isNotEmpty()) {
+            return response()->json($processes);
         }
 
         // Fallback to app-level handler
@@ -132,17 +136,18 @@ class OlimpoController extends Controller
         $exportClass = config('innertia.exports.handler');
 
         if ($exportClass && is_subclass_of($exportClass, TenantExport::class)) {
-            // Resolve the tenant model
             $tenantModel = config('innertia.saas.tenant_model', \Innertia\Models\Tenant::class);
             $tenant      = $tenantModel::findOrFail($id);
 
-            $record = (new $exportClass)->queue($tenant);
+            /** @var Process $process */
+            $process = (new $exportClass)->queue($tenant);
 
             return response()->json([
-                'id'         => $record->id,
-                'status'     => $record->status,
+                'id'         => $process->id,
+                'status'     => $process->status,
+                'type'       => $process->type,
                 'tenant_id'  => $id,
-                'created_at' => $record->created_at->toISOString(),
+                'created_at' => $process->created_at->toISOString(),
             ], 201);
         }
 

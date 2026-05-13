@@ -158,6 +158,27 @@ abstract class DomainEvent implements ShouldBroadcast
         return null;
     }
 
+    // ── Web ───────────────────────────────────────────────────────────────────
+
+    /**
+     * Return notification data for the web notification center.
+     * Called when 'web' is in channels(). Creates a record in user_notifications.
+     * Return null to silently skip web notification.
+     *
+     * Example:
+     *   public function toWeb(): array
+     *   {
+     *       return [
+     *           'title' => 'Order shipped',
+     *           'body'  => "Your order #{$this->order->id} is on its way.",
+     *       ];
+     *   }
+     */
+    public function toWeb(): ?array
+    {
+        return null;
+    }
+
     // ── Subscriptions ─────────────────────────────────────────────────────────
 
     /**

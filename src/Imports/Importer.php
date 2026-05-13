@@ -4,12 +4,12 @@ namespace Innertia\Imports;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\UploadedFile;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
-use Innertia\Imports\Events\ImportCompleted;
-use Innertia\Imports\Events\ImportFailed;
 use Innertia\Imports\Jobs\ProcessImportJob;
-use Innertia\Models\ImportRecord;
+use Innertia\Models\File;
+use Innertia\Models\Process;
+use Innertia\Platform\Events\ProcessCompleted;
+use Innertia\Platform\Events\ProcessFailed;
 use RuntimeException;
 
 /**
@@ -17,160 +17,99 @@ use RuntimeException;
  *
  * Subclass contract:
  *   - Implement row(array $row): void  — process a single data row
- *   - Optionally override rules(): array — per-row validation rules
+ *   - Optionally override rules(): array — per-row validation (Laravel rules)
  *   - Optionally override chunkSize(): int — rows per chunk (default 100)
- *   - Optionally override defaultChannels(): array — notification channels
+ *   - Optionally override defaultChannels: array — notification channels for subscribers
  *
  * Usage:
  *
- *   (new ImportUsers)
- *       ->fromRequest($request, 'file')
- *       ->subscribable($adminUser, $managerUser)
- *       ->queue();
+ *   $file = File::fromRequest($request, 'file');
  *
  *   (new ImportUsers)
- *       ->fromPath(storage_path('seeds/users.csv'))
- *       ->run();  // synchronous
+ *       ->fromFile($file)
+ *       ->subscribable($adminUser, $managerUser)
+ *       ->subscribable([$user1, $user2], channels: ['mail'])
+ *       ->queue();
+ *
+ *   // Synchronous (CLI / seeds):
+ *   $process = (new ImportUsers)->fromPath('/path/users.csv')->run();
  */
 abstract class Importer
 {
     protected int   $chunkSize       = 100;
-    protected array $defaultChannels = ['database'];
+    protected array $defaultChannels = ['database', 'web'];
 
-    private ?ImportRecord $record           = null;
-    private array         $pendingSubscribers = [];
+    private ?File    $file               = null;
+    private ?Process $process            = null;
+    private array    $pendingSubscribers = [];
 
     // ── Abstract ──────────────────────────────────────────────────────────────
 
-    /**
-     * Process a single validated row.
-     * Called for every row that passes validation.
-     * Throw any exception to mark the row as failed (import continues).
-     */
     abstract public function row(array $row): void;
 
-    // ── Hooks (optional override) ─────────────────────────────────────────────
+    // ── Hooks (optional) ──────────────────────────────────────────────────────
 
-    /**
-     * Laravel validation rules applied to each row.
-     * Rows that fail are recorded as errors and skipped.
-     */
-    public function rules(): array
-    {
-        return [];
-    }
-
-    /**
-     * Custom error messages for validation rules.
-     */
-    public function messages(): array
-    {
-        return [];
-    }
+    public function rules(): array   { return []; }
+    public function messages(): array { return []; }
 
     // ── Entry points ──────────────────────────────────────────────────────────
 
     /**
-     * Load file from an HTTP request field.
-     * The file is permanently stored in Storage before queueing.
+     * Primary entry point — accepts an already-created File model.
      */
-    public function fromRequest(\Illuminate\Http\Request $request, string $field): static
+    public function fromFile(File $file): static
     {
-        $uploaded = $request->file($field);
+        $this->file = $file;
 
-        if (! $uploaded instanceof UploadedFile) {
-            throw new RuntimeException("Field \"{$field}\" is not a valid uploaded file.");
-        }
-
-        return $this->fromUploadedFile($uploaded);
-    }
-
-    /**
-     * Load file from an already-uploaded UploadedFile instance.
-     */
-    public function fromUploadedFile(UploadedFile $file): static
-    {
-        $disk = config('filesystems.default', 'local');
-        $path = $file->store('imports/' . now()->format('Y/m'), $disk);
-
-        $this->record = ImportRecord::create([
-            'type'              => static::class,
-            'status'            => 'pending',
-            'disk'              => $disk,
-            'file_path'         => $path,
-            'original_filename' => $file->getClientOriginalName(),
-        ]);
+        $this->process = Process::start(
+            type:        'import',
+            category:    static::class,
+            triggeredBy: (string) ($file->created_by ?? auth()->id()),
+        );
 
         $this->flushPendingSubscribers();
 
         return $this;
     }
 
-    /**
-     * Load file from an absolute filesystem path (for seeding / CLI use).
-     */
-    public function fromPath(string $absolutePath): static
+    /** Shortcut: creates a File from request then calls fromFile(). */
+    public function fromRequest(\Illuminate\Http\Request $request, string $field, string $disk = ''): static
     {
-        if (! file_exists($absolutePath)) {
-            throw new RuntimeException("File not found: {$absolutePath}");
-        }
+        return $this->fromFile(File::fromRequest($request, $field, $disk));
+    }
 
-        // Copy into Storage so the job always reads from a consistent location
-        $disk     = config('filesystems.default', 'local');
-        $filename = basename($absolutePath);
-        $path     = 'imports/' . now()->format('Y/m') . '/' . uniqid() . '_' . $filename;
+    /** Shortcut: creates a File from an UploadedFile then calls fromFile(). */
+    public function fromUploadedFile(UploadedFile $file, string $disk = ''): static
+    {
+        return $this->fromFile(File::fromUploadedFile($file, $disk));
+    }
 
-        Storage::disk($disk)->put($path, file_get_contents($absolutePath));
-
-        $this->record = ImportRecord::create([
-            'type'              => static::class,
-            'status'            => 'pending',
-            'disk'              => $disk,
-            'file_path'         => $path,
-            'original_filename' => $filename,
-        ]);
-
-        $this->flushPendingSubscribers();
-
-        return $this;
+    /** Shortcut: creates a File from an absolute path then calls fromFile(). */
+    public function fromPath(string $absolutePath, string $disk = ''): static
+    {
+        return $this->fromFile(File::fromPath($absolutePath, $disk));
     }
 
     // ── Subscribable ──────────────────────────────────────────────────────────
 
     /**
-     * Subscribe users/models to import completion events.
-     * Call after fromRequest() / fromPath().
+     * Subscribe users to process completion notifications.
      *
-     *   ->subscribable($user1, $user2)
-     *   ->subscribable($adminUser, channels: ['mail', 'database'])
+     *   ->subscribable($user1, $user2)                       // defaultChannels for all
+     *   ->subscribable($user1, channels: ['mail'])            // named channels for $user1
+     *   ->subscribable([$user1, $user2], channels: ['web'])   // array + channels
      */
-    public function subscribable(Authenticatable ...$subscribers): static
+    public function subscribable(Authenticatable|array $users, array $channels = []): static
     {
-        if ($this->record) {
-            foreach ($subscribers as $subscriber) {
-                $this->record->subscribe($subscriber, channels: $this->defaultChannels);
+        $channels = $channels ?: $this->defaultChannels;
+        $users    = is_array($users) ? $users : [$users];
+
+        if ($this->process) {
+            foreach ($users as $user) {
+                $this->process->subscribe($user, channels: $channels);
             }
         } else {
-            // Buffer until record is created
-            $this->pendingSubscribers[] = [$subscribers, $this->defaultChannels];
-        }
-
-        return $this;
-    }
-
-    /**
-     * Same as subscribable() but with explicit channel override.
-     *
-     *   ->subscribableWith(['mail'], $user1, $user2)
-     */
-    public function subscribableWith(array $channels, Authenticatable ...$subscribers): static
-    {
-        if ($this->record) {
-            foreach ($subscribers as $subscriber) {
-                $this->record->subscribe($subscriber, channels: $channels);
-            }
-        } else {
-            $this->pendingSubscribers[] = [$subscribers, $channels];
+            $this->pendingSubscribers[] = [$users, $channels];
         }
 
         return $this;
@@ -179,92 +118,93 @@ abstract class Importer
     // ── Execution ─────────────────────────────────────────────────────────────
 
     /**
-     * Execute the import synchronously in the current process.
-     * Returns the completed ImportRecord.
+     * Run synchronously. Returns the completed Process.
      */
-    public function run(): ImportRecord
+    public function run(): Process
     {
-        $this->ensureRecord();
+        $this->ensureReady();
 
         $rows = $this->readFile();
 
-        $this->record->markProcessing(count($rows));
+        $this->process->markProcessing();
+        $this->process->addMetadata(['total_rows' => count($rows)]);
 
-        $errors = [];
+        $errors        = [];
+        $processedRows = 0;
 
         foreach (array_chunk($rows, $this->chunkSize) as $chunk) {
             foreach ($chunk as $index => $row) {
                 $rowNumber = $index + 1;
 
-                // Validate
                 if ($rules = $this->rules()) {
                     $validator = Validator::make($row, $rules, $this->messages());
 
                     if ($validator->fails()) {
-                        $errors[] = [
-                            'row'     => $rowNumber,
-                            'message' => implode(', ', $validator->errors()->all()),
-                        ];
+                        $errors[] = ['row' => $rowNumber, 'message' => implode(', ', $validator->errors()->all())];
                         continue;
                     }
 
                     $row = $validator->validated();
                 }
 
-                // Process
                 try {
                     $this->row($row);
-                    $this->record->incrementProcessed();
+                    $processedRows++;
                 } catch (\Throwable $e) {
                     $errors[] = ['row' => $rowNumber, 'message' => $e->getMessage()];
                 }
             }
+
+            // Update progress after each chunk
+            $progress = count($rows) > 0
+                ? (int) round(($processedRows / count($rows)) * 100)
+                : 100;
+
+            $this->process->updateProgress($progress);
         }
 
-        if (! empty($errors)) {
-            $this->record->addErrors($errors);
-        }
+        $this->process->complete([
+            'total_rows'     => count($rows),
+            'processed_rows' => $processedRows,
+            'failed_rows'    => count($errors),
+            'errors'         => $errors ?: null,
+            'file_id'        => $this->file->id,
+        ]);
 
-        $this->record->markCompleted();
-        $this->record->refresh();
+        $this->process->refresh();
+        $this->process->attachFile($this->file);
 
         $this->dispatchEvent();
 
-        return $this->record;
+        return $this->process;
     }
 
     /**
-     * Dispatch the import as a queued job.
-     * Returns the ImportRecord immediately (status: pending).
-     * Poll its status to track progress.
+     * Dispatch as a queued job. Returns the Process immediately (status: pending).
      */
-    public function queue(string $queueName = 'default'): ImportRecord
+    public function queue(string $queueName = 'default'): Process
     {
-        $this->ensureRecord();
+        $this->ensureReady();
 
-        ProcessImportJob::dispatch($this->record, static::class)
+        ProcessImportJob::dispatch($this->process, $this->file, static::class)
             ->onQueue($queueName);
 
-        return $this->record;
+        return $this->process;
     }
 
     // ── Internal ──────────────────────────────────────────────────────────────
 
-    /**
-     * Read all rows from the stored file.
-     * Returns array of associative arrays (first row = headers).
-     */
     public function readFile(): array
     {
-        $this->ensureRecord();
+        $this->ensureReady();
 
-        $path      = Storage::disk($this->record->disk)->path($this->record->file_path);
+        $path      = \Illuminate\Support\Facades\Storage::disk($this->file->disk)->path($this->file->path);
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
         return match ($extension) {
-            'csv'  => $this->readCsv($path),
-            'xlsx' => $this->readXlsx($path),
-            default => throw new RuntimeException("Unsupported import format: {$extension}. Use csv or xlsx."),
+            'csv'   => $this->readCsv($path),
+            'xlsx'  => $this->readXlsx($path),
+            default => throw new RuntimeException("Unsupported format: {$extension}. Use csv or xlsx."),
         };
     }
 
@@ -277,7 +217,6 @@ abstract class Importer
             throw new RuntimeException("Cannot open file: {$path}");
         }
 
-        // Strip BOM if present
         $bom = fread($handle, 3);
         if ($bom !== "\xEF\xBB\xBF") {
             fseek($handle, 0);
@@ -290,7 +229,6 @@ abstract class Importer
                 $headers = array_map('trim', $line);
                 continue;
             }
-
             $rows[] = array_combine($headers, array_pad($line, count($headers), null));
         }
 
@@ -303,16 +241,12 @@ abstract class Importer
     {
         $rows    = [];
         $headers = null;
-
-        $reader = new \OpenSpout\Reader\XLSX\Reader();
+        $reader  = new \OpenSpout\Reader\XLSX\Reader();
         $reader->open($path);
 
         foreach ($reader->getSheetIterator() as $sheet) {
             foreach ($sheet->getRowIterator() as $row) {
-                $values = array_map(
-                    fn ($cell) => $cell->getValue(),
-                    $row->getCells()
-                );
+                $values = array_map(fn ($cell) => $cell->getValue(), $row->getCells());
 
                 if ($headers === null) {
                     $headers = array_map('trim', $values);
@@ -321,9 +255,7 @@ abstract class Importer
 
                 $rows[] = array_combine($headers, array_pad($values, count($headers), null));
             }
-
-            // Only first sheet
-            break;
+            break; // first sheet only
         }
 
         $reader->close();
@@ -331,50 +263,42 @@ abstract class Importer
         return $rows;
     }
 
-    private function ensureRecord(): void
+    private function ensureReady(): void
     {
-        if (! $this->record) {
+        if (! $this->file || ! $this->process) {
             throw new RuntimeException(
-                'No file loaded. Call fromRequest() or fromPath() before run() / queue().'
+                'No file loaded. Call fromFile(), fromRequest(), or fromPath() first.'
             );
         }
     }
 
     private function flushPendingSubscribers(): void
     {
-        foreach ($this->pendingSubscribers as [$subscribers, $channels]) {
-            foreach ($subscribers as $subscriber) {
-                $this->record->subscribe($subscriber, channels: $channels);
+        foreach ($this->pendingSubscribers as [$users, $channels]) {
+            foreach ($users as $user) {
+                $this->process->subscribe($user, channels: $channels);
             }
         }
-
         $this->pendingSubscribers = [];
     }
 
     private function dispatchEvent(): void
     {
-        if ($this->record->status === 'failed') {
-            ImportFailed::dispatch($this->record);
+        if ($this->process->status === 'failed') {
+            ProcessFailed::dispatch($this->process);
         } else {
-            ImportCompleted::dispatch($this->record);
+            ProcessCompleted::dispatch($this->process);
         }
     }
 
-    public function getRecord(): ?ImportRecord
-    {
-        return $this->record;
-    }
+    public function getProcess(): ?Process { return $this->process; }
+    public function getFile(): ?File       { return $this->file; }
 
-    /**
-     * Rehydrate the importer with an existing ImportRecord.
-     * Used internally by ProcessImportJob — do not call manually.
-     *
-     * @internal
-     */
-    public function hydrateRecord(ImportRecord $record): static
+    /** @internal Used by ProcessImportJob to rehydrate the importer. */
+    public function hydrateFromJob(Process $process, File $file): static
     {
-        $this->record = $record;
-
+        $this->process = $process;
+        $this->file    = $file;
         return $this;
     }
 }

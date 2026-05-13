@@ -58,19 +58,16 @@ class InnertiaServiceProvider extends ServiceProvider
     {
         $isSaas = config('innertia.mode') === 'saas';
 
-        $migrations = [__DIR__ . '/../database/migrations'];
+        $saasOnly = ['create_tenants_table', 'create_tenant_apps_table'];
 
-        if (! $isSaas) {
-            // Exclude saas-only tables in single-app mode
-            $migrations = array_filter(
-                glob(__DIR__ . '/../database/migrations/*.php'),
-                fn ($f) => ! str_contains($f, 'create_tenants_table')
-                        && ! str_contains($f, 'create_tenant_apps_table')
-            );
-        }
+        $migrations = array_filter(
+            glob(__DIR__ . '/../database/migrations/*.php'),
+            fn ($f) => $isSaas || ! collect($saasOnly)->contains(fn ($s) => str_contains($f, $s))
+        );
 
-        $this->loadMigrationsFrom($migrations);
+        $this->loadMigrationsFrom(array_values($migrations));
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
+        $this->loadRoutesFrom(__DIR__ . '/Files/routes.php');
 
         // Register anonymous Blade components under the <x-innertia::mail.*> namespace
         Blade::anonymousComponentPath(__DIR__ . '/../resources/views/components', 'innertia');

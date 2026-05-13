@@ -9,6 +9,7 @@ use Innertia\Auth\Http\Controllers\SocialAuthController;
 use Innertia\Auth\Http\Controllers\SocialSettingsController;
 use Innertia\Auth\Http\Controllers\TwoFactorController;
 use Innertia\Auth\Middleware\Authenticate;
+use Innertia\Notifications\Http\NotificationsController;
 use Innertia\Platform\Http\Controllers\SubscriptionController;
 
 Route::prefix('auth')->group(function () {
@@ -46,6 +47,15 @@ Route::middleware(Authenticate::class)->prefix('subscriptions')->group(function 
     Route::post('/',        [SubscriptionController::class, 'store']);
     Route::patch('{id}',    [SubscriptionController::class, 'update']);
     Route::delete('{id}',   [SubscriptionController::class, 'destroy']);
+});
+
+// Notifications — web notification center
+Route::middleware(Authenticate::class)->prefix('notifications')->group(function () {
+    Route::get('/',              [NotificationsController::class, 'index']);
+    Route::patch('/read-all',    [NotificationsController::class, 'markAllRead']);
+    Route::patch('/{id}/read',   [NotificationsController::class, 'markRead']);
+    Route::delete('/',           [NotificationsController::class, 'destroyRead']);
+    Route::delete('/{id}',       [NotificationsController::class, 'destroy']);
 });
 
 // Admin: social provider settings (protected)

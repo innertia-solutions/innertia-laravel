@@ -3,7 +3,9 @@
 namespace Innertia\Exports;
 
 use Illuminate\Database\Eloquent\Model;
-use Innertia\Models\TenantExportRecord;
+use Innertia\Models\Process;
+use Innertia\Platform\Events\ProcessCompleted;
+use Innertia\Platform\Events\ProcessFailed;
 
 /**
  * Base class for tenant data exports (compliance / GDPR portability).
@@ -18,87 +20,81 @@ use Innertia\Models\TenantExportRecord;
  *               Client::class => [
  *                   'columns' => ['id', 'name', 'email', 'phone', 'created_at'],
  *                   'with' => [
- *                       Contact::class => [
- *                           'columns' => ['id', 'name', 'role', 'email'],
- *                           // 'fk' => 'client_id', ← optional, inferred by convention
- *                       ],
+ *                       Contact::class => ['columns' => ['id', 'name', 'role', 'email']],
  *                   ],
  *               ],
- *
- *               Order::class => [
- *                   'columns' => ['id', 'number', 'total', 'status', 'created_at'],
- *                   'with' => [
- *                       OrderItem::class => [
- *                           'columns' => ['id', 'product_name', 'qty', 'unit_price'],
- *                       ],
- *                   ],
- *               ],
- *
- *               Invoice::class => [
- *                   'columns' => ['id', 'number', 'amount', 'due_date', 'paid_at'],
- *               ],
+ *               Order::class => ['columns' => ['id', 'number', 'total', 'status', 'created_at']],
  *           ];
  *       }
  *   }
  *
- * Run synchronously:
- *   $result = (new ExportTenantData)->run($tenant);
+ *   // Run synchronously:
+ *   $process = (new ExportTenantData)->run($tenant);
  *
- * Run in the background (queued):
- *   (new ExportTenantData)->queue($tenant);
- *
- * Nested 'with' FK convention:
- *   Parent model class basename in snake_case + '_id'
- *   e.g. Order → OrderItem FK = 'order_id'
- *   Override with 'fk' => 'custom_fk' if your schema differs.
+ *   // Run in background:
+ *   $process = (new ExportTenantData)->queue($tenant);
+ *   // → returns Process immediately (status: pending)
+ *   // → poll GET /processes/{id} or subscribe for notification
  */
 abstract class TenantExport
 {
-    /**
-     * Declare the entities (and their columns) to include in the export.
-     *
-     * @return array<class-string, array{columns: string[], with?: array}>
-     */
     abstract public function entities(): array;
 
     /**
      * Run the export synchronously.
-     * Returns the record (status = completed | failed) — same shape as queue().
+     * Returns the completed Process (status: completed | failed).
      */
-    public function run(Model $tenant): TenantExportRecord
+    public function run(Model $tenant): Process
     {
-        $record = TenantExportRecord::create([
-            'tenant_id' => $tenant->getKey(),
-            'status'    => 'pending',
-        ]);
-
-        app(ExportPipeline::class)->run(
-            entities: $this->entities(),
-            tenantId: (string) $tenant->getKey(),
-            record:   $record,
+        $process = Process::start(
+            type:     'export',
+            category: static::class,
+            metadata: ['tenant_id' => (string) $tenant->getKey()],
         );
 
-        return $record->fresh();
+        try {
+            app(ExportPipeline::class)->run(
+                entities: $this->entities(),
+                tenantId: (string) $tenant->getKey(),
+                process:  $process,
+            );
+
+            ProcessCompleted::dispatch($process->fresh());
+        } catch (\Throwable $e) {
+            ProcessFailed::dispatch($process->fresh());
+            throw $e;
+        }
+
+        return $process->fresh();
     }
 
     /**
      * Dispatch the export as a background job.
-     * Returns the record immediately (status = pending) with the backup_id.
-     * Poll GET /exports/{id} to check status.
+     * Returns the Process immediately (status: pending).
+     * Poll status via Olimpo or subscribe for 'web'/'mail' notification.
      */
-    public function queue(Model $tenant): TenantExportRecord
+    public function queue(Model $tenant): Process
     {
-        $record = TenantExportRecord::create([
-            'tenant_id' => $tenant->getKey(),
-            'status'    => 'pending',
-        ]);
+        $process = Process::start(
+            type:     'export',
+            category: static::class,
+            metadata: ['tenant_id' => (string) $tenant->getKey()],
+        );
 
-        dispatch(fn () => app(ExportPipeline::class)->run(
-            entities: $this->entities(),
-            tenantId: (string) $tenant->getKey(),
-            record:   $record,
-        ));
+        dispatch(function () use ($tenant, $process) {
+            try {
+                app(ExportPipeline::class)->run(
+                    entities: $this->entities(),
+                    tenantId: (string) $tenant->getKey(),
+                    process:  $process,
+                );
 
-        return $record;
+                ProcessCompleted::dispatch($process->fresh());
+            } catch (\Throwable $e) {
+                ProcessFailed::dispatch($process->fresh());
+            }
+        });
+
+        return $process;
     }
 }
