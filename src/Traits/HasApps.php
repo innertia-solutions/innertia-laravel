@@ -2,143 +2,103 @@
 
 namespace Innertia\Traits;
 
-use Illuminate\Database\Eloquent\Collection;
-use Innertia\Models\App;
-use Innertia\Models\TenantApp;
 use Innertia\Models\UserApp;
 
 /**
- * Add to User model to manage app access.
- * Add to Tenant model to manage enabled apps.
+ * Add to your User model to manage app/context access.
  *
- * On User:
- *   $user->apps()                          // all apps the user has access to
- *   $user->hasApp('backoffice')            // in current tenant (saas) or globally (app)
+ * Apps are defined in config('innertia.apps'):
+ *   'apps' => [
+ *       'backoffice'  => 'Administración',
+ *       'technicians' => 'Portal Técnicos',
+ *       'sales'       => 'Portal Ventas',
+ *   ]
+ *
+ * Usage:
+ *   $user->hasApp('backoffice')           // bool
  *   $user->grantApp('backoffice')
+ *   $user->grantApp(['backoffice', 'sales'])
  *   $user->revokeApp('backoffice')
- *
- * On Tenant:
- *   $tenant->apps()                        // all apps enabled for this tenant
- *   $tenant->hasApp('backoffice')
- *   $tenant->enableApp('backoffice')
- *   $tenant->disableApp('backoffice')
+ *   $user->syncApps(['backoffice', 'sales'])
+ *   $user->appKeys()                      // ['backoffice', 'sales']
  */
 trait HasApps
 {
-    public function apps(): Collection
+    // ── Query ─────────────────────────────────────────────────────────────────
+
+    /**
+     * App keys the user has access to (filtered to those still in config).
+     */
+    public function appKeys(): array
     {
-        if ($this->isTenantModel()) {
-            return App::whereHas('tenantApps', function ($q) {
-                $q->where('tenant_id', $this->getKey())->where('active', true);
-            })->get();
-        }
+        $configured = array_keys(config('innertia.apps', []));
 
-        // User
-        $query = UserApp::where('user_id', $this->getKey());
-
-        if (config('innertia.mode') === 'saas') {
-            $query->where('tenant_id', $this->resolveTenantId());
-        }
-
-        $appIds = $query->pluck('app_id');
-
-        return App::whereIn('id', $appIds)->where('active', true)->get();
+        return UserApp::where('user_id', $this->getKey())
+            ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentAppTenantId()))
+            ->whereIn('app', $configured)
+            ->pluck('app')
+            ->all();
     }
 
-    public function hasApp(string $appKey): bool
+    public function hasApp(string $key): bool
     {
-        if ($this->isTenantModel()) {
-            return TenantApp::where('tenant_id', $this->getKey())
-                ->whereHas('app', fn ($q) => $q->where('key', $appKey)->where('active', true))
-                ->where('active', true)
-                ->exists();
-        }
-
-        // User
-        $app = App::findByKey($appKey);
-
-        if (! $app) {
+        if (! array_key_exists($key, config('innertia.apps', []))) {
             return false;
         }
 
-        $query = UserApp::where('user_id', $this->getKey())
-            ->where('app_id', $app->id);
-
-        if (config('innertia.mode') === 'saas') {
-            $query->where('tenant_id', $this->resolveTenantId());
-        }
-
-        return $query->exists();
+        return UserApp::where('user_id', $this->getKey())
+            ->where('app', $key)
+            ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentAppTenantId()))
+            ->exists();
     }
 
-    public function grantApp(string $appKey): void
+    // ── Grant / revoke ────────────────────────────────────────────────────────
+
+    public function grantApp(string|array $keys): void
     {
-        $app = App::findByKey($appKey);
+        foreach ((array) $keys as $key) {
+            if (! array_key_exists($key, config('innertia.apps', []))) {
+                continue;
+            }
 
-        if (! $app) {
-            return;
+            $data = ['user_id' => (string) $this->getKey(), 'app' => $key];
+
+            if (config('innertia.mode') === 'saas') {
+                $data['tenant_id'] = $this->currentAppTenantId();
+            }
+
+            UserApp::firstOrCreate($data);
         }
-
-        $data = ['user_id' => $this->getKey(), 'app_id' => $app->id];
-
-        if (config('innertia.mode') === 'saas') {
-            $data['tenant_id'] = $this->resolveTenantId();
-        }
-
-        UserApp::firstOrCreate($data);
     }
 
-    public function revokeApp(string $appKey): void
+    public function revokeApp(string $key): void
     {
-        $app = App::findByKey($appKey);
+        UserApp::where('user_id', $this->getKey())
+            ->where('app', $key)
+            ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentAppTenantId()))
+            ->delete();
+    }
 
-        if (! $app) {
-            return;
-        }
-
-        $query = UserApp::where('user_id', $this->getKey())->where('app_id', $app->id);
+    /**
+     * Replace the user's full app access set within the current context.
+     */
+    public function syncApps(array $keys): void
+    {
+        $query = UserApp::where('user_id', $this->getKey());
 
         if (config('innertia.mode') === 'saas') {
-            $query->where('tenant_id', $this->resolveTenantId());
+            $query->where('tenant_id', $this->currentAppTenantId());
         }
 
         $query->delete();
+
+        $this->grantApp($keys);
     }
 
-    public function enableApp(string $appKey): void
+    // ── Helper ────────────────────────────────────────────────────────────────
+
+    private function currentAppTenantId(): ?string
     {
-        $app = App::findByKey($appKey);
-
-        if (! $app || ! $this->isTenantModel()) {
-            return;
-        }
-
-        TenantApp::updateOrCreate(
-            ['tenant_id' => $this->getKey(), 'app_id' => $app->id],
-            ['active' => true],
-        );
-    }
-
-    public function disableApp(string $appKey): void
-    {
-        $app = App::where('key', $appKey)->first();
-
-        if (! $app || ! $this->isTenantModel()) {
-            return;
-        }
-
-        TenantApp::where('tenant_id', $this->getKey())
-            ->where('app_id', $app->id)
-            ->update(['active' => false]);
-    }
-
-    private function isTenantModel(): bool
-    {
-        return $this instanceof \Innertia\Models\Tenant;
-    }
-
-    private function resolveTenantId(): mixed
-    {
-        return function_exists('tenant') ? tenant('id') : null;
+        return (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
     }
 }

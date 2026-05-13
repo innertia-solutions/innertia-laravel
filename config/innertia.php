@@ -17,6 +17,34 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Apps / Contexts
+    |--------------------------------------------------------------------------
+    |
+    | Define the portals or contexts users can log into.
+    | Each key is the app identifier sent in the login payload.
+    | The value is a human-readable name (used in UIs and error messages).
+    |
+    | Access is controlled per-user via the user_apps table.
+    | Add HasApps to your User model to enable access management:
+    |   use Innertia\Traits\HasApps;
+    |
+    |   $user->grantApp('backoffice')
+    |   $user->hasApp('backoffice')    // bool
+    |   $user->appKeys()               // ['backoffice', 'sales']
+    |
+    | Protect routes by app context:
+    |   Route::middleware('app:backoffice')->group(...)
+    |
+    */
+
+    'apps' => [
+        // 'backoffice'  => 'Administración',
+        // 'technicians' => 'Portal Técnicos',
+        // 'sales'       => 'Portal Ventas',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | SaaS / Tenancy Settings
     |--------------------------------------------------------------------------
     |

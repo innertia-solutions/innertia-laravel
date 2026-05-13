@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Innertia\Auth\AuthServiceProvider;
+use Innertia\Auth\Middleware\AppMiddleware;
 use Innertia\Auth\Middleware\PermissionMiddleware;
 use Innertia\Auth\Middleware\RoleMiddleware;
 use Innertia\Console\Commands\Make\MakeControllerCommand;
@@ -103,6 +104,7 @@ class InnertiaServiceProvider extends ServiceProvider
 
         // ── Middleware aliases ─────────────────────────────────────────────────
         $router = $this->app['router'];
+        $router->aliasMiddleware('app',        AppMiddleware::class);
         $router->aliasMiddleware('role',       RoleMiddleware::class);
         $router->aliasMiddleware('permission', PermissionMiddleware::class);
 
