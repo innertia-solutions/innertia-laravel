@@ -21,9 +21,6 @@
         "openspout/openspout": "^4.0",
         "dompdf/dompdf": "^2.0"
     },
-    "suggest": {
-        "stancl/tenancy": "Required when using mode = saas"
-    },
     "require-dev": {
         "orchestra/testbench": "^9.0",
         "pestphp/pest": "^3.0"
@@ -50,10 +47,16 @@
                 "DataTable": "Innertia\\Facades\\DataTable",
                 "ActivityLogger": "Innertia\\Facades\\ActivityLogger",
                 "EntityHistory": "Innertia\\Facades\\EntityHistory",
-                "Settings": "Innertia\\Facades\\Settings"
+                "Settings": "Innertia\\Facades\\Settings",
+                "Innertia": "Innertia\\Facades\\Innertia"
             }
         }
     },
     "minimum-stability": "stable",
-    "prefer-stable": true
+    "prefer-stable": true,
+    "config": {
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    }
 }

@@ -49,6 +49,16 @@ class InnertiaServiceProvider extends ServiceProvider
         // Make the mode authoritative — concrete subclasses lock it in at provider registration.
         config(['innertia.mode' => $this->isSaas() ? 'saas' : 'single']);
 
+        // TenantContext + InnertiaManager — siempre registrados; no-op en App mode.
+        $this->app->singleton(\Innertia\Saas\TenantContext::class);
+
+        $this->app->singleton(\Innertia\InnertiaManager::class, function ($app) {
+            return new \Innertia\InnertiaManager(
+                $app->make(\Innertia\Saas\TenantContext::class),
+                $this->isSaas(),
+            );
+        });
+
         $this->configureAuth();
 
         $this->app->singleton(DataTableService::class);
