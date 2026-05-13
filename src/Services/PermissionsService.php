@@ -7,60 +7,90 @@ use Innertia\Models\Permission;
 /**
  * Manages named (app-level) permissions from config.
  *
- * Config formats supported:
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Permission definitions live in CODE, not in the DB.
+ * The DB is populated lazily — no artisan command required before the app works.
  *
- * 1. Classic array format:
+ * `sync` is an optional enrichment step: it creates missing named permissions
+ * and updates their descriptions from the code definition to the DB.
+ * Run it during deploys if you want the descriptions kept in sync for UIs.
+ * ─────────────────────────────────────────────────────────────────────────────
+ *
+ * Config formats supported (mix freely in the same array):
+ *
+ * 1. Classic array:
  *    'permissions' => [
  *        ['category' => 'users', 'category_alias' => 'Usuarios', 'permissions' => [
- *            'users.view'   => 'Ver usuarios',
- *            'users.manage' => 'Gestionar usuarios',
+ *            'users.view'   => 'Ver lista de usuarios',
+ *            'users.manage' => 'Crear, editar y eliminar usuarios',
  *        ]],
  *    ]
  *
- * 2. Enum class format (recommended — type-safe, IDE-complete):
+ * 2. Enum class (recommended — type-safe, IDE-complete, carries descriptions):
  *    'permissions' => [
  *        \App\Enums\UserPermissions::class,
- *        \App\Enums\ClientPermissions::class,
  *    ]
- *    Where each enum is a BackedEnum: string:
- *      enum UserPermissions: string {
+ *    Where the enum is a BackedEnum: string:
+ *      enum UserPermissions: string
+ *      {
  *          case View   = 'users.view';
  *          case Manage = 'users.manage';
+ *
+ *          // Optional — if present, sync() stores this in the DB description column.
+ *          public function description(): string
+ *          {
+ *              return match($this) {
+ *                  self::View   => 'Ver lista de usuarios',
+ *                  self::Manage => 'Crear, editar y eliminar usuarios',
+ *              };
+ *          }
  *      }
  *
- * Both formats can be mixed in the same config array.
- *
- * Optional permission hierarchy (declare in config/innertia.php):
+ * Optional permission hierarchy (config/innertia.php):
  *   'permissions_hierarchy' => [
  *       'users.manage' => ['users.view'],   // manage implies view
  *   ]
- *
- * The hierarchy is intentionally NOT built into the DB schema — it is a
- * domain concern that varies per project. Enable it per-app via config.
  */
 class PermissionsService
 {
     /**
      * Sync named permissions from config to the database.
      *
-     * Creates permissions that do not exist yet.
-     * Pass $prune = true to also delete permissions no longer in config.
+     * This is NOT required for the system to work — permissions are created
+     * lazily on first use. Run this command during deploys to keep descriptions
+     * in the DB up to date with the code definition.
      *
-     * Returns ['created' => int, 'skipped' => int, 'deleted' => int]
+     * - Creates permissions that don't exist yet.
+     * - Updates the description of existing ones from the code definition.
+     * - Pass $prune = true to also delete permissions no longer in config.
+     *
+     * Returns ['created' => int, 'updated' => int, 'skipped' => int, 'deleted' => int]
      */
     public function sync(bool $prune = false): array
     {
-        $configured = $this->keys();
-        $created    = 0;
-        $skipped    = 0;
+        $definitions = $this->definitions(); // ['users.view' => 'Ver...', ...]
+        $created     = 0;
+        $updated     = 0;
+        $skipped     = 0;
 
-        foreach ($configured as $name) {
-            $exists = Permission::whereNull('entity_type')->where('name', $name)->exists();
+        foreach ($definitions as $name => $description) {
+            $existing = Permission::named()->where('name', $name)->first();
 
-            if ($exists) {
-                $skipped++;
+            if ($existing) {
+                // Update description if it changed
+                if ($existing->description !== $description) {
+                    $existing->update(['description' => $description]);
+                    $updated++;
+                } else {
+                    $skipped++;
+                }
             } else {
-                Permission::findOrCreate($name);
+                Permission::create([
+                    'name'        => $name,
+                    'entity_type' => null,
+                    'entity_id'   => null,
+                    'description' => $description,
+                ]);
                 $created++;
             }
         }
@@ -69,11 +99,11 @@ class PermissionsService
 
         if ($prune) {
             $deleted = Permission::named()
-                ->whereNotIn('name', $configured)
+                ->whereNotIn('name', array_keys($definitions))
                 ->delete();
         }
 
-        return compact('created', 'skipped', 'deleted');
+        return compact('created', 'updated', 'skipped', 'deleted');
     }
 
     /**
@@ -94,7 +124,6 @@ class PermissionsService
             return true;
         }
 
-        // Optional hierarchy check
         return $this->checkHierarchy($user, $name);
     }
 
@@ -102,12 +131,9 @@ class PermissionsService
      * All permission groups as defined in config.
      * Useful for building role management UIs.
      *
-     * Returns a normalised array — enum entries are expanded to the same
-     * structure as classic array entries.
-     *
      * [
      *   ['category' => 'users', 'category_alias' => 'Users', 'permissions' => [
-     *       'users.view' => 'users.view', ...
+     *       'users.view' => 'Ver lista de usuarios', ...
      *   ]],
      *   ...
      * ]
@@ -122,15 +148,7 @@ class PermissionsService
      */
     public function keys(): array
     {
-        $keys = [];
-
-        foreach ($this->normalised() as $group) {
-            foreach (array_keys($group['permissions'] ?? []) as $name) {
-                $keys[] = $name;
-            }
-        }
-
-        return $keys;
+        return array_keys($this->definitions());
     }
 
     /**
@@ -160,13 +178,28 @@ class PermissionsService
 
     // ── Internal ──────────────────────────────────────────────────────────────
 
+    /**
+     * Flat map of name → description for all configured named permissions.
+     */
+    private function definitions(): array
+    {
+        $map = [];
+
+        foreach ($this->normalised() as $group) {
+            foreach ($group['permissions'] as $name => $description) {
+                $map[$name] = $description;
+            }
+        }
+
+        return $map;
+    }
+
     private function normalised(): array
     {
         $groups = [];
 
         foreach (config('innertia.permissions', []) as $entry) {
             if (is_string($entry) && enum_exists($entry)) {
-                // Enum class → expand to classic group format
                 $groups[] = $this->expandEnum($entry);
             } elseif (is_array($entry) && isset($entry['category'])) {
                 $groups[] = $entry;
@@ -176,17 +209,28 @@ class PermissionsService
         return $groups;
     }
 
+    /**
+     * Expand an enum class into the normalised group format.
+     *
+     * Reads descriptions from:
+     *   1. $case->description() — if the method exists on the enum
+     *   2. Falls back to the case name (e.g. 'View', 'Manage')
+     */
     private function expandEnum(string $enumClass): array
     {
         $cases       = $enumClass::cases();
         $permissions = [];
 
         foreach ($cases as $case) {
-            $permissions[$case->value] = $case->name; // value = 'users.view', name = 'View'
+            $description = method_exists($case, 'description')
+                ? $case->description()
+                : $case->name;
+
+            $permissions[$case->value] = $description;
         }
 
-        // Derive a readable category from the enum class name
-        // e.g. App\Enums\UserPermissions → 'user_permissions' → 'user'
+        // Derive a readable category from the enum class name.
+        // App\Enums\UserPermissions → 'user' → 'User'
         $shortName = class_basename($enumClass);
         $category  = strtolower(preg_replace('/Permissions$/i', '', $shortName));
         $category  = \Illuminate\Support\Str::snake($category);
@@ -200,11 +244,7 @@ class PermissionsService
 
     private function checkHierarchy(\Illuminate\Contracts\Auth\Authenticatable $user, string $needed): bool
     {
-        $hierarchy = $this->getHierarchy();
-
-        // hierarchy: ['users.manage' => ['users.view']]
-        // If the user has 'users.manage', they implicitly have 'users.view'.
-        foreach ($hierarchy as $grant => $implied) {
+        foreach ($this->getHierarchy() as $grant => $implied) {
             if (in_array($needed, (array) $implied, true) && $user->hasPermission($grant)) {
                 return true;
             }

@@ -37,17 +37,27 @@ class Permission extends Model
      *
      * For named permissions:  findOrCreate('users.view')
      * For entity permissions: findOrCreate('access', File::class, $id)
+     *
+     * When creating a named permission lazily (no description passed), the
+     * description is left null. Run `artisan innertia:permissions` to backfill
+     * descriptions from the config/enum definitions.
      */
     public static function findOrCreate(
         string  $name,
-        ?string $entityType = null,
-        ?string $entityId   = null,
+        ?string $entityType  = null,
+        ?string $entityId    = null,
+        ?string $description = null,
     ): static {
-        return static::firstOrCreate([
-            'name'        => $name,
-            'entity_type' => $entityType,
-            'entity_id'   => $entityId,
-        ]);
+        return static::firstOrCreate(
+            [
+                'name'        => $name,
+                'entity_type' => $entityType,
+                'entity_id'   => $entityId,
+            ],
+            [
+                'description' => $description,
+            ],
+        );
     }
 
     /**

@@ -30,18 +30,27 @@ return new class extends Migration
         //   name = 'access', entity_type = 'Innertia\Models\File', entity_id = <uuid>
         //   Used to grant access to a specific model instance.
         //
-        Schema::create('permissions', function (Blueprint $table) {
+        Schema::create('permissions', function (Blueprint $table) use ($isSaas) {
             $table->uuid('id')->primary();
+
+            // In SaaS mode permissions can be scoped per-tenant (null = platform-level).
+            if ($isSaas) {
+                $table->string('tenant_id')->nullable()->index();
+            }
+
             $table->string('name');
 
-            // null for named app permissions; set for entity-level grants
+            // null for named app permissions; set for entity-level grants.
+            // Entity-level: grants access to a specific model instance.
+            //   name = 'access', entity_type = 'Innertia\Models\File', entity_id = <uuid>
             $table->string('entity_type')->nullable()->index();
             $table->string('entity_id')->nullable()->index();
 
+            // Human-readable description. Populated by enum::description() during sync.
             $table->string('description')->nullable();
             $table->timestamps();
 
-            // Compound index to speed up lookups
+            // Compound index to speed up entity lookups
             $table->index(['entity_type', 'entity_id']);
         });
 

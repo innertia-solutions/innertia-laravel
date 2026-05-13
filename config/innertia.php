@@ -73,16 +73,30 @@ return [
     |        'users.manage' => 'Crear, editar y eliminar usuarios',
     |    ]]
     |
-    | 2. Enum class (recommended — type-safe, IDE-complete):
+    | 2. Enum class (recommended — type-safe, IDE-complete, carries descriptions):
     |    \App\Enums\UserPermissions::class
-    |    Where the enum is a backed string enum:
-    |      enum UserPermissions: string {
+    |    Where the enum is a BackedEnum: string. Add an optional description()
+    |    method and it will be stored in DB when you run the sync command:
+    |
+    |      enum UserPermissions: string
+    |      {
     |          case View   = 'users.view';
     |          case Manage = 'users.manage';
+    |
+    |          public function description(): string
+    |          {
+    |              return match($this) {
+    |                  self::View   => 'Ver lista de usuarios',
+    |                  self::Manage => 'Crear, editar y eliminar usuarios',
+    |              };
+    |          }
     |      }
     |
-    | Sync permissions to DB:
-    |   php artisan innertia:permissions          — create missing
+    | The app works WITHOUT running the sync command — permissions are created
+    | lazily when first used. The sync command is optional: run it during deploys
+    | to keep descriptions in the DB in sync with the code definition:
+    |
+    |   php artisan innertia:permissions          — create/update descriptions
     |   php artisan innertia:permissions --prune  — also delete removed ones
     |
     | Add HasRoles to your User model to enable role-based checks:
