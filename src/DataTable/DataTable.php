@@ -2,12 +2,12 @@
 
 namespace Innertia\DataTable;
 
-use App\Platform\DataTables\Contracts\ExporterInterface;
-use App\Platform\DataTables\Exporters\CsvExporter;
-use App\Platform\DataTables\Exporters\ExcelExporter;
-use App\Platform\DataTables\Exporters\JsonExporter;
-use App\Platform\DataTables\Exporters\PdfExporter;
-use App\Platform\DataTables\Support\UnsupportedExportFormatException;
+use Innertia\DataTable\Contracts\ExporterInterface;
+use Innertia\DataTable\Exporters\CsvExporter;
+use Innertia\DataTable\Exporters\XlsxExporter;
+use Innertia\DataTable\Exporters\JsonExporter;
+use Innertia\DataTable\Exporters\PdfExporter;
+use Innertia\DataTable\Exceptions\UnsupportedExportFormatException;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -72,7 +72,7 @@ class DataTable
     // Exporters disponibles
     private const EXPORTERS = [
         'pdf' => PdfExporter::class,
-        'xlsx' => ExcelExporter::class,
+        'xlsx' => XlsxExporter::class,
         'csv' => CsvExporter::class,
         'json' => JsonExporter::class,
     ];
