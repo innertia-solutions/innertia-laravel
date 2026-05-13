@@ -10,8 +10,6 @@ use Innertia\Auth\Guards\JwtGuard;
 use Innertia\Auth\Services\JwtService;
 use Innertia\Auth\Services\OtpService;
 use Innertia\Auth\Social\ConfigureSocialite;
-use SocialiteProviders\Manager\SocialiteWasCalled;
-use SocialiteProviders\MicrosoftAzure\MicrosoftAzureExtendSocialite;
 
 class AuthServiceProvider extends ServiceProvider
 {
@@ -51,7 +49,13 @@ class AuthServiceProvider extends ServiceProvider
 
     protected function registerMicrosoftSocialiteDriver(): void
     {
-        // socialiteproviders/microsoft-azure registers its driver via an event
-        Event::listen(SocialiteWasCalled::class, MicrosoftAzureExtendSocialite::class);
+        // Only register if the microsoft-azure socialite provider package is installed
+        if (class_exists(\SocialiteProviders\Manager\SocialiteWasCalled::class) &&
+            class_exists(\SocialiteProviders\MicrosoftAzure\MicrosoftAzureExtendSocialite::class)) {
+            Event::listen(
+                \SocialiteProviders\Manager\SocialiteWasCalled::class,
+                \SocialiteProviders\MicrosoftAzure\MicrosoftAzureExtendSocialite::class
+            );
+        }
     }
 }
