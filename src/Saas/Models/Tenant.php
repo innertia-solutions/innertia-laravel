@@ -4,24 +4,21 @@ namespace Innertia\Saas\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Innertia\Auth\RBAC\Traits\HasApps;
-use Stancl\Tenancy\Contracts\Tenant as TenantContract;
-use Stancl\Tenancy\Database\Concerns\HasDomains;
-use Stancl\Tenancy\Events\TenantCreated;
-use Stancl\Tenancy\Events\TenantDeleted;
-use Stancl\Tenancy\Events\TenantUpdated;
 
 /**
- * Base Tenant model for single-DB tenancy.
+ * Tenant model — single-DB multitenancy.
  *
- * id  — bigInteger auto-increment (internal PK, never exposed via API)
- * key — string slug used as external identifier (X-Tenant header / subdomain)
+ * id   — bigInteger auto-increment (PK interna, nunca expuesta en API)
+ * key  — string slug; identificador externo (header X-Tenant)
+ * name — texto libre; nombre del tenant
  *
- * Extend this in your app: class Tenant extends \Innertia\Saas\Models\Tenant { ... }
- * Then set config('innertia.saas.tenant_model') = App\Models\Tenant::class
+ * Extender en la app:
+ *   class Tenant extends \Innertia\Saas\Models\Tenant { ... }
+ * Y configurar: config('innertia.saas.tenant_model') = App\Models\Tenant::class
  */
-class Tenant extends Model implements TenantContract
+class Tenant extends Model
 {
-    use HasApps, HasDomains;
+    use HasApps;
 
     protected $fillable = [
         'key',
@@ -38,45 +35,14 @@ class Tenant extends Model implements TenantContract
         'trial_ends_at' => 'datetime',
     ];
 
-    protected $dispatchesEvents = [
-        'created' => TenantCreated::class,
-        'updated' => TenantUpdated::class,
-        'deleted' => TenantDeleted::class,
-    ];
-
-    /* ── TenantContract ── */
-
-    public function getTenantKeyName(): string
-    {
-        return 'id';
-    }
-
-    public function getTenantKey()
-    {
-        return $this->getKey();
-    }
+    // ── Route model binding ───────────────────────────────────────────────────
 
     public function getRouteKeyName(): string
     {
         return 'key';
     }
 
-    public function getInternal(string $key)
-    {
-        return $this->getAttribute($key);
-    }
-
-    public function setInternal(string $key, $value): void
-    {
-        $this->setAttribute($key, $value);
-    }
-
-    public function run(callable $callback)
-    {
-        return tenancy()->run($this, $callback);
-    }
-
-    /* ── Helpers ── */
+    // ── Helpers ───────────────────────────────────────────────────────────────
 
     public static function findByKey(string $key): ?static
     {
