@@ -5,12 +5,11 @@ namespace Innertia\Auth\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
-use Innertia\Platform\Traits\Auditable;
 use Innertia\Auth\RBAC\Traits\HasApps;
+use Innertia\Auth\RBAC\Traits\HasRoles;
+use Innertia\Platform\Traits\Auditable;
 use Innertia\Platform\Traits\HasHistory;
 use Innertia\Platform\Traits\HasUuid;
-use Spatie\Permission\Traits\HasPermissions;
-use Spatie\Permission\Traits\HasRoles;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 
 /**
@@ -20,14 +19,14 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
  *
  * Includes:
  * - JWT authentication (tymon/jwt-auth)
- * - Roles & permissions (spatie/laravel-permission)
- * - NanoId as primary key
+ * - Roles & permissions (innertia RBAC — HasRoles + HasApps)
+ * - UUID as primary key
  * - Audit trail + entity history (innertia-laravel)
  * - Soft deletes
  */
 abstract class User extends Authenticatable implements JWTSubject
 {
-    use Auditable, HasApps, HasFactory, HasHistory, HasUuid, HasPermissions, HasRoles, SoftDeletes;
+    use Auditable, HasApps, HasFactory, HasHistory, HasUuid, HasRoles, SoftDeletes;
 
     protected $fillable = [
         'name',
