@@ -12,7 +12,10 @@ class VerifyEmail extends UseCase
     public function __construct(
         public readonly string $userId,
         public readonly string $app,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): array
     {

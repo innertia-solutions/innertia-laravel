@@ -11,7 +11,10 @@ class SendEmailVerification extends UseCase
 {
     public function __construct(
         public readonly string $userId,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): void
     {

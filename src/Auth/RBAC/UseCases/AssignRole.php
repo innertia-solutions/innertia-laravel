@@ -10,7 +10,10 @@ class AssignRole extends UseCase
     public function __construct(
         public readonly string $userId,
         public readonly string $role,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): mixed
     {

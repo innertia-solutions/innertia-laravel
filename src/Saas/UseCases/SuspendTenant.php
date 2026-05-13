@@ -9,7 +9,10 @@ class SuspendTenant extends UseCase
 {
     public function __construct(
         public readonly string $tenantKey,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): mixed
     {

@@ -10,7 +10,10 @@ class DeleteRole extends UseCase
 {
     public function __construct(
         public readonly string $roleId,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): void
     {

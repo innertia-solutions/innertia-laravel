@@ -12,7 +12,10 @@ class CreateTenant extends UseCase
         public readonly string $name,
         public readonly string $status = 'trial',
         public readonly int $trialDays = 14,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): mixed
     {

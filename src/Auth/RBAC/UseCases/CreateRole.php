@@ -10,7 +10,10 @@ class CreateRole extends UseCase
     public function __construct(
         public readonly string  $name,
         public readonly ?string $description = null,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): mixed
     {

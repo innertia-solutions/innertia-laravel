@@ -14,7 +14,10 @@ class UpdateSubscription extends UseCase
         public readonly string          $subscriptionId,
         public readonly ?array          $events   = null,
         public readonly ?array          $channels = null,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): Subscription
     {

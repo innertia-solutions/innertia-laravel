@@ -10,7 +10,10 @@ class Logout extends UseCase
     public function __construct(
         protected JwtService $jwt,
         protected string $token,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): void
     {

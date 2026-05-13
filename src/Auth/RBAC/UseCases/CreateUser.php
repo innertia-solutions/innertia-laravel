@@ -17,7 +17,10 @@ class CreateUser extends UseCase
         public readonly ?string $role = null,
         public readonly bool    $forcePasswordChange = false,
         public readonly bool    $sendWelcome = true,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): mixed
     {

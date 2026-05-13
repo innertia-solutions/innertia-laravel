@@ -12,7 +12,10 @@ class Unsubscribe extends UseCase
     public function __construct(
         public readonly Authenticatable $user,
         public readonly string          $subscriptionId,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): void
     {

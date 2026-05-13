@@ -14,7 +14,10 @@ class SocialLogin extends UseCase
         public readonly SocialProvider $provider,
         public readonly SocialUser     $socialUser,
         public readonly string         $app,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): array
     {

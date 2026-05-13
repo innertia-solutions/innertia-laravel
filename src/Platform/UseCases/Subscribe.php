@@ -15,7 +15,10 @@ class Subscribe extends UseCase
         public readonly string          $subscribableId,
         public readonly array           $events   = ['*'],
         public readonly array           $channels = ['mail'],
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): Subscription
     {

@@ -10,7 +10,10 @@ class SendOtp extends UseCase
     public function __construct(
         public readonly string $userId,
         public readonly string $action,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): void
     {

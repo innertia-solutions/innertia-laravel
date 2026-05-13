@@ -18,7 +18,10 @@ class SetPassword extends UseCase
         public readonly string $password,
         public readonly string $passwordConfirmation,
         public readonly string $app,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): array
     {

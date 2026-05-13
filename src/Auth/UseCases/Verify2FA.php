@@ -13,7 +13,10 @@ class Verify2FA extends UseCase
         protected JwtService $jwt,
         protected Authenticatable $user,
         protected string $code,
-    ) {}
+    ) {
+       parent::__construct();
+       
+    }
 
     public function execute(): array
     {

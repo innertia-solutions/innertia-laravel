@@ -7,7 +7,10 @@ use Innertia\Platform\Contracts\UseCase;
 
 class Disable2FA extends UseCase
 {
-    public function __construct(protected Authenticatable $user) {}
+    public function __construct(protected Authenticatable $user) {
+       parent::__construct();
+       
+    }
 
     public function execute(): void
     {
