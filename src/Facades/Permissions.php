@@ -3,12 +3,12 @@
 namespace Innertia\Facades;
 
 use Illuminate\Support\Facades\Facade;
-use Innertia\Services\PermissionsService;
+use Innertia\Auth\RBAC\Services\PermissionsService;
 
 /**
  * @method static array  getUserPermissions(\Illuminate\Contracts\Auth\Authenticatable $user)
  * @method static void   flushUser(\Illuminate\Contracts\Auth\Authenticatable|string $user)
- * @method static void   flushRole(\Innertia\Models\Role|string $role)
+ * @method static void   flushRole(\Innertia\Auth\RBAC\Models\Role|string $role)
  * @method static bool   check(\Illuminate\Contracts\Auth\Authenticatable $user, string|\BackedEnum $permission)
  * @method static array  getHierarchy()
  * @method static array  sync(bool $prune = false)

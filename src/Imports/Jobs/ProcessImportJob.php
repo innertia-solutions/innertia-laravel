@@ -8,8 +8,8 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Innertia\Imports\Importer;
-use Innertia\Models\File;
-use Innertia\Models\Process;
+use Innertia\Files\Models\File;
+use Innertia\Platform\Models\Process;
 use Innertia\Platform\Events\ProcessFailed;
 use Throwable;
 

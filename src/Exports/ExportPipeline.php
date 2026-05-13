@@ -4,8 +4,8 @@ namespace Innertia\Exports;
 
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
-use Innertia\Models\File;
-use Innertia\Models\Process;
+use Innertia\Files\Models\File;
+use Innertia\Platform\Models\Process;
 
 class ExportPipeline
 {

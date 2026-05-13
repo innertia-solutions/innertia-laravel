@@ -15,21 +15,21 @@ use Innertia\Console\Commands\Make\MakeControllerCommand;
 use Innertia\Console\Commands\Make\MakeModelCommand;
 use Innertia\Console\Commands\Make\MakeUseCaseCommand;
 use Innertia\Console\Commands\SyncPermissionsCommand;
-use Innertia\Console\Commands\Tenant\CreateTenantCommand;
-use Innertia\Console\Commands\Tenant\DeleteTenantCommand;
-use Innertia\Console\Commands\Tenant\ListTenantsCommand;
-use Innertia\Console\Commands\Tenant\ShowTenantCommand;
+use Innertia\Saas\Console\Commands\CreateTenantCommand;
+use Innertia\Saas\Console\Commands\DeleteTenantCommand;
+use Innertia\Saas\Console\Commands\ListTenantsCommand;
+use Innertia\Saas\Console\Commands\ShowTenantCommand;
 use Innertia\DataTable\DataTableService;
 use Innertia\Exports\ExportPipeline;
 use Innertia\Platform\Events\DomainEvent;
 use Innertia\Platform\Listeners\DomainEventRouter;
-use Innertia\Webhook\WebhookService;
-use Innertia\Models\EntityPermission;
-use Innertia\Services\ActivityLogService;
-use Innertia\Services\EntityHistoryService;
-use Innertia\Services\PermissionsService;
+use Innertia\Webhooks\WebhookService;
+use Innertia\Auth\RBAC\Models\EntityPermission;
+use Innertia\Platform\Services\ActivityLogService;
+use Innertia\Platform\Services\EntityHistoryService;
+use Innertia\Auth\RBAC\Services\PermissionsService;
 use Innertia\Settings\AppSettingsService;
-use Innertia\Settings\SaasSettingsService;
+use Innertia\Saas\Settings\SaasSettingsService;
 
 class InnertiaServiceProvider extends ServiceProvider
 {
@@ -65,22 +65,18 @@ class InnertiaServiceProvider extends ServiceProvider
         $isSaas = config('innertia.mode') === 'saas';
 
         // ── Migrations ────────────────────────────────────────────────────────
-        $saasOnly = ['create_tenants_table', 'create_tenant_apps_table'];
-
-        $migrations = array_filter(
-            glob(__DIR__ . '/../database/migrations/*.php'),
-            fn ($f) => $isSaas || ! collect($saasOnly)->contains(fn ($s) => str_contains($f, $s))
-        );
+        // Each mode has its own clean migration set — no conditionals inside files.
+        $migrationsPath = __DIR__ . '/../database/migrations/' . ($isSaas ? 'saas' : 'single');
 
         // Load from vendor so migrate works out-of-the-box without publishing.
-        $this->loadMigrationsFrom(array_values($migrations));
+        $this->loadMigrationsFrom($migrationsPath);
 
-        // Also make them publishable — run `php artisan vendor:publish --tag=innertia-migrations`
-        // to copy them into database/migrations/ when you need to inspect or customize them.
-        $publishMap = array_combine(
-            array_values($migrations),
-            array_map(fn ($f) => database_path('migrations/' . basename($f)), $migrations)
-        );
+        // Also publishable — `php artisan vendor:publish --tag=innertia-migrations`
+        // copies them into database/migrations/ for inspection or customization.
+        $publishMap = [];
+        foreach (glob($migrationsPath . '/*.php') as $f) {
+            $publishMap[$f] = database_path('migrations/' . basename($f));
+        }
         $this->publishes($publishMap, 'innertia-migrations');
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
         $this->loadRoutesFrom(__DIR__ . '/Files/routes.php');
@@ -186,7 +182,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $isMulti = ($saas['db_strategy'] ?? 'single') === 'multi';
 
         $tenantModel = $saas['tenant_model']
-            ?? \Innertia\Models\Tenant::class;
+            ?? \Innertia\Saas\Models\Tenant::class;
 
         $bootstrappers = [
             \Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,

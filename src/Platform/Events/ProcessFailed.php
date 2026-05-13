@@ -3,7 +3,7 @@
 namespace Innertia\Platform\Events;
 
 use Illuminate\Database\Eloquent\Model;
-use Innertia\Models\Process;
+use Innertia\Platform\Models\Process;
 
 /**
  * Fired when an async process crashes at the job level.

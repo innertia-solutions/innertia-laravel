@@ -3,9 +3,9 @@
 namespace Innertia\Platform\Listeners;
 
 use Illuminate\Support\Facades\Mail;
-use Innertia\Models\Notification;
+use Innertia\Notifications\Models\Notification;
 use Innertia\Platform\Events\DomainEvent;
-use Innertia\Webhook\WebhookService;
+use Innertia\Webhooks\WebhookService;
 
 /**
  * Routes a DomainEvent to its configured delivery channels.

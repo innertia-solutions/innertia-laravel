@@ -5,7 +5,7 @@ namespace Innertia\Files\Http;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\Storage;
-use Innertia\Models\File;
+use Innertia\Files\Models\File;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class FileController extends Controller

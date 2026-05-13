@@ -4,7 +4,7 @@ namespace Innertia\Auth\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Innertia\Auth\Mailables\OtpMail;
-use Innertia\Models\UserOtp;
+use Innertia\Auth\Models\UserOtp;
 use Illuminate\Support\Facades\Mail;
 
 class OtpService

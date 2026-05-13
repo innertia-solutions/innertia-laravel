@@ -3,7 +3,7 @@
 namespace Innertia\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Innertia\Models\Role;
+use Innertia\Auth\RBAC\Models\Role;
 
 class RoleFactory extends Factory
 {

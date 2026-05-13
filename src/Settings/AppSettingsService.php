@@ -4,7 +4,7 @@ namespace Innertia\Settings;
 
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Cache;
-use Innertia\Models\Setting;
+use Innertia\Settings\Models\Setting;
 
 class AppSettingsService
 {

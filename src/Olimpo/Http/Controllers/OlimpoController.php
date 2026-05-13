@@ -5,8 +5,8 @@ namespace Innertia\Olimpo\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Innertia\Exports\TenantExport;
-use Innertia\Models\Process;
+use Innertia\Saas\Exports\TenantExport;
+use Innertia\Platform\Models\Process;
 use Innertia\Olimpo\Contracts\OlimpoHandler;
 use Innertia\Olimpo\Logging\OlimpoLogHandler;
 use Innertia\Olimpo\Metrics\SystemMetrics;
@@ -136,7 +136,7 @@ class OlimpoController extends Controller
         $exportClass = config('innertia.exports.handler');
 
         if ($exportClass && is_subclass_of($exportClass, TenantExport::class)) {
-            $tenantModel = config('innertia.saas.tenant_model', \Innertia\Models\Tenant::class);
+            $tenantModel = config('innertia.saas.tenant_model', \Innertia\Saas\Models\Tenant::class);
             $tenant      = $tenantModel::findOrFail($id);
 
             /** @var Process $process */

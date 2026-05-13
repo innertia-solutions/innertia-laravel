@@ -5,11 +5,11 @@ namespace Innertia\Backoffice\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Innertia\Models\Role;
-use Innertia\Roles\UseCases\CreateRole;
-use Innertia\Roles\UseCases\DeleteRole;
-use Innertia\Roles\UseCases\SyncRolePermissions;
-use Innertia\Roles\UseCases\UpdateRole;
+use Innertia\Auth\RBAC\Models\Role;
+use Innertia\Auth\RBAC\UseCases\CreateRole;
+use Innertia\Auth\RBAC\UseCases\DeleteRole;
+use Innertia\Auth\RBAC\UseCases\SyncRolePermissions;
+use Innertia\Auth\RBAC\UseCases\UpdateRole;
 
 class RolesController extends Controller
 {

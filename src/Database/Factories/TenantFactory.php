@@ -4,7 +4,7 @@ namespace Innertia\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
 use Illuminate\Support\Str;
-use Innertia\Models\Tenant;
+use Innertia\Saas\Models\Tenant;
 
 class TenantFactory extends Factory
 {

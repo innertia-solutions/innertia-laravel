@@ -4,7 +4,7 @@ namespace Innertia\Platform\UseCases;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Innertia\Exceptions\NotFoundException;
-use Innertia\Models\Subscription;
+use Innertia\Platform\Models\Subscription;
 use Innertia\Platform\Contracts\UseCase;
 
 class Unsubscribe extends UseCase

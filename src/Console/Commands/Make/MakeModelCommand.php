@@ -53,9 +53,9 @@ namespace App\Domains\\{$domain}\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
-use Innertia\Traits\Auditable;
-use Innertia\Traits\HasHistory;
-use Innertia\Traits\HasUuid;
+use Innertia\Platform\Traits\Auditable;
+use Innertia\Platform\Traits\HasHistory;
+use Innertia\Platform\Traits\HasUuid;
 
 class {$name} extends Model
 {

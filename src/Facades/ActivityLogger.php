@@ -2,8 +2,8 @@
 
 namespace Innertia\Facades;
 
-use Innertia\Models\ActivityLog;
-use Innertia\Services\ActivityLogService;
+use Innertia\Platform\Models\ActivityLog;
+use Innertia\Platform\Services\ActivityLogService;
 use Illuminate\Support\Facades\Facade;
 
 /**

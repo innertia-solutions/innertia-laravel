@@ -8,9 +8,9 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
-use Innertia\Roles\UseCases\CreateRole;
-use Innertia\Users\UseCases\AssignRole;
-use Innertia\Users\UseCases\RemoveRole;
+use Innertia\Auth\RBAC\UseCases\CreateRole;
+use Innertia\Auth\RBAC\UseCases\AssignRole;
+use Innertia\Auth\RBAC\UseCases\RemoveRole;
 
 class UsersController extends Controller
 {

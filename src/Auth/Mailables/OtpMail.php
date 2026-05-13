@@ -3,7 +3,7 @@
 namespace Innertia\Auth\Mailables;
 
 use Innertia\Mail\InnertiaMailable;
-use Innertia\Models\UserOtp;
+use Innertia\Auth\Models\UserOtp;
 
 class OtpMail extends InnertiaMailable
 {

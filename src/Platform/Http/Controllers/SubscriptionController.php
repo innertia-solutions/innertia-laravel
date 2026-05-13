@@ -5,7 +5,7 @@ namespace Innertia\Platform\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Innertia\Models\Subscription;
+use Innertia\Platform\Models\Subscription;
 use Innertia\Platform\UseCases\Subscribe;
 use Innertia\Platform\UseCases\Unsubscribe;
 use Innertia\Platform\UseCases\UpdateSubscription;

@@ -5,7 +5,7 @@ namespace Innertia\Notifications\Http;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Innertia\Models\Notification;
+use Innertia\Notifications\Models\Notification;
 
 class NotificationsController extends Controller
 {

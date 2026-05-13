@@ -5,7 +5,7 @@ namespace Innertia\Auth\Services;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Cache;
 use Innertia\Facades\Settings;
-use Innertia\Models\Session;
+use Innertia\Auth\Models\Session;
 use Tymon\JWTAuth\Facades\JWTAuth;
 use Tymon\JWTAuth\Facades\JWTFactory;
 
