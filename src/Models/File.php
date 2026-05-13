@@ -5,11 +5,11 @@ namespace Innertia\Models;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Innertia\Traits\HasEntityPermissions;
 
 /**
  * Central file registry for all uploaded/generated files.
@@ -24,14 +24,33 @@ use Illuminate\Support\Facades\Storage;
  *   $file->viewUrl()       // → /files/{id}/view    (inline, permission check)
  *   $file->temporaryUrl()  // → signed cloud URL    (bypasses permission check)
  *
+ * Visibility:
+ *   public     — anyone can access (even unauthenticated)
+ *   auth       — any authenticated user (default)
+ *   restricted — explicit grants required (see allowUsers / allowRoles)
+ *
+ * Restricted access (entity-level permissions):
  *   $file->allowUsers($user1, $user2)
  *   $file->allowRoles('admin', 'manager')
  *   $file->restrict(users: [$user1], roles: ['admin'])
  *   $file->isAccessibleBy($user)
+ *
+ * @property string      $id
+ * @property string      $disk
+ * @property string      $path
+ * @property string      $original_name
+ * @property string|null $mime_type
+ * @property string|null $extension
+ * @property int         $size
+ * @property string      $visibility  public|auth|restricted
+ * @property string|null $owner_type
+ * @property string|null $owner_id
+ * @property string|null $created_by
  */
 class File extends Model
 {
     use HasUuids;
+    use HasEntityPermissions;
 
     protected $fillable = [
         'disk',
@@ -83,10 +102,10 @@ class File extends Model
             throw new \RuntimeException("File not found: {$absolutePath}");
         }
 
-        $disk      = $disk ?: config('filesystems.default', 'local');
-        $filename  = basename($absolutePath);
-        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        $mimeType  = mime_content_type($absolutePath) ?: 'application/octet-stream';
+        $disk        = $disk ?: config('filesystems.default', 'local');
+        $filename    = basename($absolutePath);
+        $extension   = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $mimeType    = mime_content_type($absolutePath) ?: 'application/octet-stream';
         $storagePath = 'files/' . now()->format('Y/m') . '/' . uniqid() . '_' . $filename;
 
         Storage::disk($disk)->put($storagePath, file_get_contents($absolutePath));
@@ -105,12 +124,12 @@ class File extends Model
 
     public static function fromUrl(string $url, string $disk = '', string $visibility = 'auth'): static
     {
-        $response  = Http::get($url);
-        $disk      = $disk ?: config('filesystems.default', 'local');
-        $filename  = basename(parse_url($url, PHP_URL_PATH)) ?: 'download';
-        $extension = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
-        $mimeType  = $response->header('Content-Type') ?? 'application/octet-stream';
-        $contents  = $response->body();
+        $response    = Http::get($url);
+        $disk        = $disk ?: config('filesystems.default', 'local');
+        $filename    = basename(parse_url($url, PHP_URL_PATH)) ?: 'download';
+        $extension   = strtolower(pathinfo($filename, PATHINFO_EXTENSION));
+        $mimeType    = $response->header('Content-Type') ?? 'application/octet-stream';
+        $contents    = $response->body();
         $storagePath = 'files/' . now()->format('Y/m') . '/' . uniqid() . '_' . $filename;
 
         Storage::disk($disk)->put($storagePath, $contents);
@@ -150,61 +169,32 @@ class File extends Model
         return Storage::disk($this->disk)->temporaryUrl($this->path, now()->addMinutes($minutes));
     }
 
-    // ── Permissions ───────────────────────────────────────────────────────────
+    // ── Visibility & access control ───────────────────────────────────────────
 
+    /**
+     * Check if the given user can access this file.
+     *
+     * public      → always accessible
+     * auth        → any authenticated user
+     * restricted  → explicit grant required (entity-level permissions)
+     *               also checks: creator, and owner cascade if owner implements canAccess()
+     */
     public function isAccessibleBy(Authenticatable $user): bool
     {
         return match ($this->visibility) {
             'public' => true,
-            'auth'   => true, // caller already verified authentication
+            'auth'   => true, // caller already verified authentication upstream
             default  => $this->checkRestricted($user),
         };
     }
 
-    private function checkRestricted(Authenticatable $user): bool
-    {
-        $userId = (string) $user->getAuthIdentifier();
-
-        // Direct user permission
-        $direct = $this->permissions()
-            ->where('permissionable_type', get_class($user))
-            ->where('permissionable_id', $userId)
-            ->exists();
-
-        if ($direct) {
-            return true;
-        }
-
-        // Role-based permission (Spatie roles)
-        if (method_exists($user, 'getRoleNames')) {
-            $roles = $user->getRoleNames()->toArray();
-            $hasRole = $this->permissions()
-                ->where('permissionable_type', 'role')
-                ->whereIn('permissionable_id', $roles)
-                ->exists();
-
-            if ($hasRole) {
-                return true;
-            }
-        }
-
-        // Cascade via owner — if the owner model implements canAccess()
-        if ($this->owner && method_exists($this->owner, 'canAccess')) {
-            return $this->owner->canAccess($user);
-        }
-
-        // Creator always has access
-        return $this->created_by === $userId;
-    }
-
+    /**
+     * Grant file access to specific users.
+     * Sets visibility to 'restricted' automatically.
+     */
     public function allowUsers(Authenticatable ...$users): static
     {
-        foreach ($users as $user) {
-            $this->permissions()->firstOrCreate([
-                'permissionable_type' => get_class($user),
-                'permissionable_id'   => (string) $user->getAuthIdentifier(),
-            ]);
-        }
+        $this->grantAccessTo(...$users);
 
         $this->visibility = 'restricted';
         $this->save();
@@ -212,14 +202,13 @@ class File extends Model
         return $this;
     }
 
+    /**
+     * Grant file access to roles by name.
+     * Sets visibility to 'restricted' automatically.
+     */
     public function allowRoles(string ...$roles): static
     {
-        foreach ($roles as $role) {
-            $this->permissions()->firstOrCreate([
-                'permissionable_type' => 'role',
-                'permissionable_id'   => $role,
-            ]);
-        }
+        $this->grantAccessToRoles(...$roles);
 
         $this->visibility = 'restricted';
         $this->save();
@@ -227,6 +216,9 @@ class File extends Model
         return $this;
     }
 
+    /**
+     * Restrict the file and grant access to a mixed set of users and roles.
+     */
     public function restrict(array $users = [], array $roles = []): static
     {
         if (! empty($users)) {
@@ -264,6 +256,8 @@ class File extends Model
 
     public function delete(): ?bool
     {
+        $this->revokeAllEntityAccess();
+
         Storage::disk($this->disk)->delete($this->path);
 
         return parent::delete();
@@ -276,8 +270,25 @@ class File extends Model
         return $this->morphTo();
     }
 
-    public function permissions(): HasMany
+    // ── Private ───────────────────────────────────────────────────────────────
+
+    private function checkRestricted(Authenticatable $user): bool
     {
-        return $this->hasMany(FilePermission::class, 'file_id');
+        // Creator always has access
+        if ($this->created_by === (string) $user->getAuthIdentifier()) {
+            return true;
+        }
+
+        // Entity-level permission grant (via HasEntityPermissions trait)
+        if ($this->isEntityAccessibleBy($user)) {
+            return true;
+        }
+
+        // Cascade via owner — if the owning model implements canAccess()
+        if ($this->owner && method_exists($this->owner, 'canAccess')) {
+            return $this->owner->canAccess($user);
+        }
+
+        return false;
     }
 }

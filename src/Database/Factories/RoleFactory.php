@@ -3,7 +3,7 @@
 namespace Innertia\Database\Factories;
 
 use Illuminate\Database\Eloquent\Factories\Factory;
-use Spatie\Permission\Models\Role;
+use Innertia\Models\Role;
 
 class RoleFactory extends Factory
 {
@@ -12,9 +12,15 @@ class RoleFactory extends Factory
     public function definition(): array
     {
         return [
-            'name'       => $this->faker->unique()->word(),
-            'guard_name' => 'api',
+            'name'        => $this->faker->unique()->word(),
+            'description' => null,
+            'tenant_id'   => null,
         ];
+    }
+
+    public function forTenant(string $tenantId): static
+    {
+        return $this->state(['tenant_id' => $tenantId]);
     }
 
     public function withPermissions(array $permissions): static

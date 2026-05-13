@@ -65,16 +65,33 @@ return [
     | Permissions
     |--------------------------------------------------------------------------
     |
-    | Define your application permissions grouped by category. Run:
-    |   php artisan innertia:permissions          — create missing permissions
+    | Define application permissions. Two formats are supported (mix freely):
+    |
+    | 1. Classic array format:
+    |    ['category' => 'users', 'category_alias' => 'Usuarios', 'permissions' => [
+    |        'users.view'   => 'Ver lista de usuarios',
+    |        'users.manage' => 'Crear, editar y eliminar usuarios',
+    |    ]]
+    |
+    | 2. Enum class (recommended — type-safe, IDE-complete):
+    |    \App\Enums\UserPermissions::class
+    |    Where the enum is a backed string enum:
+    |      enum UserPermissions: string {
+    |          case View   = 'users.view';
+    |          case Manage = 'users.manage';
+    |      }
+    |
+    | Sync permissions to DB:
+    |   php artisan innertia:permissions          — create missing
     |   php artisan innertia:permissions --prune  — also delete removed ones
     |
-    | Each permission key is the Spatie permission name (e.g. 'users.view').
-    | The value is a human-readable description shown in role management UIs.
+    | Add HasRoles to your User model to enable role-based checks:
+    |   use Innertia\Traits\HasRoles;
     |
     */
 
     'permissions' => [
+        // Classic format example:
         // [
         //     'category'       => 'users',
         //     'category_alias' => 'Usuarios',
@@ -83,7 +100,28 @@ return [
         //         'users.manage' => 'Crear, editar y eliminar usuarios',
         //     ],
         // ],
+
+        // Enum format example:
+        // \App\Enums\UserPermissions::class,
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Permission Hierarchy (optional)
+    |--------------------------------------------------------------------------
+    |
+    | Declare which permissions implicitly grant others.
+    | This is a domain concern — disabled by default.
+    |
+    | Example: a user with 'users.manage' also has 'users.view'.
+    |
+    | 'permissions_hierarchy' => [
+    |     'users.manage' => ['users.view'],
+    | ],
+    |
+    */
+
+    'permissions_hierarchy' => [],
 
     /*
     |--------------------------------------------------------------------------

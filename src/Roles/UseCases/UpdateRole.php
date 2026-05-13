@@ -4,14 +4,15 @@ namespace Innertia\Roles\UseCases;
 
 use Innertia\Exceptions\ConflictException;
 use Innertia\Exceptions\NotFoundException;
+use Innertia\Models\Role;
 use Innertia\Platform\Contracts\UseCase;
-use Spatie\Permission\Models\Role;
 
 class UpdateRole extends UseCase
 {
     public function __construct(
-        public readonly string $roleId,
-        public readonly string $name,
+        public readonly string  $roleId,
+        public readonly string  $name,
+        public readonly ?string $description = null,
     ) {}
 
     public function execute(): mixed
@@ -23,7 +24,7 @@ class UpdateRole extends UseCase
         }
 
         $exists = Role::where('name', $this->name)
-            ->where('guard_name', $role->guard_name)
+            ->where('tenant_id', $role->tenant_id)
             ->where('id', '!=', $this->roleId)
             ->exists();
 
@@ -31,7 +32,10 @@ class UpdateRole extends UseCase
             throw new ConflictException("The role name \"{$this->name}\" is already taken by another role.");
         }
 
-        $role->update(['name' => $this->name]);
+        $role->update([
+            'name'        => $this->name,
+            'description' => $this->description ?? $role->description,
+        ]);
 
         return $role;
     }

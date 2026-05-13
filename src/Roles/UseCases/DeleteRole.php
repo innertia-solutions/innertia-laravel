@@ -3,8 +3,8 @@
 namespace Innertia\Roles\UseCases;
 
 use Innertia\Exceptions\NotFoundException;
+use Innertia\Models\Role;
 use Innertia\Platform\Contracts\UseCase;
-use Spatie\Permission\Models\Role;
 
 class DeleteRole extends UseCase
 {

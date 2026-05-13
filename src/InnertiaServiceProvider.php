@@ -2,10 +2,14 @@
 
 namespace Innertia;
 
+use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Event;
+use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Innertia\Auth\AuthServiceProvider;
+use Innertia\Auth\Middleware\PermissionMiddleware;
+use Innertia\Auth\Middleware\RoleMiddleware;
 use Innertia\Console\Commands\Make\MakeControllerCommand;
 use Innertia\Console\Commands\Make\MakeModelCommand;
 use Innertia\Console\Commands\Make\MakeUseCaseCommand;
@@ -58,6 +62,7 @@ class InnertiaServiceProvider extends ServiceProvider
     {
         $isSaas = config('innertia.mode') === 'saas';
 
+        // ── Migrations ────────────────────────────────────────────────────────
         $saasOnly = ['create_tenants_table', 'create_tenant_apps_table'];
 
         $migrations = array_filter(
@@ -69,9 +74,34 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
         $this->loadRoutesFrom(__DIR__ . '/Files/routes.php');
 
-        // Register anonymous Blade components under the <x-innertia::mail.*> namespace
+        // ── Blade components ──────────────────────────────────────────────────
         Blade::anonymousComponentPath(__DIR__ . '/../resources/views/components', 'innertia');
 
+        // ── Gate: check HasRoles::hasPermission() for all Gate checks ─────────
+        // Returns null (falls through) if the user model doesn't use HasRoles.
+        // This means the Gate keeps working for standard policy-based checks.
+        Gate::before(function (Authenticatable $user, string $ability) {
+            if (method_exists($user, 'hasPermission')) {
+                if ($user->hasPermission($ability)) {
+                    return true;
+                }
+
+                // Check optional hierarchy (config('innertia.permissions_hierarchy'))
+                $service = app(PermissionsService::class);
+                if ($service->check($user, $ability)) {
+                    return true;
+                }
+            }
+
+            return null; // fall through to policies
+        });
+
+        // ── Middleware aliases ─────────────────────────────────────────────────
+        $router = $this->app['router'];
+        $router->aliasMiddleware('role',       RoleMiddleware::class);
+        $router->aliasMiddleware('permission', PermissionMiddleware::class);
+
+        // ── Console commands ──────────────────────────────────────────────────
         if ($this->app->runningInConsole()) {
             $commands = [
                 SyncPermissionsCommand::class,
@@ -92,14 +122,16 @@ class InnertiaServiceProvider extends ServiceProvider
             $this->commands($commands);
         }
 
+        // ── Events ────────────────────────────────────────────────────────────
         Event::listen(DomainEvent::class, DomainEventRouter::class);
 
+        // ── Publishables ──────────────────────────────────────────────────────
         $this->publishes([
-            __DIR__ . '/../config/innertia.php'    => config_path('innertia.php'),
+            __DIR__ . '/../config/innertia.php' => config_path('innertia.php'),
         ], 'innertia-config');
 
         $this->publishes([
-            __DIR__ . '/../resources/views'        => resource_path('views/vendor/innertia'),
+            __DIR__ . '/../resources/views' => resource_path('views/vendor/innertia'),
         ], 'innertia-mail-views');
     }
 
@@ -134,8 +166,8 @@ class InnertiaServiceProvider extends ServiceProvider
 
     protected function configureTenancy(): void
     {
-        $saas     = config('innertia.saas', []);
-        $isMulti  = ($saas['db_strategy'] ?? 'single') === 'multi';
+        $saas    = config('innertia.saas', []);
+        $isMulti = ($saas['db_strategy'] ?? 'single') === 'multi';
 
         $tenantModel = $saas['tenant_model']
             ?? \Innertia\Models\Tenant::class;
@@ -147,7 +179,6 @@ class InnertiaServiceProvider extends ServiceProvider
         ];
 
         if ($isMulti) {
-            // Switch DB connection per tenant
             array_unshift($bootstrappers, \Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper::class);
         }
 

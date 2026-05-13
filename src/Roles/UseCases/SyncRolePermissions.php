@@ -3,14 +3,14 @@
 namespace Innertia\Roles\UseCases;
 
 use Innertia\Exceptions\NotFoundException;
+use Innertia\Models\Role;
 use Innertia\Platform\Contracts\UseCase;
-use Spatie\Permission\Models\Role;
 
 class SyncRolePermissions extends UseCase
 {
     public function __construct(
         public readonly string $roleId,
-        public readonly array $permissions,
+        public readonly array  $permissions,
     ) {}
 
     public function execute(): mixed
@@ -23,6 +23,6 @@ class SyncRolePermissions extends UseCase
 
         $role->syncPermissions($this->permissions);
 
-        return $role;
+        return $role->load('permissions');
     }
 }

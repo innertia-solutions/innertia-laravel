@@ -2,32 +2,65 @@
 
 namespace Innertia\Services;
 
-use Spatie\Permission\Models\Permission;
+use Innertia\Models\Permission;
 
+/**
+ * Manages named (app-level) permissions from config.
+ *
+ * Config formats supported:
+ *
+ * 1. Classic array format:
+ *    'permissions' => [
+ *        ['category' => 'users', 'category_alias' => 'Usuarios', 'permissions' => [
+ *            'users.view'   => 'Ver usuarios',
+ *            'users.manage' => 'Gestionar usuarios',
+ *        ]],
+ *    ]
+ *
+ * 2. Enum class format (recommended — type-safe, IDE-complete):
+ *    'permissions' => [
+ *        \App\Enums\UserPermissions::class,
+ *        \App\Enums\ClientPermissions::class,
+ *    ]
+ *    Where each enum is a BackedEnum: string:
+ *      enum UserPermissions: string {
+ *          case View   = 'users.view';
+ *          case Manage = 'users.manage';
+ *      }
+ *
+ * Both formats can be mixed in the same config array.
+ *
+ * Optional permission hierarchy (declare in config/innertia.php):
+ *   'permissions_hierarchy' => [
+ *       'users.manage' => ['users.view'],   // manage implies view
+ *   ]
+ *
+ * The hierarchy is intentionally NOT built into the DB schema — it is a
+ * domain concern that varies per project. Enable it per-app via config.
+ */
 class PermissionsService
 {
     /**
-     * Sync permissions from config to the database.
+     * Sync named permissions from config to the database.
      *
-     * Creates permissions that don't exist yet.
+     * Creates permissions that do not exist yet.
      * Pass $prune = true to also delete permissions no longer in config.
      *
      * Returns ['created' => int, 'skipped' => int, 'deleted' => int]
      */
     public function sync(bool $prune = false): array
     {
-        $configured = $this->configuredKeys();
-
-        $created = 0;
-        $skipped = 0;
+        $configured = $this->keys();
+        $created    = 0;
+        $skipped    = 0;
 
         foreach ($configured as $name) {
-            $exists = Permission::where('name', $name)->exists();
+            $exists = Permission::whereNull('entity_type')->where('name', $name)->exists();
 
             if ($exists) {
                 $skipped++;
             } else {
-                Permission::create(['name' => $name, 'guard_name' => 'api']);
+                Permission::findOrCreate($name);
                 $created++;
             }
         }
@@ -35,39 +68,73 @@ class PermissionsService
         $deleted = 0;
 
         if ($prune) {
-            $deleted = Permission::whereNotIn('name', $configured)->delete();
+            $deleted = Permission::named()
+                ->whereNotIn('name', $configured)
+                ->delete();
         }
-
-        app()[\Spatie\Permission\PermissionRegistrar::class]->forgetCachedPermissions();
 
         return compact('created', 'skipped', 'deleted');
     }
 
     /**
-     * All permissions grouped by category, as defined in config.
-     * Useful for building a role management UI.
+     * Check if a user has a named permission.
+     * Convenience wrapper around $user->hasPermission().
      *
-     * Returns:
+     * Respects the optional hierarchy defined in config('innertia.permissions_hierarchy').
+     */
+    public function check(\Illuminate\Contracts\Auth\Authenticatable $user, string|\BackedEnum $permission): bool
+    {
+        if (! method_exists($user, 'hasPermission')) {
+            return false;
+        }
+
+        $name = $permission instanceof \BackedEnum ? $permission->value : $permission;
+
+        if ($user->hasPermission($name)) {
+            return true;
+        }
+
+        // Optional hierarchy check
+        return $this->checkHierarchy($user, $name);
+    }
+
+    /**
+     * All permission groups as defined in config.
+     * Useful for building role management UIs.
+     *
+     * Returns a normalised array — enum entries are expanded to the same
+     * structure as classic array entries.
+     *
      * [
-     *   ['category' => 'users', 'category_alias' => 'Usuarios', 'permissions' => ['users.view' => 'Ver...']],
+     *   ['category' => 'users', 'category_alias' => 'Users', 'permissions' => [
+     *       'users.view' => 'users.view', ...
+     *   ]],
      *   ...
      * ]
      */
     public function all(): array
     {
-        return config('innertia.permissions', []);
+        return $this->normalised();
     }
 
     /**
-     * Flat list of all permission names from config.
+     * Flat list of all configured permission names.
      */
     public function keys(): array
     {
-        return $this->configuredKeys();
+        $keys = [];
+
+        foreach ($this->normalised() as $group) {
+            foreach (array_keys($group['permissions'] ?? []) as $name) {
+                $keys[] = $name;
+            }
+        }
+
+        return $keys;
     }
 
     /**
-     * Category list only (without permissions detail).
+     * Category list only — without permission detail.
      */
     public function categories(): array
     {
@@ -76,20 +143,73 @@ class PermissionsService
                 'category'       => $group['category'],
                 'category_alias' => $group['category_alias'],
             ],
-            config('innertia.permissions', [])
+            $this->normalised()
         );
     }
 
-    private function configuredKeys(): array
+    /**
+     * Hierarchy map from config.
+     *
+     * Example: ['users.manage' => ['users.view']]
+     * Means: a user with 'users.manage' implicitly has 'users.view'.
+     */
+    public function getHierarchy(): array
     {
-        $keys = [];
+        return config('innertia.permissions_hierarchy', []);
+    }
 
-        foreach (config('innertia.permissions', []) as $group) {
-            foreach (array_keys($group['permissions'] ?? []) as $name) {
-                $keys[] = $name;
+    // ── Internal ──────────────────────────────────────────────────────────────
+
+    private function normalised(): array
+    {
+        $groups = [];
+
+        foreach (config('innertia.permissions', []) as $entry) {
+            if (is_string($entry) && enum_exists($entry)) {
+                // Enum class → expand to classic group format
+                $groups[] = $this->expandEnum($entry);
+            } elseif (is_array($entry) && isset($entry['category'])) {
+                $groups[] = $entry;
             }
         }
 
-        return $keys;
+        return $groups;
+    }
+
+    private function expandEnum(string $enumClass): array
+    {
+        $cases       = $enumClass::cases();
+        $permissions = [];
+
+        foreach ($cases as $case) {
+            $permissions[$case->value] = $case->name; // value = 'users.view', name = 'View'
+        }
+
+        // Derive a readable category from the enum class name
+        // e.g. App\Enums\UserPermissions → 'user_permissions' → 'user'
+        $shortName = class_basename($enumClass);
+        $category  = strtolower(preg_replace('/Permissions$/i', '', $shortName));
+        $category  = \Illuminate\Support\Str::snake($category);
+
+        return [
+            'category'       => $category,
+            'category_alias' => \Illuminate\Support\Str::title(str_replace('_', ' ', $category)),
+            'permissions'    => $permissions,
+        ];
+    }
+
+    private function checkHierarchy(\Illuminate\Contracts\Auth\Authenticatable $user, string $needed): bool
+    {
+        $hierarchy = $this->getHierarchy();
+
+        // hierarchy: ['users.manage' => ['users.view']]
+        // If the user has 'users.manage', they implicitly have 'users.view'.
+        foreach ($hierarchy as $grant => $implied) {
+            if (in_array($needed, (array) $implied, true) && $user->hasPermission($grant)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
