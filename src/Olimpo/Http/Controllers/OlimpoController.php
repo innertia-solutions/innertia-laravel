@@ -5,6 +5,8 @@ namespace Innertia\Olimpo\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Innertia\Exports\TenantExport;
+use Innertia\Models\TenantExportRecord;
 use Innertia\Olimpo\Contracts\OlimpoHandler;
 use Innertia\Olimpo\Logging\OlimpoLogHandler;
 use Innertia\Olimpo\Metrics\SystemMetrics;
@@ -88,13 +90,63 @@ class OlimpoController extends Controller
         return response()->json($this->handler->impersonate($id, $userId));
     }
 
+    /**
+     * GET /olimpo/tenants/{id}/backups
+     *
+     * Lists all TenantExportRecords for a specific tenant.
+     * Falls back to OlimpoHandler::getTenantBackups() if no records found
+     * (backwards compatibility with apps that implement their own backup logic).
+     */
     public function getTenantBackups(string $id): JsonResponse
     {
+        $records = TenantExportRecord::where('tenant_id', $id)
+            ->orderByDesc('created_at')
+            ->get()
+            ->map(fn (TenantExportRecord $r) => [
+                'id'           => $r->id,
+                'status'       => $r->status,
+                'size_mb'      => $r->sizeMb(),
+                'checksum'     => $r->checksum,
+                'error'        => $r->error,
+                'completed_at' => $r->completed_at?->toISOString(),
+                'created_at'   => $r->created_at->toISOString(),
+            ]);
+
+        if ($records->isNotEmpty()) {
+            return response()->json($records);
+        }
+
+        // Fallback to app-level handler
         return response()->json($this->handler->getTenantBackups($id));
     }
 
+    /**
+     * POST /olimpo/tenants/{id}/backups
+     *
+     * Triggers a tenant export for the given tenant ID.
+     * The export class must be registered in config('innertia.exports.handler').
+     * Falls back to OlimpoHandler::createBackup() if not configured.
+     */
     public function createBackup(string $id): JsonResponse
     {
+        $exportClass = config('innertia.exports.handler');
+
+        if ($exportClass && is_subclass_of($exportClass, TenantExport::class)) {
+            // Resolve the tenant model
+            $tenantModel = config('innertia.saas.tenant_model', \Innertia\Models\Tenant::class);
+            $tenant      = $tenantModel::findOrFail($id);
+
+            $record = (new $exportClass)->queue($tenant);
+
+            return response()->json([
+                'id'         => $record->id,
+                'status'     => $record->status,
+                'tenant_id'  => $id,
+                'created_at' => $record->created_at->toISOString(),
+            ], 201);
+        }
+
+        // Fallback to app-level handler
         return response()->json($this->handler->createBackup($id), 201);
     }
 }

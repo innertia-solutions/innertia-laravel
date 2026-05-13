@@ -115,7 +115,13 @@ return [
     */
 
     'exports' => [
+        // Storage disk for export ZIPs (defaults to cloud disk: R2/S3)
         'disk' => env('EXPORT_DISK', env('FILESYSTEM_CLOUD', 'local')),
+
+        // Your TenantExport subclass. When set, Olimpo's POST /olimpo/tenants/{id}/backups
+        // will automatically queue an export using this class.
+        // Example: \App\Exports\ExportTenantData::class
+        'handler' => null,
     ],
 
     'mail' => [
