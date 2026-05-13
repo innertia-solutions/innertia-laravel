@@ -4,6 +4,7 @@ namespace Innertia\Traits;
 
 use Illuminate\Support\Collection;
 use Innertia\Exceptions\NotFoundException;
+use Innertia\Facades\Permissions;
 use Innertia\Models\Permission;
 use Innertia\Models\Role;
 
@@ -67,6 +68,7 @@ trait HasRoles
     {
         $role = $this->resolveRole($role);
         $this->roles()->syncWithoutDetaching([$role->id]);
+        Permissions::flushUser($this);
     }
 
     /**
@@ -78,6 +80,7 @@ trait HasRoles
 
         if ($role) {
             $this->roles()->detach($role->id);
+            Permissions::flushUser($this);
         }
     }
 
@@ -95,6 +98,7 @@ trait HasRoles
             ->all();
 
         $this->roles()->sync($ids);
+        Permissions::flushUser($this);
     }
 
     // ── Role checks ───────────────────────────────────────────────────────────
@@ -136,29 +140,14 @@ trait HasRoles
     /**
      * Check if the model has a named (app-level) permission.
      *
-     * Checks in order:
-     *   1. Direct grants (model_permissions)
-     *   2. Via assigned roles (model_roles → role_permissions)
+     * Delegates to PermissionsService so the result is cache-aware
+     * and respects the optional permissions hierarchy from config.
      *
      * Accepts a plain string or any BackedEnum.
      */
     public function hasPermission(string|\BackedEnum $permission): bool
     {
-        $name = $permission instanceof \BackedEnum ? $permission->value : $permission;
-
-        // 1 — Direct grant
-        $hasDirect = $this->directPermissions()
-            ->where('name', $name)
-            ->exists();
-
-        if ($hasDirect) {
-            return true;
-        }
-
-        // 2 — Via roles
-        return $this->roles()
-            ->whereHas('permissions', fn ($q) => $q->where('name', $name))
-            ->exists();
+        return Permissions::check($this, $permission);
     }
 
     /**
@@ -169,6 +158,7 @@ trait HasRoles
         $name = $permission instanceof \BackedEnum ? $permission->value : $permission;
         $p    = Permission::findOrCreate($name);
         $this->directPermissions()->syncWithoutDetaching([$p->id]);
+        Permissions::flushUser($this);
     }
 
     /**
@@ -182,6 +172,7 @@ trait HasRoles
 
         if ($p) {
             $this->directPermissions()->detach($p->id);
+            Permissions::flushUser($this);
         }
     }
 

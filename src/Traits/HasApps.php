@@ -2,6 +2,7 @@
 
 namespace Innertia\Traits;
 
+use Illuminate\Support\Facades\Cache;
 use Innertia\Models\UserApp;
 
 /**
@@ -28,16 +29,27 @@ trait HasApps
 
     /**
      * App keys the user has access to (filtered to those still in config).
+     *
+     * Result is cached per user (+ tenant in SaaS) using the same TTL as
+     * the permissions cache (config('innertia.cache.ttl')).
      */
     public function appKeys(): array
     {
-        $configured = array_keys(config('innertia.apps', []));
+        $ttl = config('innertia.cache.ttl', 60);
 
-        return UserApp::where('user_id', $this->getKey())
-            ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentAppTenantId()))
-            ->whereIn('app', $configured)
-            ->pluck('app')
-            ->all();
+        $loader = function () {
+            $configured = array_keys(config('innertia.apps', []));
+
+            return UserApp::where('user_id', $this->getKey())
+                ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentAppTenantId()))
+                ->whereIn('app', $configured)
+                ->pluck('app')
+                ->all();
+        };
+
+        return $ttl === null
+            ? Cache::rememberForever($this->appCacheKey(), $loader)
+            : Cache::remember($this->appCacheKey(), now()->addMinutes($ttl), $loader);
     }
 
     public function hasApp(string $key): bool
@@ -46,10 +58,7 @@ trait HasApps
             return false;
         }
 
-        return UserApp::where('user_id', $this->getKey())
-            ->where('app', $key)
-            ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentAppTenantId()))
-            ->exists();
+        return in_array($key, $this->appKeys(), true);
     }
 
     // ── Grant / revoke ────────────────────────────────────────────────────────
@@ -69,6 +78,8 @@ trait HasApps
 
             UserApp::firstOrCreate($data);
         }
+
+        $this->flushAppCache();
     }
 
     public function revokeApp(string $key): void
@@ -77,6 +88,8 @@ trait HasApps
             ->where('app', $key)
             ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentAppTenantId()))
             ->delete();
+
+        $this->flushAppCache();
     }
 
     /**
@@ -93,9 +106,25 @@ trait HasApps
         $query->delete();
 
         $this->grantApp($keys);
+        // grantApp already flushes — no double flush needed
     }
 
-    // ── Helper ────────────────────────────────────────────────────────────────
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function appCacheKey(): string
+    {
+        $userId   = (string) $this->getKey();
+        $tenantId = $this->currentAppTenantId();
+
+        return $tenantId
+            ? "innertia.apps.{$tenantId}.{$userId}"
+            : "innertia.apps.{$userId}";
+    }
+
+    private function flushAppCache(): void
+    {
+        Cache::forget($this->appCacheKey());
+    }
 
     private function currentAppTenantId(): ?string
     {

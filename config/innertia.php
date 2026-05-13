@@ -17,6 +17,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Cache
+    |--------------------------------------------------------------------------
+    |
+    | TTL in minutes for permission and app-access caches.
+    | null = store forever (relies entirely on explicit invalidation).
+    |
+    | Cache is automatically busted when roles/permissions/apps are changed
+    | via the library's traits and use cases.
+    |
+    */
+
+    'cache' => [
+        'ttl' => 60, // minutes — null for no expiry
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Apps / Contexts
     |--------------------------------------------------------------------------
     |

@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Innertia\Exceptions\ConflictException;
 use Innertia\Exceptions\NotFoundException;
+use Innertia\Facades\Permissions;
 
 /**
  * Role model.
@@ -75,33 +76,39 @@ class Role extends Model
      * Add permissions to the role without removing existing ones.
      *
      * Accepts: string names, BackedEnum values, or Permission models.
+     * Busts the cache for every user that has this role.
      */
     public function givePermissions(string|\BackedEnum|Permission ...$permissions): static
     {
         $ids = $this->resolvePermissionIds($permissions);
         $this->permissions()->syncWithoutDetaching($ids);
+        Permissions::flushRole($this);
 
         return $this;
     }
 
     /**
      * Replace the role's full permission set.
+     * Busts the cache for every user that has this role.
      */
     public function syncPermissions(array $permissions): static
     {
         $ids = $this->resolvePermissionIds($permissions);
         $this->permissions()->sync($ids);
+        Permissions::flushRole($this);
 
         return $this;
     }
 
     /**
      * Remove one or more permissions from the role.
+     * Busts the cache for every user that has this role.
      */
     public function revokePermissions(string|\BackedEnum|Permission ...$permissions): static
     {
         $ids = $this->resolvePermissionIds($permissions);
         $this->permissions()->detach($ids);
+        Permissions::flushRole($this);
 
         return $this;
     }
