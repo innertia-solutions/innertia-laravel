@@ -12,8 +12,7 @@ class CreateTenantCommand extends Command
         {key  : Unique slug identifier for the tenant (e.g. acme)}
         {name : Display name for the tenant (e.g. "Acme Corp")}
         {--status=trial       : Initial status (trial, active, inactive)}
-        {--trial-days=14      : Days until trial expires (only when status=trial)}
-        {--domain=            : Optional domain to attach (e.g. acme.myapp.com)}';
+        {--trial-days=14      : Days until trial expires (only when status=trial)}';
 
     protected $description = 'Create a new tenant';
 
@@ -29,10 +28,6 @@ class CreateTenantCommand extends Command
         } catch (ConflictException $e) {
             $this->error($e->getMessage());
             return self::FAILURE;
-        }
-
-        if ($domain = $this->option('domain')) {
-            $tenant->domains()->create(['domain' => $domain]);
         }
 
         $this->info("Tenant \"{$key}\" created successfully.");

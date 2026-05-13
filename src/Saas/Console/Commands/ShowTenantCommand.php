@@ -31,12 +31,6 @@ class ShowTenantCommand extends Command
             ['Updated',    $tenant->updated_at->format('Y-m-d H:i')],
         ]);
 
-        if ($tenant->domains && $tenant->domains->isNotEmpty()) {
-            $this->newLine();
-            $this->line('<fg=gray>Domains:</>');
-            $this->table(['Domain'], $tenant->domains->map(fn ($d) => [$d->domain])->toArray());
-        }
-
         return self::SUCCESS;
     }
 }

@@ -74,10 +74,6 @@ class InnertiaServiceProvider extends ServiceProvider
             $isSaas ? SaasSettingsService::class : AppSettingsService::class
         );
 
-        if ($isSaas) {
-            $this->configureTenancy();
-        }
-
         $this->app->register(AuthServiceProvider::class);
         $this->app->singleton(WebhookService::class);
     }
@@ -133,9 +129,11 @@ class InnertiaServiceProvider extends ServiceProvider
 
         // ── Middleware aliases ─────────────────────────────────────────────────
         $router = $this->app['router'];
-        $router->aliasMiddleware('app',        AppMiddleware::class);
-        $router->aliasMiddleware('role',       RoleMiddleware::class);
-        $router->aliasMiddleware('permission', PermissionMiddleware::class);
+        $router->aliasMiddleware('app',            AppMiddleware::class);
+        $router->aliasMiddleware('role',           RoleMiddleware::class);
+        $router->aliasMiddleware('permission',     PermissionMiddleware::class);
+        $router->aliasMiddleware('tenant.resolve', \Innertia\Saas\Middleware\ResolveTenantFromHeader::class);
+        $router->aliasMiddleware('tenant.require', \Innertia\Saas\Middleware\RequireTenant::class);
 
         // ── Console commands ──────────────────────────────────────────────────
         if ($this->app->runningInConsole()) {
@@ -207,73 +205,4 @@ class InnertiaServiceProvider extends ServiceProvider
         ]);
     }
 
-    protected function configureTenancy(): void
-    {
-        $saas    = config('innertia.saas', []);
-        $isMulti = ($saas['db_strategy'] ?? 'single') === 'multi';
-
-        $tenantModel = $saas['tenant_model']
-            ?? \Innertia\Saas\Models\Tenant::class;
-
-        $bootstrappers = [
-            \Stancl\Tenancy\Bootstrappers\CacheTenancyBootstrapper::class,
-            \Stancl\Tenancy\Bootstrappers\FilesystemTenancyBootstrapper::class,
-            \Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper::class,
-        ];
-
-        if ($isMulti) {
-            array_unshift($bootstrappers, \Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper::class);
-        }
-
-        config([
-            'tenancy.tenant_model'    => $tenantModel,
-            'tenancy.id_generator'    => null,
-            'tenancy.central_domains' => $saas['central_domains'] ?? ['localhost', '127.0.0.1'],
-
-            'tenancy.bootstrappers' => $bootstrappers,
-
-            'tenancy.database' => [
-                'central_connection'         => 'pgsql',
-                'template_tenant_connection' => null,
-                'prefix'                     => $saas['db_prefix'] ?? 'tenant_',
-                'suffix'                     => '',
-                'managers'                   => [
-                    'pgsql' => \Stancl\Tenancy\TenantDatabaseManagers\PostgreSQLDatabaseManager::class,
-                ],
-            ],
-
-            'tenancy.cache' => [
-                'tag_base' => 'tenant',
-            ],
-
-            'tenancy.filesystem' => [
-                'suffix_base'          => 'tenant',
-                'disks'                => ['local', 'public'],
-                'root_override'        => [
-                    'local'  => '%storage_path%/app/',
-                    'public' => '%storage_path%/app/public/',
-                ],
-                'suffix_storage_path'  => true,
-                'asset_helper_tenancy' => false,
-            ],
-
-            'tenancy.redis' => [
-                'prefix_base'          => 'tenant',
-                'prefixed_connections' => [],
-            ],
-
-            'tenancy.features' => [],
-            'tenancy.routes'   => false,
-
-            'tenancy.migration_parameters' => [
-                '--force'    => true,
-                '--path'     => [database_path('migrations/tenant')],
-                '--realpath' => true,
-            ],
-
-            'tenancy.seeder_parameters' => [
-                '--class' => 'TenantDatabaseSeeder',
-            ],
-        ]);
-    }
 }
