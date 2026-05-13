@@ -72,7 +72,16 @@ class InnertiaServiceProvider extends ServiceProvider
             fn ($f) => $isSaas || ! collect($saasOnly)->contains(fn ($s) => str_contains($f, $s))
         );
 
+        // Load from vendor so migrate works out-of-the-box without publishing.
         $this->loadMigrationsFrom(array_values($migrations));
+
+        // Also make them publishable — run `php artisan vendor:publish --tag=innertia-migrations`
+        // to copy them into database/migrations/ when you need to inspect or customize them.
+        $publishMap = array_combine(
+            array_values($migrations),
+            array_map(fn ($f) => database_path('migrations/' . basename($f)), $migrations)
+        );
+        $this->publishes($publishMap, 'innertia-migrations');
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
         $this->loadRoutesFrom(__DIR__ . '/Files/routes.php');
 
