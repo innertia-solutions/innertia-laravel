@@ -148,7 +148,6 @@ trait HasRoles
 
         // 1 — Direct grant
         $hasDirect = $this->directPermissions()
-            ->whereNull('entity_type')
             ->where('name', $name)
             ->exists();
 
@@ -158,7 +157,7 @@ trait HasRoles
 
         // 2 — Via roles
         return $this->roles()
-            ->whereHas('permissions', fn ($q) => $q->whereNull('entity_type')->where('name', $name))
+            ->whereHas('permissions', fn ($q) => $q->where('name', $name))
             ->exists();
     }
 
@@ -177,8 +176,9 @@ trait HasRoles
      */
     public function revokePermission(string|\BackedEnum $permission): void
     {
-        $name = $permission instanceof \BackedEnum ? $permission->value : $permission;
-        $p    = Permission::named($name)->first();
+        $name     = $permission instanceof \BackedEnum ? $permission->value : $permission;
+        $tenantId = $this->currentTenantId();
+        $p        = Permission::where('name', $name)->where('tenant_id', $tenantId)->first();
 
         if ($p) {
             $this->directPermissions()->detach($p->id);

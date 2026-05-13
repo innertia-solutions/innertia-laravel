@@ -8,51 +8,41 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 /**
- * Unified permission record.
+ * Named (app-level) permission.
  *
- * Named permission (entity_type = null, entity_id = null):
- *   Permission::findOrCreate('users.view')
+ * Permissions define what actions exist in the system ('users.view', 'clients.manage').
+ * They are defined in code (config/enums) and optionally synced to DB with descriptions.
+ * The app works without running sync — permissions are created lazily via findOrCreate().
  *
- * Entity-level permission (grants access to a specific model instance):
- *   Permission::findOrCreate('access', File::class, $file->id)
- *   Permission::forEntity($file)          // shorthand, name defaults to 'access'
- *   Permission::forEntity($file, 'edit')  // custom action name
+ * For granting access to a specific model instance (row-level), use EntityPermission.
  *
  * @property string      $id
+ * @property string|null $tenant_id
  * @property string      $name
- * @property string|null $entity_type
- * @property string|null $entity_id
  * @property string|null $description
  */
 class Permission extends Model
 {
     use HasUuids;
 
-    protected $fillable = ['name', 'entity_type', 'entity_id', 'description'];
+    protected $fillable = ['tenant_id', 'name', 'description'];
 
     // ── Static factories ──────────────────────────────────────────────────────
 
     /**
-     * Find an existing permission or create it.
+     * Find an existing named permission or create it lazily.
      *
-     * For named permissions:  findOrCreate('users.view')
-     * For entity permissions: findOrCreate('access', File::class, $id)
-     *
-     * When creating a named permission lazily (no description passed), the
-     * description is left null. Run `artisan innertia:permissions` to backfill
-     * descriptions from the config/enum definitions.
+     * When created lazily (description = null), run `artisan innertia:permissions`
+     * to backfill descriptions from the config/enum definitions.
      */
-    public static function findOrCreate(
-        string  $name,
-        ?string $entityType  = null,
-        ?string $entityId    = null,
-        ?string $description = null,
-    ): static {
+    public static function findOrCreate(string $name, ?string $description = null): static
+    {
+        $tenantId = (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
+
         return static::firstOrCreate(
             [
-                'name'        => $name,
-                'entity_type' => $entityType,
-                'entity_id'   => $entityId,
+                'name'      => $name,
+                'tenant_id' => $tenantId,
             ],
             [
                 'description' => $description,
@@ -60,29 +50,15 @@ class Permission extends Model
         );
     }
 
-    /**
-     * Get (or create) the entity-level permission for a model instance.
-     *
-     * Usage: Permission::forEntity($file)
-     *        Permission::forEntity($document, 'edit')
-     */
-    public static function forEntity(Model $entity, string $name = 'access'): static
-    {
-        return static::findOrCreate($name, get_class($entity), (string) $entity->getKey());
-    }
-
     // ── Scopes ────────────────────────────────────────────────────────────────
 
-    /** Only named (app-level) permissions. */
+    /**
+     * Scope to named permissions (excludes nothing — all rows are named now).
+     * Kept for readability and forward-compat.
+     */
     public function scopeNamed(Builder $query): Builder
     {
-        return $query->whereNull('entity_type');
-    }
-
-    /** Only entity-level permissions for a given model class. */
-    public function scopeForEntityType(Builder $query, string $type): Builder
-    {
-        return $query->where('entity_type', $type);
+        return $query;
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────

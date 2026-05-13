@@ -3,49 +3,69 @@
 namespace Innertia\Traits;
 
 use Illuminate\Contracts\Auth\Authenticatable;
-use Illuminate\Support\Facades\DB;
-use Innertia\Models\Permission;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Innertia\Models\EntityPermission;
 use Innertia\Models\Role;
 
 /**
  * Add to any Eloquent model to enable entity-level access control.
  *
- * This trait allows granting/revoking access to a specific model instance
- * for individual users or roles — independently of app-level named permissions.
+ * This trait is for row-level / resource-level access — not app-wide named permissions.
+ * It answers the question: "can THIS user access THIS specific resource?"
  *
  *   class File extends Model {
  *       use HasEntityPermissions;
  *   }
  *
- * Usage:
- *   $file->grantAccessTo($user1, $user2);
- *   $file->grantAccessToRoles('admin', 'manager');
- *   $file->revokeAccessFrom($user);
- *   $file->isEntityAccessibleBy($user);    // bool
- *   $file->revokeAllEntityAccess();        // drops the permission record entirely
+ * Granting access:
+ *   $file->grantAccessTo($user)               // User → File
+ *   $file->grantAccessTo($user, 'edit')        // User → File (specific action)
+ *   $file->grantAccessToRoles('admin')         // Role → File
+ *   $file->grantAccessToRoles('admin', 'edit') // Role → File (specific action)
+ *   $file->grantAccessTo($project)             // Entity → File (cascade)
  *
- * How it works:
- *   - A row in `permissions` is lazily created: name='access', entity_type=<class>, entity_id=<id>
- *   - Grants are rows in `model_permissions`: model_type=User::class, model_id=<uid>, permission_id=<pid>
- *   - Role grants: model_type=Role::class, model_id=<role_id>, permission_id=<pid>
+ * Revoking:
+ *   $file->revokeAccessFrom($user)
+ *   $file->revokeAllEntityAccess()            // drop all grants on this entity
+ *
+ * Checking:
+ *   $file->isEntityAccessibleBy($user)
+ *   $file->isEntityAccessibleBy($user, 'edit')
+ *
+ * Low-level (via EntityPermission model directly):
+ *   EntityPermission::grant($file, $user)
+ *   EntityPermission::check($file, $user)
+ *   EntityPermission::revoke($file, $user)
  */
 trait HasEntityPermissions
 {
+    // ── Relationship ──────────────────────────────────────────────────────────
+
+    /**
+     * All entity-level grants on this model instance.
+     */
+    public function entityPermissions(): HasMany
+    {
+        return $this->hasMany(EntityPermission::class, 'entity_id')
+            ->where('entity_type', static::class);
+    }
+
     // ── Grant ─────────────────────────────────────────────────────────────────
 
     /**
-     * Grant access to specific users.
+     * Grant access to one or more grantables (User, Role, or any entity).
+     *
+     * $file->grantAccessTo($user)
+     * $file->grantAccessTo($user, 'edit')
+     * $file->grantAccessTo($role, $user2)          // multiple grantables, same action
+     * $file->grantAccessTo($user, action: 'delete')
      */
-    public function grantAccessTo(Authenticatable ...$users): static
+    public function grantAccessTo(mixed ...$args): static
     {
-        $permission = Permission::forEntity($this);
+        [$grantables, $action] = $this->parseGrantArgs($args, 'access');
 
-        foreach ($users as $user) {
-            DB::table('model_permissions')->insertOrIgnore([
-                'model_type'    => get_class($user),
-                'model_id'      => (string) $user->getAuthIdentifier(),
-                'permission_id' => $permission->id,
-            ]);
+        foreach ($grantables as $grantable) {
+            EntityPermission::grant($this, $grantable, $action);
         }
 
         return $this;
@@ -53,22 +73,21 @@ trait HasEntityPermissions
 
     /**
      * Grant access to roles by name.
-     * Roles are resolved within the current tenant context.
+     *
+     * $file->grantAccessToRoles('admin', 'manager')
+     * $file->grantAccessToRoles('admin', action: 'edit')
      */
-    public function grantAccessToRoles(string ...$roleNames): static
+    public function grantAccessToRoles(mixed ...$args): static
     {
-        $permission = Permission::forEntity($this);
-        $tenantId   = $this->currentEntityTenantId();
+        [$roleNames, $action] = $this->parseGrantArgs($args, 'access');
+
+        $tenantId = (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
 
         foreach ($roleNames as $name) {
-            $role = Role::findByName($name, $tenantId);
+            $role = Role::findByName((string) $name, $tenantId);
 
             if ($role) {
-                DB::table('model_permissions')->insertOrIgnore([
-                    'model_type'    => Role::class,
-                    'model_id'      => (string) $role->id,
-                    'permission_id' => $permission->id,
-                ]);
+                EntityPermission::grant($this, $role, $action);
             }
         }
 
@@ -78,63 +97,53 @@ trait HasEntityPermissions
     // ── Revoke ────────────────────────────────────────────────────────────────
 
     /**
-     * Revoke access from specific users.
+     * Revoke access from one or more grantables.
+     *
+     * $file->revokeAccessFrom($user)
+     * $file->revokeAccessFrom($user, action: 'edit')
      */
-    public function revokeAccessFrom(Authenticatable ...$users): static
+    public function revokeAccessFrom(mixed ...$args): static
     {
-        $permission = $this->entityPermission();
+        [$grantables, $action] = $this->parseGrantArgs($args, 'access');
 
-        if (! $permission) {
-            return $this;
-        }
-
-        foreach ($users as $user) {
-            DB::table('model_permissions')
-                ->where('model_type', get_class($user))
-                ->where('model_id', (string) $user->getAuthIdentifier())
-                ->where('permission_id', $permission->id)
-                ->delete();
+        foreach ($grantables as $grantable) {
+            EntityPermission::revoke($this, $grantable, $action);
         }
 
         return $this;
     }
 
     /**
-     * Remove all entity-level access grants and the permission record itself.
-     * Use when the entity is deleted or access needs a full reset.
+     * Remove ALL entity-level grants on this instance (all grantables, all actions).
+     * Call this before/on delete to keep entity_permissions clean.
      */
     public function revokeAllEntityAccess(): void
     {
-        $permission = $this->entityPermission();
-
-        if ($permission) {
-            // model_permissions rows are cascade-deleted via FK
-            $permission->delete();
-        }
+        EntityPermission::revokeAll($this);
     }
 
     // ── Check ─────────────────────────────────────────────────────────────────
 
     /**
-     * Check if a user has entity-level access to this model instance.
+     * Check if a user has the given action granted on this entity.
      *
      * Checks in order:
-     *   1. Direct user grant (model_permissions where model = user)
-     *   2. Role-based grant (model_permissions where model = one of user's roles)
+     *   1. Direct grant  — EntityPermission where grantable = $user
+     *   2. Role-based    — EntityPermission where grantable = one of $user's roles
+     *   3. Entity cascade— EntityPermission where grantable = $this->owner (if exists)
+     *                       and owner itself is accessible by the user
      */
-    public function isEntityAccessibleBy(Authenticatable $user): bool
+    public function isEntityAccessibleBy(Authenticatable $user, string $action = 'access'): bool
     {
-        $permission = $this->entityPermission();
-
-        if (! $permission) {
-            return false;
-        }
+        $entityType = static::class;
+        $entityId   = (string) $this->getKey();
 
         // 1 — Direct user grant
-        $hasDirect = DB::table('model_permissions')
-            ->where('model_type', get_class($user))
-            ->where('model_id', (string) $user->getAuthIdentifier())
-            ->where('permission_id', $permission->id)
+        $hasDirect = EntityPermission::where('entity_type', $entityType)
+            ->where('entity_id', $entityId)
+            ->where('grantable_type', get_class($user))
+            ->where('grantable_id', (string) $user->getAuthIdentifier())
+            ->where('action', $action)
             ->exists();
 
         if ($hasDirect) {
@@ -146,32 +155,63 @@ trait HasEntityPermissions
             $roleIds = $user->roles()->pluck('id')->map(fn ($id) => (string) $id)->all();
 
             if (! empty($roleIds)) {
-                return DB::table('model_permissions')
-                    ->where('model_type', Role::class)
-                    ->whereIn('model_id', $roleIds)
-                    ->where('permission_id', $permission->id)
+                $hasRoleGrant = EntityPermission::where('entity_type', $entityType)
+                    ->where('entity_id', $entityId)
+                    ->where('grantable_type', Role::class)
+                    ->whereIn('grantable_id', $roleIds)
+                    ->where('action', $action)
                     ->exists();
+
+                if ($hasRoleGrant) {
+                    return true;
+                }
+            }
+        }
+
+        // 3 — Entity cascade: check if this entity itself is a grantable on another entity
+        //     that the user can access. E.g. user can access Project → user can access Files of that Project.
+        if (isset($this->owner_type, $this->owner_id) && $this->owner_type && $this->owner_id) {
+            $ownerClass = $this->owner_type;
+            $ownerId    = $this->owner_id;
+
+            $ownerIsGrantable = EntityPermission::where('entity_type', $ownerClass)
+                ->where('entity_id', $ownerId)
+                ->where('grantable_type', get_class($user))
+                ->where('grantable_id', (string) $user->getAuthIdentifier())
+                ->where('action', $action)
+                ->exists();
+
+            if ($ownerIsGrantable) {
+                return true;
             }
         }
 
         return false;
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
+    // ── Private ───────────────────────────────────────────────────────────────
 
     /**
-     * Retrieve the entity permission record (if it exists).
-     * Returns null if no access grants have been set up yet.
+     * Parse variadic args: positional Models + optional named 'action'.
+     *
+     * grantAccessTo($user1, $user2)                  → [$user1, $user2], 'access'
+     * grantAccessTo($user, action: 'edit')            → [$user], 'edit'
+     * grantAccessToRoles('admin', 'manager')          → ['admin', 'manager'], 'access'
+     * grantAccessToRoles('admin', action: 'delete')   → ['admin'], 'delete'
      */
-    public function entityPermission(): ?Permission
+    private function parseGrantArgs(array $args, string $defaultAction): array
     {
-        return Permission::where('entity_type', static::class)
-            ->where('entity_id', (string) $this->getKey())
-            ->first();
-    }
+        $action    = $defaultAction;
+        $grantables = [];
 
-    private function currentEntityTenantId(): ?string
-    {
-        return (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
+        foreach ($args as $key => $value) {
+            if ($key === 'action') {
+                $action = $value;
+            } else {
+                $grantables[] = $value;
+            }
+        }
+
+        return [$grantables, $action];
     }
 }

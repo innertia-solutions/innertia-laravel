@@ -73,11 +73,14 @@ class PermissionsService
         $updated     = 0;
         $skipped     = 0;
 
+        $tenantId = (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
+
         foreach ($definitions as $name => $description) {
-            $existing = Permission::named()->where('name', $name)->first();
+            $existing = Permission::where('name', $name)
+                ->where('tenant_id', $tenantId)
+                ->first();
 
             if ($existing) {
-                // Update description if it changed
                 if ($existing->description !== $description) {
                     $existing->update(['description' => $description]);
                     $updated++;
@@ -86,9 +89,8 @@ class PermissionsService
                 }
             } else {
                 Permission::create([
+                    'tenant_id'   => $tenantId,
                     'name'        => $name,
-                    'entity_type' => null,
-                    'entity_id'   => null,
                     'description' => $description,
                 ]);
                 $created++;
@@ -98,7 +100,8 @@ class PermissionsService
         $deleted = 0;
 
         if ($prune) {
-            $deleted = Permission::named()
+            $tenantId = (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
+            $deleted  = Permission::where('tenant_id', $tenantId)
                 ->whereNotIn('name', array_keys($definitions))
                 ->delete();
         }

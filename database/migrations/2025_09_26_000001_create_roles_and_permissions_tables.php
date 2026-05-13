@@ -5,16 +5,25 @@ use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
 /**
- * Innertia custom permissions system.
+ * Innertia custom RBAC + entity permissions system.
  *
- * Replaces spatie/laravel-permission with a unified, morph-aware schema.
+ * Two separate concerns:
  *
- * Tables created:
- *   permissions      — named app permissions AND entity-level morph permissions
- *   roles            — role definitions (per-tenant in SaaS mode)
- *   role_permissions — which permissions belong to a role
- *   model_roles      — which roles are assigned to a model (user → role)
- *   model_permissions— direct permission grants to any model
+ * ── Named permissions (RBAC) ──────────────────────────────────────────────────
+ *   permissions       — named permission definitions ('users.view', etc.)
+ *   roles             — role definitions, per-tenant in SaaS mode
+ *   role_permissions  — role → named permission
+ *   model_roles       — model (User) → role
+ *   model_permissions — model (User) → named permission (direct grant, bypasses roles)
+ *
+ * ── Entity-level access control ───────────────────────────────────────────────
+ *   entity_permissions — grants access to a specific model instance.
+ *                        grantable can be a User, Role, or another entity.
+ *
+ *   Examples:
+ *     User directly → File          (user can access this specific file)
+ *     Role          → File          (all users of this role can access this file)
+ *     Entity        → Entity        (owning entity cascades access to nested entity)
  */
 return new class extends Migration
 {
@@ -22,54 +31,33 @@ return new class extends Migration
     {
         $isSaas = config('innertia.mode') === 'saas';
 
-        // ── Permissions ───────────────────────────────────────────────────────
-        // Named permissions (entity_type = null, entity_id = null):
-        //   name = 'users.view', 'clients.manage', etc.
-        //
-        // Entity-level permissions (entity_type + entity_id set):
-        //   name = 'access', entity_type = 'Innertia\Models\File', entity_id = <uuid>
-        //   Used to grant access to a specific model instance.
-        //
+        // ── Named permissions ─────────────────────────────────────────────────
         Schema::create('permissions', function (Blueprint $table) use ($isSaas) {
             $table->uuid('id')->primary();
 
-            // In SaaS mode permissions can be scoped per-tenant (null = platform-level).
             if ($isSaas) {
                 $table->string('tenant_id')->nullable()->index();
             }
 
             $table->string('name');
-
-            // null for named app permissions; set for entity-level grants.
-            // Entity-level: grants access to a specific model instance.
-            //   name = 'access', entity_type = 'Innertia\Models\File', entity_id = <uuid>
-            $table->string('entity_type')->nullable()->index();
-            $table->string('entity_id')->nullable()->index();
-
-            // Human-readable description. Populated by enum::description() during sync.
             $table->string('description')->nullable();
             $table->timestamps();
-
-            // Compound index to speed up entity lookups
-            $table->index(['entity_type', 'entity_id']);
         });
 
         // ── Roles ─────────────────────────────────────────────────────────────
         Schema::create('roles', function (Blueprint $table) use ($isSaas) {
             $table->uuid('id')->primary();
-            $table->string('name');
-            $table->string('description')->nullable();
 
-            // In SaaS mode each tenant has its own role set.
-            // null means the role belongs to the central/platform level.
             if ($isSaas) {
                 $table->string('tenant_id')->nullable()->index();
             }
 
+            $table->string('name');
+            $table->string('description')->nullable();
             $table->timestamps();
         });
 
-        // ── Role → Permission ──────────────────────────────────────────────────
+        // ── Role → Named permission ───────────────────────────────────────────
         Schema::create('role_permissions', function (Blueprint $table) {
             $table->uuid('role_id');
             $table->uuid('permission_id');
@@ -80,10 +68,10 @@ return new class extends Migration
             $table->primary(['role_id', 'permission_id']);
         });
 
-        // ── Model → Role (user gets a role) ───────────────────────────────────
+        // ── Model → Role ──────────────────────────────────────────────────────
         Schema::create('model_roles', function (Blueprint $table) {
             $table->string('model_type');
-            $table->string('model_id');   // stored as string to support UUID + int PKs
+            $table->string('model_id');   // string to support UUID + int PKs
             $table->uuid('role_id');
 
             $table->foreign('role_id')->references('id')->on('roles')->cascadeOnDelete();
@@ -92,7 +80,7 @@ return new class extends Migration
             $table->index(['model_type', 'model_id']);
         });
 
-        // ── Model → Permission (direct grant, bypasses roles) ─────────────────
+        // ── Model → Named permission (direct grant, bypasses roles) ───────────
         Schema::create('model_permissions', function (Blueprint $table) {
             $table->string('model_type');
             $table->string('model_id');
@@ -103,10 +91,50 @@ return new class extends Migration
             $table->primary(['model_type', 'model_id', 'permission_id']);
             $table->index(['model_type', 'model_id']);
         });
+
+        // ── Entity-level access control ───────────────────────────────────────
+        //
+        // Grants access to a specific model instance (entity_type + entity_id)
+        // to any other model (grantable_type + grantable_id).
+        //
+        //   grantable = User    → direct user-level access
+        //   grantable = Role    → role-level access (all users of that role)
+        //   grantable = Entity  → entity-cascade (owning entity grants access)
+        //
+        // action defaults to 'access'. Use 'edit', 'delete', etc. for granularity.
+        //
+        Schema::create('entity_permissions', function (Blueprint $table) use ($isSaas) {
+            $table->uuid('id')->primary();
+
+            if ($isSaas) {
+                $table->string('tenant_id')->nullable()->index();
+            }
+
+            // What is being accessed
+            $table->string('entity_type');
+            $table->string('entity_id');
+
+            // Who gets access (User, Role, or another entity)
+            $table->string('grantable_type');
+            $table->string('grantable_id');
+
+            // What action is granted
+            $table->string('action')->default('access');
+
+            $table->timestamp('created_at')->useCurrent();
+
+            $table->unique(
+                ['entity_type', 'entity_id', 'grantable_type', 'grantable_id', 'action'],
+                'entity_permissions_unique'
+            );
+            $table->index(['entity_type', 'entity_id']);
+            $table->index(['grantable_type', 'grantable_id']);
+        });
     }
 
     public function down(): void
     {
+        Schema::dropIfExists('entity_permissions');
         Schema::dropIfExists('model_permissions');
         Schema::dropIfExists('model_roles');
         Schema::dropIfExists('role_permissions');

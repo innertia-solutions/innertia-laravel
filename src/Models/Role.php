@@ -114,7 +114,6 @@ class Role extends Model
         $name = $permission instanceof \BackedEnum ? $permission->value : $permission;
 
         return $this->permissions()
-            ->whereNull('entity_type')
             ->where('name', $name)
             ->exists();
     }

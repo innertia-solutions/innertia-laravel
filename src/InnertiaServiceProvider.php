@@ -23,6 +23,7 @@ use Innertia\Exports\ExportPipeline;
 use Innertia\Platform\Events\DomainEvent;
 use Innertia\Platform\Listeners\DomainEventRouter;
 use Innertia\Webhook\WebhookService;
+use Innertia\Models\EntityPermission;
 use Innertia\Services\ActivityLogService;
 use Innertia\Services\EntityHistoryService;
 use Innertia\Services\PermissionsService;
