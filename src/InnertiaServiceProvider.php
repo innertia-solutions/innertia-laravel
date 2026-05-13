@@ -108,6 +108,14 @@ class InnertiaServiceProvider extends ServiceProvider
         // ── Blade components ──────────────────────────────────────────────────
         Blade::anonymousComponentPath(__DIR__ . '/../resources/views/components', 'innertia');
 
+        // ── Facade aliases ────────────────────────────────────────────────────
+        // Necesario cuando el paquete está en dont-discover (el proyecto registra
+        // InnertiaSaasProvider / InnertiaAppProvider manualmente).
+        \Illuminate\Foundation\AliasLoader::getInstance()->alias(
+            'Innertia',
+            \Innertia\Facades\Innertia::class
+        );
+
         // ── Gate: check HasRoles::hasPermission() for all Gate checks ─────────
         // Returns null (falls through) if the user model doesn't use HasRoles.
         // This means the Gate keeps working for standard policy-based checks.
