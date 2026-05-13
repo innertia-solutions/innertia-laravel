@@ -5,7 +5,9 @@ namespace Innertia\Backoffice\Http\Controllers;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Password;
 use Innertia\Roles\UseCases\CreateRole;
 use Innertia\Users\UseCases\AssignRole;
 use Innertia\Users\UseCases\RemoveRole;
@@ -19,7 +21,11 @@ class UsersController extends Controller
         $model   = config('innertia.auth.user_model');
         $perPage = $request->integer('per_page', 20);
 
-        $query = $model::query()->withTrashed(false);
+        if ($request->boolean('trashed')) {
+            $query = $model::onlyTrashed();
+        } else {
+            $query = $model::query();
+        }
 
         if ($request->filled('search')) {
             $s = $request->search;
@@ -187,6 +193,103 @@ class UsersController extends Controller
         $user->syncApps($request->apps);
 
         return response()->json(['apps' => $user->appKeys()]);
+    }
+
+    // ── Sessions ──────────────────────────────────────────────────────────────
+
+    public function sessions(string $id): JsonResponse
+    {
+        $model = config('innertia.auth.user_model');
+        $model::withTrashed()->findOrFail($id);
+
+        $sessions = DB::table('user_tokens')
+            ->where('user_id', $id)
+            ->where('active', true)
+            ->whereNull('used_at')
+            ->where('expires_at', '>', now())
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($sessions);
+    }
+
+    public function revokeSession(string $id, string $sessionId): JsonResponse
+    {
+        $model = config('innertia.auth.user_model');
+        $model::withTrashed()->findOrFail($id);
+
+        DB::table('user_tokens')
+            ->where('id', $sessionId)
+            ->where('user_id', $id)
+            ->update(['active' => false]);
+
+        return response()->json(['revoked' => true]);
+    }
+
+    public function revokeAllSessions(string $id): JsonResponse
+    {
+        $model = config('innertia.auth.user_model');
+        $model::withTrashed()->findOrFail($id);
+
+        DB::table('user_tokens')
+            ->where('user_id', $id)
+            ->update(['active' => false]);
+
+        return response()->json(['revoked' => true]);
+    }
+
+    // ── Password + Reactivate ─────────────────────────────────────────────────
+
+    public function reactivate(string $id): JsonResponse
+    {
+        $model = config('innertia.auth.user_model');
+        $user  = $model::withTrashed()->findOrFail($id);
+
+        $user->restore();
+
+        Password::broker()->sendResetLink(['email' => $user->email]);
+
+        return response()->json(['reactivated' => true]);
+    }
+
+    public function resetPassword(Request $request, string $id): JsonResponse
+    {
+        $model = config('innertia.auth.user_model');
+        $user  = $model::withTrashed()->findOrFail($id);
+
+        $data = $request->validate([
+            'mode'     => 'required|in:email,manual',
+            'password' => 'required_if:mode,manual|string|min:8',
+        ]);
+
+        if ($data['mode'] === 'email') {
+            Password::broker()->sendResetLink(['email' => $user->email]);
+
+            return response()->json(['sent' => true]);
+        }
+
+        $user->update([
+            'password'              => Hash::make($data['password']),
+            'force_password_change' => true,
+        ]);
+
+        return response()->json(['updated' => true]);
+    }
+
+    // ── Activity ──────────────────────────────────────────────────────────────
+
+    public function activity(Request $request, string $id): JsonResponse
+    {
+        $model = config('innertia.auth.user_model');
+        $model::withTrashed()->findOrFail($id);
+
+        $perPage = $request->integer('per_page', 15);
+
+        $query = DB::table('activity_logs')
+            ->where('user_id', $id)
+            ->orderBy('created_at', 'desc');
+
+        return response()->json($query->paginate($perPage));
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

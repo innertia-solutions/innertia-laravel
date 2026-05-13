@@ -28,6 +28,18 @@ Route::prefix($prefix)
         Route::post   ('users/{id}/apps/sync',         [UsersController::class, 'syncApps']);
         Route::delete ('users/{id}/apps/{app}',        [UsersController::class, 'revokeApp']);
 
+        // ── Sessions ──────────────────────────────────────────────────────────
+        Route::get    ('users/{id}/sessions',              [UsersController::class, 'sessions']);
+        Route::delete ('users/{id}/sessions/{sessionId}',  [UsersController::class, 'revokeSession']);
+        Route::delete ('users/{id}/sessions',              [UsersController::class, 'revokeAllSessions']);
+
+        // ── Password + Reactivate ─────────────────────────────────────────────
+        Route::post   ('users/{id}/reactivate',            [UsersController::class, 'reactivate']);
+        Route::post   ('users/{id}/reset-password',        [UsersController::class, 'resetPassword']);
+
+        // ── Activity ──────────────────────────────────────────────────────────
+        Route::get    ('users/{id}/activity',              [UsersController::class, 'activity']);
+
         // ── Roles ─────────────────────────────────────────────────────────────
         Route::get    ('roles',                        [RolesController::class, 'index']);
         Route::post   ('roles',                        [RolesController::class, 'store']);
