@@ -29,8 +29,8 @@ use Innertia\Models\Role;
  *   $file->revokeAllEntityAccess()            // drop all grants on this entity
  *
  * Checking:
- *   $file->isEntityAccessibleBy($user)
- *   $file->isEntityAccessibleBy($user, 'edit')
+ *   $file->isAccessibleBy($user)
+ *   $file->isAccessibleBy($user, 'edit')
  *
  * Low-level (via EntityPermission model directly):
  *   EntityPermission::grant($file, $user)
@@ -133,7 +133,7 @@ trait HasEntityPermissions
      *   3. Entity cascade— EntityPermission where grantable = $this->owner (if exists)
      *                       and owner itself is accessible by the user
      */
-    public function isEntityAccessibleBy(Authenticatable $user, string $action = 'access'): bool
+    public function isAccessibleBy(Authenticatable $user, string $action = 'access'): bool
     {
         $entityType = static::class;
         $entityId   = (string) $this->getKey();

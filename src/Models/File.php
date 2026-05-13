@@ -50,7 +50,11 @@ use Innertia\Traits\HasEntityPermissions;
 class File extends Model
 {
     use HasUuids;
-    use HasEntityPermissions;
+    use HasEntityPermissions {
+        // Rename trait method to avoid collision with File's own isAccessibleBy
+        // (which adds the visibility layer on top of the entity-level check).
+        isAccessibleBy as checkEntityAccess;
+    }
 
     protected $fillable = [
         'disk',
@@ -279,8 +283,8 @@ class File extends Model
             return true;
         }
 
-        // Entity-level permission grant (via HasEntityPermissions trait)
-        if ($this->isEntityAccessibleBy($user)) {
+        // Entity-level permission check (direct user, role-based, entity cascade)
+        if ($this->checkEntityAccess($user)) {
             return true;
         }
 
