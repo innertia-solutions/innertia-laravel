@@ -4,6 +4,12 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Innertia — Archivos gestionados por el sistema.
+ *
+ *   files — Metadatos de archivos subidos (disco, ruta, visibilidad, propietario).
+ *           El archivo físico vive en el disco configurado; esta tabla solo guarda metadata.
+ */
 return new class extends Migration
 {
     public function up(): void
@@ -18,15 +24,13 @@ return new class extends Migration
             $table->string('extension', 20)->nullable();
             $table->unsignedBigInteger('size')->default(0); // bytes
 
-            // Access control
+            // Control de acceso
             $table->enum('visibility', ['public', 'auth', 'restricted'])->default('auth');
 
-            // Polymorphic owner (User, Process, Invoice, etc.)
+            // Propietario polimórfico (User, Process, Invoice, etc.)
             $table->nullableMorphs('owner');
 
-            // Who uploaded it
             $table->string('created_by')->nullable();
-
             $table->timestamps();
 
             $table->index('visibility');

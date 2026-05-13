@@ -4,6 +4,12 @@ use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
 use Illuminate\Support\Facades\Schema;
 
+/**
+ * Innertia — Suscripciones a eventos de entidades.
+ *
+ *   subscriptions — Un usuario se suscribe a eventos de una entidad específica
+ *                   para recibirlos por los canales configurados (mail, realtime).
+ */
 return new class extends Migration
 {
     public function up(): void
@@ -11,17 +17,16 @@ return new class extends Migration
         Schema::create('subscriptions', function (Blueprint $table) {
             $table->id();
 
-            // The User subscribing
             $table->string('subscriber_id')->index();
 
-            // The entity being subscribed to (polymorphic)
+            // Entidad a la que se suscribe (polimórfico)
             $table->string('subscribable_type');
             $table->string('subscribable_id');
 
-            // ['*'] to receive all events, or specific keys: ['order.shipped', 'invoice.paid']
+            // ['*'] para todos los eventos, o específicos: ['order.shipped', 'invoice.paid']
             $table->json('events')->default('["*"]');
 
-            // Preferred delivery channels: ['mail', 'realtime']
+            // Canales de entrega: ['mail', 'realtime']
             $table->json('channels')->default('["mail"]');
 
             $table->timestamps();
