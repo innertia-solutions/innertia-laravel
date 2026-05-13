@@ -217,4 +217,37 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Backoffice
+    |--------------------------------------------------------------------------
+    |
+    | Built-in admin API for managing users, roles and permissions.
+    | All routes are protected by auth by default.
+    |
+    | prefix     — URL prefix for all backoffice routes.
+    |              Override via env BACKOFFICE_PREFIX.
+    |
+    | middleware — Extra middleware applied on top of auth.
+    |              E.g. ['role:admin'] to restrict access to admins only.
+    |
+    | enabled    — Set to false to disable backoffice routes entirely.
+    |              You can then implement your own controllers using the
+    |              use cases provided by the library.
+    |
+    | users.allow_delete — Whether DELETE /backoffice/users/{id} is enabled.
+    |                      Defaults to false (soft-delete via flag instead).
+    |
+    */
+
+    'backoffice' => [
+        'prefix'     => env('BACKOFFICE_PREFIX', 'backoffice'),
+        'middleware' => [],  // e.g. ['role:admin'] or ['permission:backoffice.access']
+        'enabled'    => true,
+
+        'users' => [
+            'allow_delete' => false,
+        ],
+    ],
+
 ];

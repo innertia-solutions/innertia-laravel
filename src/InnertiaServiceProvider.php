@@ -75,6 +75,10 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
         $this->loadRoutesFrom(__DIR__ . '/Files/routes.php');
 
+        if (config('innertia.backoffice.enabled', true)) {
+            $this->loadRoutesFrom(__DIR__ . '/Backoffice/routes.php');
+        }
+
         // ── Blade components ──────────────────────────────────────────────────
         Blade::anonymousComponentPath(__DIR__ . '/../resources/views/components', 'innertia');
 

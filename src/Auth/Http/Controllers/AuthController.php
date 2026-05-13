@@ -33,6 +33,41 @@ class AuthController extends Controller
         return response()->json($request->user());
     }
 
+    /**
+     * GET /auth/me/permissions
+     *
+     * Returns the authenticated user's roles and resolved permission names.
+     * Useful for frontend to decide what to show/hide without extra round-trips.
+     *
+     * {
+     *   "roles": ["admin", "manager"],
+     *   "permissions": ["users.view", "users.manage", "clients.view"]
+     * }
+     */
+    public function mePermissions(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        $roles       = [];
+        $permissions = [];
+
+        if (method_exists($user, 'roles')) {
+            $roles = $user->getRoleNames()->values()->all();
+
+            // Collect all named permissions via roles + direct grants
+            $viaRoles = $user->roles()
+                ->with('permissions')
+                ->get()
+                ->flatMap(fn ($role) => $role->permissions->pluck('name'));
+
+            $direct = $user->directPermissions()->pluck('name');
+
+            $permissions = $viaRoles->merge($direct)->unique()->values()->all();
+        }
+
+        return response()->json(compact('roles', 'permissions'));
+    }
+
     public function refresh(Request $request): JsonResponse
     {
         $token = $this->extractToken($request);
