@@ -196,6 +196,8 @@ trait HasRoles
 
     private function currentTenantId(): ?string
     {
-        return (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
+        return \Innertia\Facades\Innertia::tenant()
+            ? (string) \Innertia\Facades\Innertia::tenant()->getKey()
+            : null;
     }
 }

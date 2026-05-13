@@ -81,7 +81,7 @@ trait HasEntityPermissions
     {
         [$roleNames, $action] = $this->parseGrantArgs($args, 'access');
 
-        $tenantId = (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
+        $tenantId = \Innertia\Facades\Innertia::tenant() ? (string) \Innertia\Facades\Innertia::tenant()->getKey() : null;
 
         foreach ($roleNames as $name) {
             $role = Role::findByName((string) $name, $tenantId);

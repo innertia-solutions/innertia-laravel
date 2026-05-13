@@ -17,7 +17,9 @@ class CreateRole extends UseCase
 
     public function execute(): mixed
     {
-        $tenantId = (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
+        $tenantId = \Innertia\Facades\Innertia::tenant()
+            ? (string) \Innertia\Facades\Innertia::tenant()->getKey()
+            : null;
 
         return Role::createUnique($this->name, $this->description, $tenantId);
     }

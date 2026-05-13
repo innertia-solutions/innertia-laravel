@@ -5,6 +5,7 @@ namespace Innertia\Auth\RBAC\Models;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Innertia\Facades\Innertia;
 
 /**
  * Entity-level access grant.
@@ -62,7 +63,7 @@ class EntityPermission extends Model
         string $action    = 'access',
         ?string $tenantId = null,
     ): static {
-        $tenantId ??= (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
+        $tenantId ??= Innertia::tenant() ? (string) Innertia::tenant()->getKey() : null;
 
         return static::firstOrCreate([
             'entity_type'    => get_class($entity),

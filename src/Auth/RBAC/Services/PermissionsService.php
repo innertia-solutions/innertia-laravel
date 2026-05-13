@@ -131,7 +131,7 @@ class PermissionsService
     public function sync(bool $prune = false): array
     {
         $definitions = $this->definitions();
-        $tenantId    = (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
+        $tenantId    = \Innertia\Facades\Innertia::tenant() ? (string) \Innertia\Facades\Innertia::tenant()->getKey() : null;
 
         $created = $updated = $skipped = 0;
 
@@ -197,7 +197,9 @@ class PermissionsService
 
     private function cacheKey(string $userId): string
     {
-        $tenantId = (function_exists('tenant') && tenant()) ? (string) tenant('id') : null;
+        $tenantId = \Innertia\Facades\Innertia::tenant()
+            ? (string) \Innertia\Facades\Innertia::tenant()->getKey()
+            : null;
 
         return $tenantId
             ? "innertia.perms.{$tenantId}.{$userId}"

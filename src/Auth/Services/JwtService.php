@@ -119,8 +119,6 @@ class JwtService
 
     protected function resolveTenantId(): mixed
     {
-        return config('innertia.mode') === 'saas' && function_exists('tenant')
-            ? tenant('id')
-            : null;
+        return \Innertia\Facades\Innertia::tenant()?->getKey();
     }
 }
