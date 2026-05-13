@@ -91,11 +91,13 @@ class InnertiaServiceProvider extends ServiceProvider
         }
         $this->publishes($publishMap, 'innertia-migrations');
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
+
+        // Files: rutas de acceso/descarga de archivos (plataforma interna).
         $this->loadRoutesFrom(__DIR__ . '/Files/routes.php');
 
-        if (config('innertia.backoffice.enabled', true)) {
-            $this->loadRoutesFrom(__DIR__ . '/Backoffice/routes.php');
-        }
+        // Auth y Backoffice NO se auto-cargan aquí.
+        // El proyecto es dueño de routes/api.php (publicado con innertia-routes).
+        // Esto evita rutas duplicadas y da control total al developer.
 
         // ── Blade components ──────────────────────────────────────────────────
         Blade::anonymousComponentPath(__DIR__ . '/../resources/views/components', 'innertia');
