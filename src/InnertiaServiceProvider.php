@@ -168,11 +168,13 @@ class InnertiaServiceProvider extends ServiceProvider
             __DIR__ . '/../resources/views' => resource_path('views/vendor/innertia'),
         ], 'innertia-mail-views');
 
-        // Stub de rutas: base de partida para routes/api.php del proyecto.
-        // Se publica una sola vez durante el scaffold; el developer lo edita libremente.
+        // Stubs de rutas: api.php + api.public.php + api.private.php
+        // Se publican una sola vez durante el scaffold; el developer los edita libremente.
         $stub = $this->isSaas() ? 'saas' : 'app';
         $this->publishes([
-            __DIR__ . "/../stubs/{$stub}/api.php" => base_path('routes/api.php'),
+            __DIR__ . "/../stubs/{$stub}/api.php"         => base_path('routes/api.php'),
+            __DIR__ . "/../stubs/{$stub}/api.public.php"  => base_path('routes/api.public.php'),
+            __DIR__ . "/../stubs/{$stub}/api.private.php" => base_path('routes/api.private.php'),
         ], 'innertia-routes');
     }
 
