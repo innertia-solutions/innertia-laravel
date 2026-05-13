@@ -9,14 +9,18 @@ use PragmaRX\Google2FA\Google2FA;
 
 class Verify2FA extends UseCase
 {
-    public function __construct(protected JwtService $jwt) {}
+    public function __construct(
+        protected JwtService $jwt,
+        protected Authenticatable $user,
+        protected string $code,
+    ) {}
 
-    public function execute(Authenticatable $user, string $code): array
+    public function execute(): array
     {
         $google2fa = new Google2FA();
-        $secret    = decrypt($user->two_factor_secret);
+        $secret    = decrypt($this->user->two_factor_secret);
 
-        if (! $google2fa->verifyKey($secret, $code)) {
+        if (! $google2fa->verifyKey($secret, $this->code)) {
             throw new \Illuminate\Validation\ValidationException(
                 validator([], []),
                 response()->json(['message' => 'Invalid 2FA code.'], 422)
@@ -24,12 +28,12 @@ class Verify2FA extends UseCase
         }
 
         // Confirm 2FA enabled on first successful verify
-        if (! $user->two_factor_enabled) {
-            $user->forceFill(['two_factor_enabled' => true])->save();
+        if (! $this->user->two_factor_enabled) {
+            $this->user->forceFill(['two_factor_enabled' => true])->save();
         }
 
-        $token = $this->jwt->generateToken($user);
+        $token = $this->jwt->generateToken($this->user);
 
-        return ['token' => $token, 'user' => $user];
+        return ['token' => $token, 'user' => $this->user];
     }
 }

@@ -8,19 +8,21 @@ use PragmaRX\Google2FA\Google2FA;
 
 class Enable2FA extends UseCase
 {
-    public function execute(Authenticatable $user): array
+    public function __construct(protected Authenticatable $user) {}
+
+    public function execute(): array
     {
         $google2fa = new Google2FA();
         $secret    = $google2fa->generateSecretKey();
 
-        $user->forceFill([
+        $this->user->forceFill([
             'two_factor_secret'  => encrypt($secret),
             'two_factor_enabled' => false, // confirmed on first verify
         ])->save();
 
         $qrCodeUrl = $google2fa->getQRCodeUrl(
             config('app.name'),
-            $user->email,
+            $this->user->email,
             $secret,
         );
 

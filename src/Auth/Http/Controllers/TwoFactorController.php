@@ -14,7 +14,7 @@ class TwoFactorController extends Controller
 {
     public function enable(Request $request): JsonResponse
     {
-        $result = (new Enable2FA())->execute($request->user());
+        $result = (new Enable2FA($request->user()))->execute();
 
         return response()->json($result);
     }
@@ -28,14 +28,14 @@ class TwoFactorController extends Controller
 
         $model  = config('auth.providers.users.model');
         $user   = $model::findOrFail($data['user_id']);
-        $result = (new Verify2FA(app(JwtService::class)))->execute($user, $data['code']);
+        $result = (new Verify2FA(app(JwtService::class), $user, $data['code']))->execute();
 
         return response()->json($result);
     }
 
     public function disable(Request $request): JsonResponse
     {
-        (new Disable2FA())->execute($request->user());
+        (new Disable2FA($request->user()))->execute();
 
         return response()->json(['message' => '2FA disabled.']);
     }

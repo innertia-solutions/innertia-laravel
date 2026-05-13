@@ -33,9 +33,21 @@ use Innertia\Saas\Settings\SaasSettingsService;
 
 class InnertiaServiceProvider extends ServiceProvider
 {
+    /**
+     * Override in InnertiaAppProvider (false) or InnertiaSaasProvider (true).
+     * Falls back to config('innertia.mode') when used directly.
+     */
+    protected function isSaas(): bool
+    {
+        return config('innertia.mode') === 'saas';
+    }
+
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/innertia.php', 'innertia');
+
+        // Make the mode authoritative — concrete subclasses lock it in at provider registration.
+        config(['innertia.mode' => $this->isSaas() ? 'saas' : 'single']);
 
         $this->configureAuth();
 
@@ -45,7 +57,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->singleton(EntityHistoryService::class);
         $this->app->singleton(PermissionsService::class);
 
-        $isSaas = config('innertia.mode') === 'saas';
+        $isSaas = $this->isSaas();
 
         $this->app->singleton(
             AppSettingsService::class,
@@ -62,7 +74,7 @@ class InnertiaServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $isSaas = config('innertia.mode') === 'saas';
+        $isSaas = $this->isSaas();
 
         // ── Migrations ────────────────────────────────────────────────────────
         // Each mode has its own clean migration set — no conditionals inside files.

@@ -7,10 +7,13 @@ use Innertia\Platform\Contracts\UseCase;
 
 class RefreshToken extends UseCase
 {
-    public function __construct(protected JwtService $jwt) {}
+    public function __construct(
+        protected JwtService $jwt,
+        protected string $token,
+    ) {}
 
-    public function execute(string $token): string
+    public function execute(): string
     {
-        return $this->jwt->refreshToken($token);
+        return $this->jwt->refreshToken($this->token);
     }
 }

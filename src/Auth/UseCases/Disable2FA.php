@@ -7,9 +7,11 @@ use Innertia\Platform\Contracts\UseCase;
 
 class Disable2FA extends UseCase
 {
-    public function execute(Authenticatable $user): void
+    public function __construct(protected Authenticatable $user) {}
+
+    public function execute(): void
     {
-        $user->forceFill([
+        $this->user->forceFill([
             'two_factor_secret'  => null,
             'two_factor_enabled' => false,
         ])->save();

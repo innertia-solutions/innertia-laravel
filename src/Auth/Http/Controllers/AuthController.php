@@ -78,7 +78,7 @@ class AuthController extends Controller
     public function refresh(Request $request): JsonResponse
     {
         $token = $this->extractToken($request);
-        $new   = (new RefreshToken(app(\Innertia\Auth\Services\JwtService::class)))->execute($token);
+        $new = (new RefreshToken(app(\Innertia\Auth\Services\JwtService::class), $token))->execute();
 
         return response()->json(['token' => $new]);
     }
@@ -86,7 +86,7 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         $token = $this->extractToken($request);
-        (new Logout(app(\Innertia\Auth\Services\JwtService::class)))->execute($token);
+        (new Logout(app(\Innertia\Auth\Services\JwtService::class), $token))->execute();
 
         return response()->json(['message' => 'Logged out.']);
     }
