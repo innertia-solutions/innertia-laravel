@@ -1,6 +1,6 @@
 {
     "name": "innertia-solutions/laravel-innertia",
-    "description": "Innertia Solutions — Laravel framework: DataTable, History, Audit, Auth, Multitenancy, UseCase, DomainEvent
+    "description": "Innertia Solutions — Laravel framework: DataTable, History, Audit, Auth, Multitenancy, UseCase, DomainEvent",
     "type": "library",
     "license": "MIT",
     "keywords": ["laravel", "datatable", "audit", "history", "traits"],
