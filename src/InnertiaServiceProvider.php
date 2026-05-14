@@ -135,6 +135,12 @@ class InnertiaServiceProvider extends ServiceProvider
             return null; // fall through to policies
         });
 
+        // ── ForceJsonResponse — global en todas las rutas de la API ──────────
+        // Pone Accept: application/json en cada request para que el exception
+        // handler y los middlewares de Laravel siempre devuelvan JSON.
+        $this->app[\Illuminate\Contracts\Http\Kernel::class]
+            ->pushMiddleware(\Innertia\Http\Middleware\ForceJsonResponse::class);
+
         // ── Middleware aliases ─────────────────────────────────────────────────
         $router = $this->app['router'];
         $router->aliasMiddleware('app',            AppMiddleware::class);

@@ -25,11 +25,10 @@ class InnertiaExceptionHandler
 {
     public static function register(Exceptions $exceptions): void
     {
-        $exceptions->render(function (\Throwable $e, Request $request): ?JsonResponse {
-            if (! $request->expectsJson()) {
-                return null;
-            }
-
+        // Esta es una API pura — siempre JSON, sin importar el Accept header.
+        // Los responses de archivo/stream ya tienen su propio Content-Type y
+        // nunca pasan por aquí (son retornados directamente por el controller).
+        $exceptions->render(function (\Throwable $e, Request $request): JsonResponse {
             return static::toJson($e);
         });
     }
