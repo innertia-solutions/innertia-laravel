@@ -141,6 +141,21 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app[\Illuminate\Contracts\Http\Kernel::class]
             ->pushMiddleware(\Innertia\Http\Middleware\ForceJsonResponse::class);
 
+        // ── TraceId — genera X-Trace-Id por request ───────────────────────────
+        $this->app[\Illuminate\Contracts\Http\Kernel::class]
+            ->pushMiddleware(\Innertia\Http\Middleware\TraceId::class);
+
+        // ── Monolog processor — añade trace_id a todos los logs ──────────────
+        $this->app['log']->pushProcessor(function ($record) {
+            $traceId = $this->app->bound('trace_id') ? $this->app->make('trace_id') : null;
+            if ($traceId) {
+                $extra             = $record->extra ?? [];
+                $extra['trace_id'] = $traceId;
+                return $record->with(extra: $extra);
+            }
+            return $record;
+        });
+
         // ── Middleware aliases ─────────────────────────────────────────────────
         $router = $this->app['router'];
         $router->aliasMiddleware('app',            AppMiddleware::class);
