@@ -14,9 +14,11 @@ use Innertia\Auth\Http\Controllers\TwoFactorController;
 use Innertia\Saas\Http\Controllers\TenantController;
 use Innertia\Saas\Middleware\ResolveTenantFromHeader;
 
-// ── Tenant ────────────────────────────────────────────────────────────────────
-// Sin middleware: el frontend lo llama antes de conocer el tenant.
-Route::get('tenant/validate', [TenantController::class, 'validate']);
+// ── Tenant ping ───────────────────────────────────────────────────────────────
+// Usado por el middleware SSR del frontend para validar que el tenant existe y el backend responde.
+// ResolveTenantFromHeader lee X-Tenant: {slug} y retorna 404 si no existe.
+Route::middleware(ResolveTenantFromHeader::class)
+    ->get('ping', [TenantController::class, 'ping']);
 
 // ── Backoffice (contexto) ──────────────────────────────────────────────────────
 Route::middleware(ResolveTenantFromHeader::class)->prefix('backoffice/auth')->group(function () {
