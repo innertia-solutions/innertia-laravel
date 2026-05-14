@@ -17,9 +17,10 @@ use Innertia\Platform\Http\Controllers\SubscriptionController;
 use Innertia\Saas\Middleware\RequireTenant;
 use Innertia\Saas\Middleware\ResolveTenantFromHeader;
 
-Route::middleware([ResolveTenantFromHeader::class, Authenticate::class, RequireTenant::class])->group(function () {
+// ── Rutas de sesión — solo requieren autenticación (sin tenant obligatorio) ──
+// auth/me, refresh y logout se usan antes/después de seleccionar un tenant.
+Route::middleware([ResolveTenantFromHeader::class, Authenticate::class])->group(function () {
 
-    // ── Auth ──────────────────────────────────────────────────────────────────
     Route::prefix('auth')->group(function () {
         Route::get ('me',             [AuthController::class, 'me']);
         Route::get ('me/permissions', [AuthController::class, 'mePermissions']);
@@ -28,6 +29,11 @@ Route::middleware([ResolveTenantFromHeader::class, Authenticate::class, RequireT
         Route::post('2fa/enable',     [TwoFactorController::class, 'enable']);
         Route::post('2fa/disable',    [TwoFactorController::class, 'disable']);
     });
+
+});
+
+// ── Rutas de negocio — requieren autenticación + tenant activo ───────────────
+Route::middleware([ResolveTenantFromHeader::class, Authenticate::class, RequireTenant::class])->group(function () {
 
     // ── Suscripciones ─────────────────────────────────────────────────────────
     Route::prefix('subscriptions')->group(function () {
