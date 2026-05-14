@@ -212,10 +212,10 @@ class InnertiaServiceProvider extends ServiceProvider
         $userModel = config('innertia.auth.user_model', \App\Models\User::class);
 
         config([
-            'auth.defaults.guard'     => 'api',
+            'auth.defaults.guard'     => 'jwt',
             'auth.defaults.passwords' => 'users',
 
-            'auth.guards.api' => [
+            'auth.guards.jwt' => [
                 'driver'   => 'jwt',
                 'provider' => 'users',
             ],
