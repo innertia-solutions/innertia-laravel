@@ -11,7 +11,12 @@ use Innertia\Auth\Http\Controllers\EmailVerificationController;
 use Innertia\Auth\Http\Controllers\OtpController;
 use Innertia\Auth\Http\Controllers\SocialAuthController;
 use Innertia\Auth\Http\Controllers\TwoFactorController;
+use Innertia\Saas\Http\Controllers\TenantController;
 use Innertia\Saas\Middleware\ResolveTenantFromHeader;
+
+// ── Tenant ────────────────────────────────────────────────────────────────────
+// Sin middleware: el frontend lo llama antes de conocer el tenant.
+Route::get('tenant/validate', [TenantController::class, 'validate']);
 
 // ── Backoffice (contexto) ──────────────────────────────────────────────────────
 Route::middleware(ResolveTenantFromHeader::class)->prefix('backoffice/auth')->group(function () {
