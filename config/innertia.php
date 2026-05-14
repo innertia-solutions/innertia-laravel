@@ -55,7 +55,7 @@ return [
     */
 
     'apps' => [
-        // 'backoffice'  => 'Administración',
+        'backoffice'  => 'Administración',
         // 'technicians' => 'Portal Técnicos',
         // 'sales'       => 'Portal Ventas',
     ],
