@@ -19,6 +19,8 @@ Route::prefix('auth')->group(function () {
     Route::post('2fa/verify',        [TwoFactorController::class, 'verify']);
     Route::post('email/verify/send', [EmailVerificationController::class, 'send']);
     Route::get ('email/verify',      [EmailVerificationController::class, 'verify'])->name('auth.email.verify');
+    Route::post('password/forgot',   [PasswordController::class, 'forgot']);
+    Route::post('password/reset',    [PasswordController::class, 'reset']);
     Route::post('password/change',   [PasswordController::class, 'change']);
     Route::post('password/set',      [PasswordController::class, 'set']);
 
