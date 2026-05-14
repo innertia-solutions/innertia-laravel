@@ -20,7 +20,6 @@ class ChangePassword extends UseCase
         public readonly string $passwordConfirmation,
         public readonly string $app,
     ) {
-       parent::__construct();
        
     }
 

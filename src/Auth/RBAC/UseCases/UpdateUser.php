@@ -13,7 +13,6 @@ class UpdateUser extends UseCase
         public readonly ?string $name = null,
         public readonly ?string $email = null,
     ) {
-       parent::__construct();
        
     }
 

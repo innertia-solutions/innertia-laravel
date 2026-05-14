@@ -11,7 +11,6 @@ class CreateRole extends UseCase
         public readonly string  $name,
         public readonly ?string $description = null,
     ) {
-       parent::__construct();
        
     }
 

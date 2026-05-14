@@ -16,19 +16,25 @@ abstract class UseCase implements ShouldQueue
     public int    $timeout = 60;
 
     /**
-     * Captura el key del tenant activo en el momento de construcción del UseCase.
-     * Al ejecutarse en queue, se restaura el contexto antes de llamar execute().
+     * Clave del tenant activo al momento de despachar a la cola.
+     * Capturado en __sleep() (serialización), restaurado en handle().
+     * En ejecución sincrónica (execute() directo) no se usa — el contexto ya está activo.
      */
     protected ?string $__tenantKey = null;
 
-    public function __construct()
-    {
-        // Capturar el tenant activo al momento de crear el UseCase.
-        // Innertia::tenant() devuelve null en App mode — sin efecto.
-        $this->__tenantKey = Innertia::tenant()?->key;
-    }
-
     abstract public function execute(): mixed;
+
+    /**
+     * Llamado automáticamente por PHP justo antes de serializar (dispatch a queue).
+     * Captura el tenant aquí — no en __construct() — así las subclases no necesitan
+     * llamar parent::__construct().
+     */
+    public function __sleep(): array
+    {
+        $this->__tenantKey = Innertia::tenant()?->key;
+
+        return parent::__sleep(); // SerializesModels hace el resto
+    }
 
     /**
      * Llamado por el queue worker. Restaura el tenant antes de ejecutar.

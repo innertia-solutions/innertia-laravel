@@ -13,7 +13,6 @@ class Unsubscribe extends UseCase
         public readonly Authenticatable $user,
         public readonly string          $subscriptionId,
     ) {
-       parent::__construct();
        
     }
 

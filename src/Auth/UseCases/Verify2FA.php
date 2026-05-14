@@ -14,7 +14,6 @@ class Verify2FA extends UseCase
         protected Authenticatable $user,
         protected string $code,
     ) {
-       parent::__construct();
        
     }
 

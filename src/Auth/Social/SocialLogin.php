@@ -15,7 +15,6 @@ class SocialLogin extends UseCase
         public readonly SocialUser     $socialUser,
         public readonly string         $app,
     ) {
-       parent::__construct();
        
     }
 

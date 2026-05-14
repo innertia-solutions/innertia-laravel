@@ -11,7 +11,6 @@ class RemoveRole extends UseCase
         public readonly string $userId,
         public readonly string $role,
     ) {
-       parent::__construct();
        
     }
 

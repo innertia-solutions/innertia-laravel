@@ -16,7 +16,6 @@ class Subscribe extends UseCase
         public readonly array           $events   = ['*'],
         public readonly array           $channels = ['mail'],
     ) {
-       parent::__construct();
        
     }
 

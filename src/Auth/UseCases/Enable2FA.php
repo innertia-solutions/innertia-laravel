@@ -9,7 +9,6 @@ use PragmaRX\Google2FA\Google2FA;
 class Enable2FA extends UseCase
 {
     public function __construct(protected Authenticatable $user) {
-       parent::__construct();
        
     }
 

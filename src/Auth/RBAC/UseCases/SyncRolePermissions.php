@@ -12,7 +12,6 @@ class SyncRolePermissions extends UseCase
         public readonly string $roleId,
         public readonly array  $permissions,
     ) {
-       parent::__construct();
        
     }
 

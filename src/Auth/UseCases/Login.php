@@ -17,7 +17,6 @@ class Login extends UseCase
         public readonly string $password,
         public readonly string $app,
     ) {
-       parent::__construct();
        
     }
 

@@ -11,7 +11,6 @@ class SendOtp extends UseCase
         public readonly string $userId,
         public readonly string $action,
     ) {
-       parent::__construct();
        
     }
 

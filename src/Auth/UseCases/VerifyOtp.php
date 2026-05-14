@@ -15,7 +15,6 @@ class VerifyOtp extends UseCase
         public readonly string $action,
         public readonly string $app,
     ) {
-       parent::__construct();
        
     }
 

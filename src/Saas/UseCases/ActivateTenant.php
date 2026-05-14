@@ -10,7 +10,6 @@ class ActivateTenant extends UseCase
     public function __construct(
         public readonly string $tenantKey,
     ) {
-       parent::__construct();
        
     }
 

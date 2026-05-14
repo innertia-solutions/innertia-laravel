@@ -11,7 +11,6 @@ class Logout extends UseCase
         protected JwtService $jwt,
         protected string $token,
     ) {
-       parent::__construct();
        
     }
 
