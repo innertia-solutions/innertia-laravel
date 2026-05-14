@@ -2,6 +2,7 @@
 
 namespace Innertia\Saas\Settings;
 
+use Innertia\Facades\Innertia;
 use Innertia\Settings\Models\Setting;
 use Innertia\Settings\AppSettingsService;
 
@@ -9,7 +10,7 @@ class SaasSettingsService extends AppSettingsService
 {
     protected function tenantId(): mixed
     {
-        return tenant('id');
+        return Innertia::tenant()?->id;
     }
 
     public function get(string $key, mixed $default = null): mixed
