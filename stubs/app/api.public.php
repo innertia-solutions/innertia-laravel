@@ -11,7 +11,8 @@ use Innertia\Auth\Http\Controllers\OtpController;
 use Innertia\Auth\Http\Controllers\SocialAuthController;
 use Innertia\Auth\Http\Controllers\TwoFactorController;
 
-Route::prefix('auth')->group(function () {
+// ── Backoffice (contexto) ──────────────────────────────────────────────────────
+Route::prefix('backoffice/auth')->group(function () {
 
     Route::post('login',             [AuthController::class, 'login']);
     Route::post('otp/send',          [OtpController::class, 'send']);

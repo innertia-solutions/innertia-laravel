@@ -13,7 +13,8 @@ use Innertia\Auth\Http\Controllers\SocialAuthController;
 use Innertia\Auth\Http\Controllers\TwoFactorController;
 use Innertia\Saas\Middleware\ResolveTenantFromHeader;
 
-Route::middleware(ResolveTenantFromHeader::class)->prefix('auth')->group(function () {
+// ── Backoffice (contexto) ──────────────────────────────────────────────────────
+Route::middleware(ResolveTenantFromHeader::class)->prefix('backoffice/auth')->group(function () {
 
     Route::post('login',             [AuthController::class, 'login']);
     Route::post('otp/send',          [OtpController::class, 'send']);
