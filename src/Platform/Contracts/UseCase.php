@@ -25,18 +25,6 @@ abstract class UseCase implements ShouldQueue
     abstract public function execute(): mixed;
 
     /**
-     * Llamado automáticamente por PHP justo antes de serializar (dispatch a queue).
-     * Captura el tenant aquí — no en __construct() — así las subclases no necesitan
-     * llamar parent::__construct().
-     */
-    public function __sleep(): array
-    {
-        $this->__tenantKey = Innertia::tenant()?->key;
-
-        return parent::__sleep(); // SerializesModels hace el resto
-    }
-
-    /**
      * Llamado por el queue worker. Restaura el tenant antes de ejecutar.
      */
     public function handle(): void
@@ -62,7 +50,8 @@ abstract class UseCase implements ShouldQueue
      */
     public function onQueue(?string $queue = null): void
     {
-        $this->queue = $queue ?? 'use-cases';
+        $this->__tenantKey = Innertia::tenant()?->key;
+        $this->queue       = $queue ?? 'use-cases';
 
         dispatch($this);
     }
@@ -75,6 +64,8 @@ abstract class UseCase implements ShouldQueue
      */
     public function delay(\DateTimeInterface|\DateInterval|int $delay): void
     {
+        $this->__tenantKey = Innertia::tenant()?->key;
+
         dispatch($this)->delay($delay);
     }
 }
