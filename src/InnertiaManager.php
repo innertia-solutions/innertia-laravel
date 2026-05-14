@@ -7,14 +7,15 @@ use Innertia\Saas\Models\Tenant;
 use Innertia\Saas\TenantContext;
 
 /**
- * API pública para tenant management.
+ * API pública del contexto runtime de Innertia.
  *
+ *   Innertia::app()             → string|null  (app/contexto del JWT activo, ej: 'backoffice')
  *   Innertia::tenant()          → Tenant|null  (tenant activo en runtime)
  *   Innertia::tenant('acme')    → Tenant|null  (busca por key; null en App mode)
  *   Innertia::activate('acme')  → Tenant|null  (busca + setea; null en App mode)
  *   Innertia::deactivate()      → void         (limpia contexto; no-op en App mode)
  *
- * Todos los métodos son no-op / devuelven null en App mode (isSaas = false).
+ * tenant() es no-op / null en App mode (isSaas = false).
  */
 class InnertiaManager
 {
@@ -22,6 +23,22 @@ class InnertiaManager
         private readonly TenantContext $context,
         private readonly bool          $isSaas,
     ) {}
+
+    /**
+     * Devuelve el app/contexto embebido en el JWT activo.
+     * Retorna null si no hay token válido o no tiene claim 'app'.
+     *
+     *   Innertia::app()  // → 'backoffice' | 'technician' | null
+     */
+    public function app(): ?string
+    {
+        try {
+            $payload = \Tymon\JWTAuth\Facades\JWTAuth::parseToken()->getPayload();
+            return $payload->get('app');
+        } catch (\Throwable) {
+            return null;
+        }
+    }
 
     /**
      * Sin argumento: devuelve el tenant activo en runtime.
