@@ -1,11 +1,11 @@
-# innertia-solutions/laravel-kit
+# innertia-solutions/laravel-innertia
 
 The Innertia internal framework. Provides the full platform layer for single-app and SaaS Laravel backends: auth, settings, gates, use cases, realtime events, exceptions, and mail.
 
 ## Installation
 
 ```bash
-composer require innertia-solutions/laravel-kit
+composer require innertia-solutions/laravel-innertia
 ```
 
 Auto-discovered by Laravel. Migrations load automatically.
@@ -444,7 +444,7 @@ And in `composer.json`:
 ```json
 "extra": {
     "laravel": {
-        "dont-discover": ["innertia-solutions/laravel-kit", "stancl/tenancy"]
+        "dont-discover": ["innertia-solutions/laravel-innertia", "stancl/tenancy"]
     }
 }
 ```
