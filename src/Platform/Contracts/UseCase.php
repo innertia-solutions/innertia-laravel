@@ -22,7 +22,7 @@ abstract class UseCase implements ShouldQueue
      */
     protected ?string $__tenantKey = null;
 
-    abstract public function execute(): mixed;
+    abstract public function execute();
 
     /**
      * Llamado por el queue worker. Restaura el tenant antes de ejecutar.
