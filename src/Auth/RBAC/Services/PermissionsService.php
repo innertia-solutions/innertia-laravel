@@ -67,9 +67,14 @@ class PermissionsService
             return $viaRoles->merge($direct)->unique()->values()->all();
         };
 
-        return $ttl === null
-            ? Cache::rememberForever($key, $loader)
-            : Cache::remember($key, now()->addMinutes($ttl), $loader);
+        try {
+            return $ttl === null
+                ? Cache::rememberForever($key, $loader)
+                : Cache::remember($key, now()->addMinutes($ttl), $loader);
+        } catch (\Throwable) {
+            // Cache unavailable (e.g. Redis not running) — fall back to direct DB query.
+            return $loader();
+        }
     }
 
     /**
@@ -82,7 +87,11 @@ class PermissionsService
             ? (string) $user->getAuthIdentifier()
             : $user;
 
-        Cache::forget($this->cacheKey($id));
+        try {
+            Cache::forget($this->cacheKey($id));
+        } catch (\Throwable) {
+            // Cache unavailable — ignore, no stale data to bust.
+        }
     }
 
     /**
@@ -96,7 +105,13 @@ class PermissionsService
         DB::table('model_roles')
             ->where('role_id', $roleId)
             ->pluck('model_id')
-            ->each(fn ($userId) => Cache::forget($this->cacheKey((string) $userId)));
+            ->each(function ($userId) {
+                try {
+                    Cache::forget($this->cacheKey((string) $userId));
+                } catch (\Throwable) {
+                    // Cache unavailable — ignore.
+                }
+            });
     }
 
     /**
