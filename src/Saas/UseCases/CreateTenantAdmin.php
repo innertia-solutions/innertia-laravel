@@ -1,0 +1,60 @@
+<?php
+
+namespace Innertia\Saas\UseCases;
+
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
+use Innertia\Facades\Innertia;
+use Innertia\Platform\Contracts\UseCase;
+
+/**
+ * Creates the initial admin user for a tenant and grants access to all configured apps.
+ *
+ * Usage:
+ *   Innertia::activate($tenantKey);
+ *   $result = (new CreateTenantAdmin(email: 'admin@acme.com', name: 'Admin'))->execute();
+ *   // $result['password'] — plain-text password (only returned once)
+ */
+class CreateTenantAdmin extends UseCase
+{
+    public function __construct(
+        public readonly string $email,
+        public readonly string $name = 'Admin',
+        public readonly ?string $password = null,
+    ) {}
+
+    public function execute(): array
+    {
+        $model    = config('auth.providers.users.model');
+        $password = $this->password ?? Str::password(12, symbols: false);
+
+        $user = $model::create([
+            'name'     => $this->name,
+            'email'    => $this->email,
+            'password' => Hash::make($password),
+            'email_verified_at' => now(),
+        ]);
+
+        // Grant access to every app defined in config
+        $apps = array_keys(config('innertia.apps', []));
+        if ($apps && method_exists($user, 'grantApp')) {
+            $user->grantApp($apps);
+        }
+
+        // Assign admin role if roles are configured
+        if (method_exists($user, 'assignRole')) {
+            $adminRole = config('innertia.saas.admin_role', 'admin');
+            try {
+                $user->assignRole($adminRole);
+            } catch (\Throwable) {
+                // Role may not exist yet — skip silently
+            }
+        }
+
+        return [
+            'user'     => $user,
+            'email'    => $user->email,
+            'password' => $password,
+        ];
+    }
+}
