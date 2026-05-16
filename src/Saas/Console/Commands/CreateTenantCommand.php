@@ -5,6 +5,7 @@ namespace Innertia\Saas\Console\Commands;
 use Illuminate\Console\Command;
 use Innertia\Exceptions\ConflictException;
 use Innertia\Facades\Innertia;
+use Innertia\Facades\Permissions;
 use Innertia\Saas\UseCases\CreateTenant;
 use Innertia\Saas\UseCases\CreateTenantAdmin;
 
@@ -52,6 +53,8 @@ class CreateTenantCommand extends Command
         }
 
         Innertia::activate($key);
+
+        Permissions::sync();
 
         $email     = $this->option('email') ?: "admin@{$key}.com";
         $adminName = $this->option('admin-name');

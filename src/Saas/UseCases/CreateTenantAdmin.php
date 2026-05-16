@@ -41,14 +41,15 @@ class CreateTenantAdmin extends UseCase
             $user->grantApp($apps);
         }
 
-        // Assign admin role if roles are configured
+        // Assign admin role — create it scoped to the current tenant if it doesn't exist yet
         if (method_exists($user, 'assignRole')) {
-            $adminRole = config('innertia.saas.admin_role', 'admin');
-            try {
-                $user->assignRole($adminRole);
-            } catch (\Throwable) {
-                // Role may not exist yet — skip silently
-            }
+            $adminRole = config('innertia.saas.admin_role', 'super-admin');
+            $tenantId  = Innertia::tenant() ? (string) Innertia::tenant()->getKey() : null;
+            \Innertia\Auth\RBAC\Models\Role::firstOrCreate([
+                'name'      => $adminRole,
+                'tenant_id' => $tenantId,
+            ]);
+            $user->assignRole($adminRole);
         }
 
         return [
