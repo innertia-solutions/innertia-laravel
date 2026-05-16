@@ -41,7 +41,8 @@
     "extra": {
         "laravel": {
             "providers": [
-                "Innertia\\InnertiaServiceProvider"
+                "Innertia\\InnertiaServiceProvider",
+                "Innertia\\Olimpo\\OlimpoServiceProvider"
             ],
             "aliases": {
                 "DataTable": "Innertia\\Facades\\DataTable",

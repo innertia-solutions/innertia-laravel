@@ -33,10 +33,7 @@ class OlimpoServiceProvider extends ServiceProvider
             );
         }
 
-        // Registrar rutas cuando hay clave Olimpo configurada
-        if (config('olimpo.key')) {
-            $this->loadRoutesFrom(__DIR__ . '/routes.php');
-        }
+        $this->loadRoutesFrom(__DIR__ . '/routes.php');
 
         // Escuchar jobs fallidos si hay OLIMPO_URL configurado
         if (config('olimpo.url') && config('olimpo.key')) {
