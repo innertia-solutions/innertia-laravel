@@ -25,8 +25,16 @@ class OlimpoServiceProvider extends ServiceProvider
         // Registrar middleware
         $this->app['router']->aliasMiddleware('olimpo.auth', OlimpoAuth::class);
 
-        // Registrar rutas solo si el handler está vinculado
-        if ($this->app->bound(\Innertia\Olimpo\Contracts\OlimpoHandler::class)) {
+        // Auto-bind default handler when no custom one is registered
+        if (! $this->app->bound(\Innertia\Olimpo\Contracts\OlimpoHandler::class)) {
+            $this->app->bind(
+                \Innertia\Olimpo\Contracts\OlimpoHandler::class,
+                \Innertia\Olimpo\DefaultOlimpoHandler::class,
+            );
+        }
+
+        // Registrar rutas cuando hay clave Olimpo configurada
+        if (config('olimpo.key')) {
             $this->loadRoutesFrom(__DIR__ . '/routes.php');
         }
 
