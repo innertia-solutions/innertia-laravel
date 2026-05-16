@@ -6,6 +6,8 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Innertia\Saas\Exports\TenantExport;
+use Innertia\Saas\UseCases\EnableTenantDemo;
+use Innertia\Saas\UseCases\DisableTenantDemo;
 use Innertia\Platform\Models\Process;
 use Innertia\Olimpo\Contracts\OlimpoHandler;
 use Innertia\Olimpo\Logging\OlimpoLogHandler;
@@ -153,5 +155,44 @@ class OlimpoController extends Controller
 
         // Fallback to app-level handler
         return response()->json($this->handler->createBackup($id), 201);
+    }
+
+    /**
+     * PUT /olimpo/tenants/{id}/demo
+     *
+     * Enables demo mode for the tenant, storing plain-text credentials
+     * that the public /ping endpoint will expose to the login page.
+     *
+     * Body: { "email": "demo@acme.com", "password": "demo1234" }
+     */
+    public function enableDemo(string $id, Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'email'    => 'required|email',
+            'password' => 'required|string|min:6',
+        ]);
+
+        $tenant = (new EnableTenantDemo(
+            tenantKey: $id,
+            email:     $data['email'],
+            password:  $data['password'],
+        ))->execute();
+
+        return response()->json([
+            'ok'    => true,
+            'demo'  => $tenant->configs['demo'],
+        ]);
+    }
+
+    /**
+     * DELETE /olimpo/tenants/{id}/demo
+     *
+     * Disables demo mode for the tenant and removes the stored credentials.
+     */
+    public function disableDemo(string $id): JsonResponse
+    {
+        (new DisableTenantDemo(tenantKey: $id))->execute();
+
+        return response()->json(['ok' => true]);
     }
 }

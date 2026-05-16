@@ -19,4 +19,7 @@ Route::prefix('olimpo')
         Route::post('tenants/{id}/users/{userId}/impersonate', [OlimpoController::class, 'impersonate']);
         Route::get('tenants/{id}/backups', [OlimpoController::class, 'getTenantBackups']);
         Route::post('tenants/{id}/backups', [OlimpoController::class, 'createBackup']);
+
+        Route::put('tenants/{id}/demo',    [OlimpoController::class, 'enableDemo']);
+        Route::delete('tenants/{id}/demo', [OlimpoController::class, 'disableDemo']);
     });
