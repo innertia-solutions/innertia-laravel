@@ -36,9 +36,9 @@ trait HasApiKeys
         $this->validatePermissions('user', $permissions);
 
         $generated = ApiKey::generate(
-            tenantId:    $tenantId,
             name:        $name,
             permissions: $permissions,
+            tenantId:    $tenantId,
             userId:      (string) $this->getKey(),
             expiresAt:   $expiresAt,
         );

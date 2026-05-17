@@ -26,10 +26,9 @@ class ApiKeyService
         $this->validatePermissions('tenant', $permissions);
 
         $generated = ApiKey::generate(
-            tenantId:    $tenantId,
             name:        $name,
             permissions: $permissions,
-            userId:      null,
+            tenantId:    $tenantId,
             expiresAt:   $expiresAt,
         );
 
@@ -40,17 +39,24 @@ class ApiKeyService
 
     public function list(?string $tenantId = null): \Illuminate\Database\Eloquent\Collection
     {
-        return ApiKey::forTenant($tenantId ?? $this->currentTenantId())
-            ->active()
-            ->orderByDesc('created_at')
-            ->get();
+        $query = ApiKey::active()->orderByDesc('created_at');
+
+        if (config('innertia.mode') === 'saas') {
+            $query->forTenant($tenantId ?? $this->currentTenantId());
+        }
+
+        return $query->get();
     }
 
     public function revoke(string $id, ?string $tenantId = null): void
     {
-        ApiKey::forTenant($tenantId ?? $this->currentTenantId())
-            ->findOrFail($id)
-            ->revoke();
+        $query = ApiKey::query();
+
+        if (config('innertia.mode') === 'saas') {
+            $query->forTenant($tenantId ?? $this->currentTenantId());
+        }
+
+        $query->findOrFail($id)->revoke();
     }
 
     /**

@@ -84,29 +84,36 @@ class ApiKey extends Model
      * Returns ['raw' => '...', 'attributes' => [...]]
      */
     public static function generate(
-        string $tenantId,
-        string $name,
-        array  $permissions = [],
+        string  $name,
+        array   $permissions = [],
+        ?string $tenantId = null,
         ?string $userId = null,
         ?\Carbon\Carbon $expiresAt = null,
     ): array {
-        $type   = $userId ? 'user' : 'tenant';
-        $prefix = $userId ? 'inn_u_' : 'inn_t_';
-        $raw    = $prefix . Str::random(40);
+        $isSaas = config('innertia.mode') === 'saas';
+        $type   = $userId ? 'user' : ($isSaas ? 'tenant' : 'app');
+        $prefix = match($type) {
+            'user'   => 'inn_u_',
+            'tenant' => 'inn_t_',
+            default  => 'inn_a_',
+        };
+        $raw = $prefix . Str::random(40);
 
-        return [
-            'raw'        => $raw,
-            'attributes' => [
-                'tenant_id'   => $tenantId,
-                'user_id'     => $userId,
-                'name'        => $name,
-                'type'        => $type,
-                'key'         => Hash::make($raw),
-                'key_hint'    => '...' . substr($raw, -4),
-                'permissions' => $permissions,
-                'expires_at'  => $expiresAt,
-            ],
+        $attributes = [
+            'user_id'     => $userId,
+            'name'        => $name,
+            'type'        => $type,
+            'key'         => Hash::make($raw),
+            'key_hint'    => '...' . substr($raw, -4),
+            'permissions' => $permissions,
+            'expires_at'  => $expiresAt,
         ];
+
+        if ($isSaas && $tenantId) {
+            $attributes['tenant_id'] = $tenantId;
+        }
+
+        return ['raw' => $raw, 'attributes' => $attributes];
     }
 
     /**
@@ -115,11 +122,15 @@ class ApiKey extends Model
      */
     public static function findByRawKey(string $raw): ?self
     {
-        // Derive tenant_id from prefix to narrow the lookup
-        $type = str_starts_with($raw, 'inn_t_') ? 'tenant' : 'user';
+        $type = match(true) {
+            str_starts_with($raw, 'inn_t_') => 'tenant',
+            str_starts_with($raw, 'inn_u_') => 'user',
+            str_starts_with($raw, 'inn_a_') => 'app',
+            default                         => null,
+        };
 
-        // We must check all active keys of this type — Hash::check is the only way
-        // (no reverse lookup). Narrow with type to limit rows scanned.
+        if (! $type) return null;
+
         $candidates = self::active()->where('type', $type)->get();
 
         foreach ($candidates as $apiKey) {
