@@ -3,6 +3,7 @@
 namespace Innertia\Platform\Http\Controllers;
 
 use Illuminate\Http\Request;
+use Illuminate\Pagination\LengthAwarePaginator;
 use Innertia\Platform\Models\ActivityLog;
 use Innertia\Platform\Models\EntityHistory;
 
@@ -12,15 +13,40 @@ class HistoryController
 
     public function index(Request $request, string $entityType, string $id)
     {
+        $perPage = (int) $request->input('per_page', 20);
+        $page    = (int) $request->input('page', 1);
+
         $historyEvents  = $this->fetchEntityHistory($entityType, $id);
         $activityEvents = $this->fetchActivityLog($entityType, $id, $historyEvents->isNotEmpty());
 
-        $timeline = $historyEvents
-            ->merge($activityEvents)
-            ->sortByDesc('created_at')
-            ->values();
+        $all = $historyEvents->merge($activityEvents)->sortByDesc('created_at')->values();
 
-        return response()->json($timeline);
+        $paginator = new LengthAwarePaginator(
+            $all->forPage($page, $perPage)->values(),
+            $all->count(),
+            $perPage,
+            $page,
+            ['path' => $request->url(), 'query' => $request->query()],
+        );
+
+        return response()->json([
+            'data' => $paginator->items(),
+            'meta' => [
+                'total'          => $paginator->total(),
+                'per_page'       => $paginator->perPage(),
+                'current_page'   => $paginator->currentPage(),
+                'last_page'      => $paginator->lastPage(),
+                'from'           => $paginator->firstItem(),
+                'to'             => $paginator->lastItem(),
+                'first_page_url' => $paginator->url(1),
+                'last_page_url'  => $paginator->url($paginator->lastPage()),
+                'next_page_url'  => $paginator->nextPageUrl(),
+                'prev_page_url'  => $paginator->previousPageUrl(),
+                'path'           => $paginator->path(),
+                'request'        => $request->all(),
+                'table_name'     => 'history',
+            ],
+        ]);
     }
 
     // ─── EntityHistory ────────────────────────────────────────────────────────
