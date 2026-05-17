@@ -739,7 +739,10 @@ class DataTable
         }
 
         try {
-            $modelClass = $this->getModelClass();
+            $modelClass = $this->sourceClass instanceof Builder
+                ? get_class($this->sourceClass->getModel())
+                : $this->getModelClass();
+
             $traits     = class_uses_recursive($modelClass);
             $hasHistory = in_array(\Innertia\Platform\Traits\HasHistory::class, $traits)
                        || in_array(\Innertia\Platform\Traits\Auditable::class, $traits);
