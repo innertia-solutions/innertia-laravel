@@ -23,6 +23,7 @@ return new class extends Migration
             $table->string('key')->unique();                // hashed
             $table->string('key_hint', 8);
             $table->json('permissions')->default('[]');
+            $table->uuid('created_by_key_id')->nullable()->index();
             $table->timestamp('last_used_at')->nullable();
             $table->timestamp('expires_at')->nullable();
             $table->timestamp('revoked_at')->nullable();

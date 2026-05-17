@@ -19,6 +19,7 @@ class ApiKey extends Model
         'key',
         'key_hint',
         'permissions',
+        'created_by_key_id',
         'expires_at',
     ];
 

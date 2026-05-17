@@ -20,6 +20,7 @@ class ApiKeyService
         array  $permissions = [],
         ?string $tenantId = null,
         ?\Carbon\Carbon $expiresAt = null,
+        ?string $createdByKeyId = null,
     ): array {
         $tenantId = $tenantId ?? $this->currentTenantId();
 
@@ -32,7 +33,10 @@ class ApiKeyService
             expiresAt:   $expiresAt,
         );
 
-        $apiKey = ApiKey::create($generated['attributes']);
+        $apiKey = ApiKey::create(array_merge(
+            $generated['attributes'],
+            $createdByKeyId ? ['created_by_key_id' => $createdByKeyId] : [],
+        ));
 
         return ['key' => $apiKey, 'raw' => $generated['raw']];
     }

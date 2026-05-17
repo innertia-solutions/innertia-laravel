@@ -30,7 +30,13 @@ use Illuminate\Support\Facades\Route;
 // Config en .env:  INNERTIA_API_DOMAIN=api.tuproducto.com
 // Config en innertia.php → saas.api_domain
 Route::prefix('v1')->middleware(['tenant.subdomain', 'apikey'])->group(function () {
-    // Agrega aquí tus rutas de API pública para clientes
+
+    // ── API Key self-management (requiere permiso api_keys.manage) ────────────
+    Route::get    ('api-keys',      [\Innertia\ApiKeys\Http\Controllers\ApiKeysClientController::class, 'index']);
+    Route::post   ('api-keys',      [\Innertia\ApiKeys\Http\Controllers\ApiKeysClientController::class, 'store']);
+    Route::delete ('api-keys/{id}', [\Innertia\ApiKeys\Http\Controllers\ApiKeysClientController::class, 'destroy']);
+
+    // ── Agrega aquí tus rutas de API pública para clientes ───────────────────
     // Route::middleware('apikey:invoices.read')->get('/invoices',      [InvoicesClientController::class, 'index']);
     // Route::middleware('apikey:invoices.read')->get('/invoices/{id}', [InvoicesClientController::class, 'show']);
 });

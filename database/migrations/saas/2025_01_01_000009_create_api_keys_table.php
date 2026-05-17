@@ -27,6 +27,7 @@ return new class extends Migration
             $table->string('key')->unique();                // hashed raw key
             $table->string('key_hint', 8);                 // last 4 chars for display
             $table->json('permissions')->default('[]');     // granted permissions subset
+            $table->uuid('created_by_key_id')->nullable()->index(); // key that created this key
             $table->timestamp('last_used_at')->nullable();
             $table->timestamp('expires_at')->nullable();
             $table->timestamp('revoked_at')->nullable();
