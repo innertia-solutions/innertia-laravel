@@ -124,6 +124,10 @@ class PermissionsService
             return false;
         }
 
+        if ($this->isSuperAdmin($user)) {
+            return true;
+        }
+
         $name = $permission instanceof \BackedEnum ? $permission->value : $permission;
 
         $all = $this->getUserPermissions($user);
@@ -133,6 +137,17 @@ class PermissionsService
         }
 
         return $this->checkHierarchy($all, $name);
+    }
+
+    public function isSuperAdmin(Authenticatable $user): bool
+    {
+        $roleName = config('innertia.super_admin_role', 'super_admin');
+
+        if (! $roleName || ! method_exists($user, 'roles')) {
+            return false;
+        }
+
+        return $user->roles()->where('name', $roleName)->exists();
     }
 
     // ── Sync ──────────────────────────────────────────────────────────────────
