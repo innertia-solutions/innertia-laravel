@@ -10,10 +10,39 @@ return [
     | 'app'  — single-tenant. Settings are global (tenant_id = null).
     | 'saas' — multi-tenant. Settings resolve per active tenant with fallback
     |          to platform level. Tenancy is configured automatically.
+    | 'api'  — API product mode. No users/tenants. Authenticates via client
+    |          API keys. Ideal for internal engines: Cognitia, billing, email.
     |
     */
 
     'mode' => 'app',
+
+    /*
+    |--------------------------------------------------------------------------
+    | API Product Mode
+    |--------------------------------------------------------------------------
+    |
+    | Only relevant when mode = 'api'.
+    |
+    | key_prefix  — Prefix for generated client API keys (e.g. 'cog_', 'bil_').
+    |               Override per-product to distinguish keys across services.
+    | key_header  — HTTP header used to pass the API key in requests.
+    |
+    | available_permissions — Full list of permissions any client key can hold.
+    |   Define them here so Olimpo can display them when creating keys.
+    |
+    */
+
+    'api' => [
+        'key_prefix'  => env('API_KEY_PREFIX', 'api_'),
+        'key_header'  => 'X-Api-Key',
+
+        'available_permissions' => [
+            // Define your product's permissions here. Example:
+            // 'chat.create'      => 'Iniciar conversaciones',
+            // 'documents.index'  => 'Indexar documentos',
+        ],
+    ],
 
     /*
     |--------------------------------------------------------------------------
