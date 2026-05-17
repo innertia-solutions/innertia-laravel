@@ -196,10 +196,36 @@ class PermissionsService
 
     // ── Config readers ────────────────────────────────────────────────────────
 
-    /** All permission groups in normalised format. */
+    /** All permission groups in normalised format (flat, each group has app/app_label). */
     public function all(): array
     {
         return $this->normalised();
+    }
+
+    /**
+     * All permissions grouped by app then by category.
+     * Returns: [{ app, app_label, groups: [{ category, category_alias, permissions }] }]
+     */
+    public function allByApp(): array
+    {
+        $byApp = [];
+
+        foreach ($this->normalised() as $group) {
+            $app      = $group['app']       ?? 'default';
+            $appLabel = $group['app_label'] ?? '';
+
+            if (! isset($byApp[$app])) {
+                $byApp[$app] = ['app' => $app, 'app_label' => $appLabel, 'groups' => []];
+            }
+
+            $byApp[$app]['groups'][] = [
+                'category'       => $group['category'],
+                'category_alias' => $group['category_alias'],
+                'permissions'    => $group['permissions'],
+            ];
+        }
+
+        return array_values($byApp);
     }
 
     /** Flat list of all configured permission names. */
@@ -262,17 +288,52 @@ class PermissionsService
 
     private function normalised(): array
     {
+        $config = config('innertia.permissions', []);
         $groups = [];
 
-        foreach (config('innertia.permissions', []) as $entry) {
-            if (is_string($entry) && enum_exists($entry)) {
-                $groups[] = $this->expandEnum($entry);
-            } elseif (is_array($entry) && isset($entry['category'])) {
-                $groups[] = $entry;
+        if ($this->isAppKeyed($config)) {
+            // New format: ['backoffice' => ['label' => '...', 'permissions' => [...]]]
+            foreach ($config as $appSlug => $appConfig) {
+                $appLabel = $appConfig['label'] ?? \Illuminate\Support\Str::title($appSlug);
+                foreach ($appConfig['permissions'] ?? [] as $entry) {
+                    $group                = $this->expandEntry($entry);
+                    $group['app']         = $appSlug;
+                    $group['app_label']   = $appLabel;
+                    $groups[]             = $group;
+                }
+            }
+        } else {
+            // Legacy flat format: [EnumClass::class, [...category array...]]
+            foreach ($config as $entry) {
+                $group                = $this->expandEntry($entry);
+                $group['app']         = 'default';
+                $group['app_label']   = '';
+                $groups[]             = $group;
             }
         }
 
         return $groups;
+    }
+
+    private function isAppKeyed(array $config): bool
+    {
+        foreach ($config as $key => $value) {
+            if (is_string($key) && is_array($value) && isset($value['permissions'])) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function expandEntry(mixed $entry): array
+    {
+        if (is_string($entry) && enum_exists($entry)) {
+            return $this->expandEnum($entry);
+        }
+        if (is_array($entry) && isset($entry['category'])) {
+            return $entry;
+        }
+        return ['category' => 'unknown', 'category_alias' => 'Unknown', 'permissions' => []];
     }
 
     private function expandEnum(string $enumClass): array

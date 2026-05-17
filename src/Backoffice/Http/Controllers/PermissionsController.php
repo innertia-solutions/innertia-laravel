@@ -12,13 +12,15 @@ class PermissionsController extends Controller
     /**
      * GET /backoffice/permissions
      *
-     * Returns all named permissions defined in config, grouped by category.
+     * Returns permissions grouped by app then by category.
      * Use ?flat=1 to get a flat list of permission names instead.
      *
-     * Grouped response:
+     * Default response:
      * [
-     *   { "category": "users", "category_alias": "Usuarios", "permissions": [
-     *       { "name": "users.view", "description": "Ver lista de usuarios" }
+     *   { "app": "backoffice", "app_label": "Backoffice", "groups": [
+     *       { "category": "user", "category_alias": "Usuarios", "permissions": [
+     *           { "name": "users.view", "description": "Ver lista de usuarios" }
+     *       ]}
      *   ]}
      * ]
      *
@@ -31,18 +33,24 @@ class PermissionsController extends Controller
             return response()->json(Permissions::keys());
         }
 
-        $groups = array_map(function ($group) {
+        $apps = array_map(function ($app) {
             return [
-                'category'       => $group['category'],
-                'category_alias' => $group['category_alias'],
-                'permissions'    => array_map(
-                    fn ($name, $description) => compact('name', 'description'),
-                    array_keys($group['permissions']),
-                    array_values($group['permissions']),
-                ),
+                'app'       => $app['app'],
+                'app_label' => $app['app_label'],
+                'groups'    => array_map(function ($group) {
+                    return [
+                        'category'       => $group['category'],
+                        'category_alias' => $group['category_alias'],
+                        'permissions'    => array_map(
+                            fn ($name, $description) => compact('name', 'description'),
+                            array_keys($group['permissions']),
+                            array_values($group['permissions']),
+                        ),
+                    ];
+                }, $app['groups']),
             ];
-        }, Permissions::all());
+        }, Permissions::allByApp());
 
-        return response()->json(array_values($groups));
+        return response()->json(array_values($apps));
     }
 }
