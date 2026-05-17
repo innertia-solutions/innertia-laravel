@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Password;
 use Innertia\Auth\RBAC\UseCases\CreateRole;
 use Innertia\Auth\RBAC\UseCases\AssignRole;
 use Innertia\Auth\RBAC\UseCases\RemoveRole;
+use Innertia\Facades\DataTable;
 
 class UsersController extends Controller
 {
@@ -18,28 +19,26 @@ class UsersController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $model   = config('innertia.auth.user_model');
-        $perPage = $request->integer('per_page', 20);
+        $model = config('innertia.auth.user_model');
 
-        if ($request->boolean('trashed')) {
-            $query = $model::onlyTrashed();
-        } else {
-            $query = $model::query();
-        }
+        $statusExpr = "CASE WHEN users.force_password_change = true THEN 'password_pending' WHEN users.email_verified_at IS NULL AND users.seen_at IS NULL THEN 'invited' WHEN users.email_verified_at IS NULL THEN 'unverified' WHEN users.seen_at IS NULL THEN 'never_logged_in' ELSE 'active' END";
 
-        if ($request->filled('search')) {
-            $s = $request->search;
-            $query->where(fn ($q) => $q
-                ->where('name', 'like', "%{$s}%")
-                ->orWhere('email', 'like', "%{$s}%")
-            );
-        }
+        $statuses = array_filter((array) $request->input('statuses', []));
 
-        if ($request->boolean('with_roles') && $this->modelHasRoles($model)) {
-            $query->with('roles');
-        }
-
-        return response()->json($query->paginate($perPage));
+        return DataTable::create('users')
+            ->columns(['name', 'email', 'force_password_change', 'two_factor_enabled', 'seen_at', 'created_at', 'created_by'])
+            ->addCalculatedColumn('"roles"', "(SELECT COALESCE(jsonb_agg(jsonb_build_object('id', roles.id, 'name', roles.name)), '[]'::jsonb) FROM roles INNER JOIN model_roles ON roles.id::text = model_roles.role_id::text WHERE model_roles.model_id = users.id::text AND model_roles.model_type LIKE '%User')")
+            ->addCalculatedColumn('"otp_configured"', 'users.two_factor_secret IS NOT NULL')
+            ->addCalculatedColumn('"status"', $statusExpr)
+            ->addCalculatedColumn('"created_by_name"', '(SELECT u.name FROM users u WHERE u.id::text = users.created_by::text LIMIT 1)')
+            ->prepareQuery(function ($query) use ($statuses, $statusExpr) {
+                if (!empty($statuses)) {
+                    $query->whereRaw("({$statusExpr}) IN (" . implode(',', array_fill(0, count($statuses), '?')) . ")", $statuses);
+                }
+                return $query;
+            })
+            ->enableExport()
+            ->render($model, $request, 'created_at', 'desc');
     }
 
     // ── Show ──────────────────────────────────────────────────────────────────
