@@ -26,6 +26,7 @@ class RolesController extends Controller
             ->columns(['name', 'description', 'created_at'])
             ->addCalculatedColumn('"permissions_count"', '(SELECT COUNT(*) FROM role_permissions WHERE role_permissions.role_id = roles.id)')
             ->addCalculatedColumn('"users_count"', '(SELECT COUNT(*) FROM model_roles WHERE model_roles.role_id = roles.id)')
+            ->addCalculatedColumn('"permissions"', "(SELECT COALESCE(json_agg(json_build_object('name', p.name, 'description', p.description)), '[]'::json) FROM permissions p JOIN role_permissions rp ON rp.permission_id = p.id WHERE rp.role_id = roles.id)")
             ->render($query, $request);
     }
 
