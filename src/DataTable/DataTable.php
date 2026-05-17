@@ -732,6 +732,27 @@ class DataTable
         return is_string($this->sourceClass) ? $this->sourceClass : get_class($this->sourceClass);
     }
 
+    private function resolveHistoryMeta(): array
+    {
+        if (! $this->sourceClass) {
+            return ['has_history' => false, 'entity_type' => null];
+        }
+
+        try {
+            $modelClass = $this->getModelClass();
+            $traits     = class_uses_recursive($modelClass);
+            $hasHistory = in_array(\Innertia\Platform\Traits\HasHistory::class, $traits)
+                       || in_array(\Innertia\Platform\Traits\Auditable::class, $traits);
+
+            return [
+                'has_history' => $hasHistory,
+                'entity_type' => $hasHistory ? class_basename($modelClass) : null,
+            ];
+        } catch (\Throwable) {
+            return ['has_history' => false, 'entity_type' => null];
+        }
+    }
+
     public function getQuery(string|Builder $source, ?string $search = '', array $sortColumns = [], bool $includeTrashed = false, bool $onlyTrashed = false): Builder
     {
         $this->sourceClass = $source;
@@ -956,6 +977,7 @@ class DataTable
                 'path' => ($this->enableList && $list) ? $table['path'] : $table->path(),
                 'request' => $request->all(),
                 'table_name' => $this->name,
+                ...$this->resolveHistoryMeta(),
             ],
         ];
 

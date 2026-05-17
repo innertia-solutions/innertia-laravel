@@ -34,20 +34,21 @@ use Innertia\Saas\Settings\SaasSettingsService;
 class InnertiaServiceProvider extends ServiceProvider
 {
     /**
-     * Override in InnertiaAppProvider (false) or InnertiaSaasProvider (true).
-     * Falls back to config('innertia.mode') when used directly.
+     * Override in subclasses to lock in the mode.
+     * InnertiaAppProvider  → isSaas: false, isApi: false
+     * InnertiaSaasProvider → isSaas: true,  isApi: false
+     * InnertiaApiProvider  → isSaas: false, isApi: true
      */
-    protected function isSaas(): bool
-    {
-        return config('innertia.mode') === 'saas';
-    }
+    protected function isSaas(): bool { return config('innertia.mode') === 'saas'; }
+    protected function isApi(): bool  { return false; }
 
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/innertia.php', 'innertia');
 
-        // Make the mode authoritative — concrete subclasses lock it in at provider registration.
-        config(['innertia.mode' => $this->isSaas() ? 'saas' : 'single']);
+        // Make the mode authoritative. Valid values: 'app' | 'saas' | 'api'
+        $mode = $this->isSaas() ? 'saas' : ($this->isApi() ? 'api' : 'app');
+        config(['innertia.mode' => $mode]);
 
         // TenantContext + InnertiaManager — siempre registrados; no-op en App mode.
         $this->app->singleton(\Innertia\Saas\TenantContext::class);
@@ -85,13 +86,17 @@ class InnertiaServiceProvider extends ServiceProvider
 
         // ── Migrations ────────────────────────────────────────────────────────
         // Each mode has its own clean migration set — no conditionals inside files.
-        $migrationsPath = __DIR__ . '/../database/migrations/' . ($isSaas ? 'saas' : 'single');
+        $mode           = config('innertia.mode');
+        $migrationsPath = __DIR__ . '/../database/migrations/' . match($mode) {
+            'saas' => 'saas',
+            'api'  => 'api',
+            default => 'app',   // 'app' mode
+        };
 
         // Load from vendor so migrate works out-of-the-box without publishing.
         $this->loadMigrationsFrom($migrationsPath);
 
         // Also publishable — `php artisan vendor:publish --tag=innertia-migrations`
-        // copies them into database/migrations/ for inspection or customization.
         $publishMap = [];
         foreach (glob($migrationsPath . '/*.php') as $f) {
             $publishMap[$f] = database_path('migrations/' . basename($f));
@@ -101,6 +106,14 @@ class InnertiaServiceProvider extends ServiceProvider
 
         // Files: rutas de acceso/descarga de archivos (plataforma interna).
         $this->loadRoutesFrom(__DIR__ . '/Files/routes.php');
+
+        // Platform: history, files upload, notifications genéricas.
+        $this->loadRoutesFrom(__DIR__ . '/Platform/routes.php');
+
+        // Api mode: rutas Olimpo para gestión de clients.
+        if ($mode === 'api') {
+            $this->loadRoutesFrom(__DIR__ . '/Api/routes.php');
+        }
 
         // Auth y Backoffice NO se auto-cargan aquí.
         // El proyecto es dueño de routes/api.php (publicado con innertia-routes).
@@ -202,7 +215,11 @@ class InnertiaServiceProvider extends ServiceProvider
 
         // Stubs de rutas: api.php + api.public.php + api.private.php
         // Se publican una sola vez durante el scaffold; el developer los edita libremente.
-        $stub = $this->isSaas() ? 'saas' : 'app';
+        $stub = match($mode) {
+            'saas' => 'saas',
+            'api'  => 'api',
+            default => 'app',
+        };
         $routeStubs = [
             __DIR__ . "/../stubs/{$stub}/api.php"         => base_path('routes/api.php'),
             __DIR__ . "/../stubs/{$stub}/api.public.php"  => base_path('routes/api.public.php'),
