@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Innertia\Exceptions\ConflictException;
 use Innertia\Exceptions\NotFoundException;
 use Innertia\Facades\Permissions;
+use Innertia\Platform\Traits\HasHistory;
 
 /**
  * Role model.
@@ -28,7 +29,7 @@ use Innertia\Facades\Permissions;
  */
 class Role extends Model
 {
-    use HasUuids;
+    use HasUuids, HasHistory;
 
     protected $fillable = ['name', 'description', 'tenant_id'];
 
