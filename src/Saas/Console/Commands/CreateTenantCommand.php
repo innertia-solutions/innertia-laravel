@@ -8,6 +8,7 @@ use Innertia\Facades\Innertia;
 use Innertia\Facades\Permissions;
 use Innertia\Saas\UseCases\CreateTenant;
 use Innertia\Saas\UseCases\CreateTenantAdmin;
+use Innertia\Saas\UseCases\EnableTenantDemo;
 
 class CreateTenantCommand extends Command
 {
@@ -71,8 +72,11 @@ class CreateTenantCommand extends Command
             return self::FAILURE;
         }
 
+        // Enable demo mode with the admin credentials
+        (new EnableTenantDemo($key, $result['email'], $result['password']))->execute();
+
         $this->newLine();
-        $this->info('Admin user created:');
+        $this->info('Admin user created (demo mode enabled):');
         $this->table(['Email', 'Password'], [[
             $result['email'],
             $result['password'],
