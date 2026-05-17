@@ -22,10 +22,9 @@ class RolesController extends Controller
 
         $query = Role::where('tenant_id', $tenantId)->withCount('permissions', 'users');
 
-        return DataTable::render($request, $query, [
-            'searchColumns' => ['name', 'description'],
-            'sortable'      => ['name', 'created_at', 'permissions_count', 'users_count'],
-        ]);
+        return DataTable::create('roles')
+            ->columns(['name', 'description', 'permissions_count', 'users_count', 'created_at'])
+            ->render($query, $request);
     }
 
     // ── Show ──────────────────────────────────────────────────────────────────
