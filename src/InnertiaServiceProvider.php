@@ -66,6 +66,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->singleton(ActivityLogService::class);
         $this->app->singleton(EntityHistoryService::class);
         $this->app->singleton(PermissionsService::class);
+        $this->app->singleton(\Innertia\ApiKeys\Services\ApiKeyService::class);
 
         $isSaas = $this->isSaas();
 
@@ -163,6 +164,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $router->aliasMiddleware('permission',     PermissionMiddleware::class);
         $router->aliasMiddleware('tenant.resolve', \Innertia\Saas\Middleware\ResolveTenantFromHeader::class);
         $router->aliasMiddleware('tenant.require', \Innertia\Saas\Middleware\RequireTenant::class);
+        $router->aliasMiddleware('apikey',         \Innertia\ApiKeys\Middleware\ApiKeyMiddleware::class);
 
         // ── Console commands ──────────────────────────────────────────────────
         if ($this->app->runningInConsole()) {
@@ -200,11 +202,17 @@ class InnertiaServiceProvider extends ServiceProvider
         // Stubs de rutas: api.php + api.public.php + api.private.php
         // Se publican una sola vez durante el scaffold; el developer los edita libremente.
         $stub = $this->isSaas() ? 'saas' : 'app';
-        $this->publishes([
+        $routeStubs = [
             __DIR__ . "/../stubs/{$stub}/api.php"         => base_path('routes/api.php'),
             __DIR__ . "/../stubs/{$stub}/api.public.php"  => base_path('routes/api.public.php'),
             __DIR__ . "/../stubs/{$stub}/api.private.php" => base_path('routes/api.private.php'),
-        ], 'innertia-routes');
+        ];
+
+        if (file_exists(__DIR__ . "/../stubs/{$stub}/api.clients.php")) {
+            $routeStubs[__DIR__ . "/../stubs/{$stub}/api.clients.php"] = base_path('routes/api.clients.php');
+        }
+
+        $this->publishes($routeStubs, 'innertia-routes');
     }
 
     protected function configureAuth(): void

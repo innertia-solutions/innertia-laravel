@@ -285,6 +285,51 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | API Keys
+    |--------------------------------------------------------------------------
+    |
+    | Client-facing API authentication via X-Api-Key header.
+    | Two key types, distinguished by prefix:
+    |
+    |   inn_t_xxx — Tenant key: resolves tenant only. No user context.
+    |               Ideal for ERP integrations, webhooks, server-to-server.
+    |
+    |   inn_u_xxx — User key: resolves tenant + authenticates a specific user.
+    |               Ideal for personal developer access within a tenant.
+    |
+    | available_permissions defines the maximum set of permissions any key of
+    | that type can be granted. Define them matching your app's permission names.
+    |
+    | Routes go in routes/api.clients.php (published with innertia-routes).
+    | Protect them with: Route::middleware('apikey')->group(...)
+    |                 or: Route::middleware('apikey:invoices.read')->get(...)
+    |
+    */
+
+    'api_keys' => [
+        'header' => 'X-Api-Key',
+
+        'tenant' => [
+            'available_permissions' => [
+                // Define here what a tenant API key can access:
+                // 'invoices.read',
+                // 'invoices.write',
+                // 'products.read',
+                // 'products.write',
+            ],
+        ],
+
+        'user' => [
+            'available_permissions' => [
+                // User keys typically get read-only access:
+                // 'invoices.read',
+                // 'products.read',
+            ],
+        ],
+    ],
+
     'backoffice' => [
         'prefix'     => env('BACKOFFICE_PREFIX', 'backoffice'),
         'middleware' => [],  // e.g. ['role:admin'] or ['permission:backoffice.access']

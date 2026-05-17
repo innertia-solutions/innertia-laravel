@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Innertia\Auth\Middleware\Authenticate;
+use Innertia\ApiKeys\Http\Controllers\ApiKeysController;
 use Innertia\Backoffice\Http\Controllers\PermissionsController;
 use Innertia\Backoffice\Http\Controllers\RolesController;
 use Innertia\Backoffice\Http\Controllers\UsersController;
@@ -50,4 +51,15 @@ Route::prefix($prefix)
 
         // ── Permissions ───────────────────────────────────────────────────────
         Route::get    ('permissions',                  [PermissionsController::class, 'index']);
+
+        // ── API Keys — Tenant ─────────────────────────────────────────────────
+        Route::get    ('api-keys',                     [ApiKeysController::class, 'index']);
+        Route::post   ('api-keys',                     [ApiKeysController::class, 'store']);
+        Route::delete ('api-keys/{id}',                [ApiKeysController::class, 'destroy']);
+        Route::get    ('api-keys/permissions',         [ApiKeysController::class, 'permissions']);
+
+        // ── API Keys — User (self-service) ────────────────────────────────────
+        Route::get    ('api-keys/user',                [ApiKeysController::class, 'userIndex']);
+        Route::post   ('api-keys/user',                [ApiKeysController::class, 'userStore']);
+        Route::delete ('api-keys/user/{id}',           [ApiKeysController::class, 'userDestroy']);
     });
