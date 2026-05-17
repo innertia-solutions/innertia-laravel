@@ -20,10 +20,12 @@ class RolesController extends Controller
     {
         $tenantId = $this->tenantId();
 
-        $query = Role::where('tenant_id', $tenantId)->withCount('permissions', 'users');
+        $query = Role::where('tenant_id', $tenantId);
 
         return DataTable::create('roles')
-            ->columns(['name', 'description', 'permissions_count', 'users_count', 'created_at'])
+            ->columns(['name', 'description', 'created_at'])
+            ->addCalculatedColumn('"permissions_count"', '(SELECT COUNT(*) FROM role_permissions WHERE role_permissions.role_id = roles.id)')
+            ->addCalculatedColumn('"users_count"', '(SELECT COUNT(*) FROM model_roles WHERE model_roles.role_id = roles.id)')
             ->render($query, $request);
     }
 
