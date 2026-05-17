@@ -52,6 +52,12 @@ class CreateTenantAdmin extends UseCase
             $user->assignRole($adminRole);
         }
 
+        // Enable demo mode automatically so every new tenant starts in demo
+        $tenant = Innertia::tenant();
+        if ($tenant) {
+            (new EnableTenantDemo((string) $tenant->key, $user->email, $password))->execute();
+        }
+
         return [
             'user'     => $user,
             'email'    => $user->email,
