@@ -288,9 +288,13 @@ class PermissionsService
         $shortName = class_basename($enumClass);
         $category  = \Illuminate\Support\Str::snake(preg_replace('/Permissions$/i', '', $shortName));
 
+        $alias = method_exists($enumClass, 'label')
+            ? $enumClass::label()
+            : \Illuminate\Support\Str::title(str_replace('_', ' ', $category));
+
         return [
             'category'       => $category,
-            'category_alias' => \Illuminate\Support\Str::title(str_replace('_', ' ', $category)),
+            'category_alias' => $alias,
             'permissions'    => $permissions,
         ];
     }
