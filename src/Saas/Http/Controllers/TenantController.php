@@ -37,6 +37,7 @@ class TenantController
                     'oauthProviders' => $tenant->configs['oauthProviders'] ?? [],
                     'features'       => $tenant->configs['features'] ?? [],
                     'isActive'       => $isActive,
+                    'demo'           => $tenant->configs['demo'] ?? null,
                 ],
             ],
         ]);
