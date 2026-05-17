@@ -48,15 +48,26 @@ class ApiKeyMiddleware
             }
         }
 
-        // Activate tenant
-        $tenantModel = config('innertia.saas.tenant_model', \Innertia\Saas\Models\Tenant::class);
-        $tenant = $tenantModel::find($apiKey->tenant_id);
+        // Tenant resolution: if already active (e.g. resolved by tenant.subdomain middleware),
+        // cross-validate that the key belongs to the same tenant.
+        // Otherwise, activate tenant from the key itself.
+        $activeTenant = Innertia::tenant();
 
-        if (! $tenant) {
-            return $this->unauthorized('Tenant not found.');
+        if ($activeTenant) {
+            // Cross-validate: key must belong to the already-resolved tenant
+            if ((string) $activeTenant->getKey() !== (string) $apiKey->tenant_id) {
+                return $this->unauthorized('API key does not belong to this tenant.');
+            }
+        } else {
+            $tenantModel = config('innertia.saas.tenant_model', \Innertia\Saas\Models\Tenant::class);
+            $tenant      = $tenantModel::find($apiKey->tenant_id);
+
+            if (! $tenant) {
+                return $this->unauthorized('Tenant not found.');
+            }
+
+            Innertia::activate($tenant->key);
         }
-
-        Innertia::activate($tenant->key);
 
         // Authenticate user if it's a user key
         if ($apiKey->type === 'user' && $apiKey->user_id) {

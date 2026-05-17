@@ -86,6 +86,12 @@ return [
             'localhost',
             '127.0.0.1',
         ],
+
+        // Base domain for client-facing API subdomain resolution.
+        // Set this to your API domain so only subdomains of it are resolved as tenants.
+        // e.g. 'api.tuproducto.com' → acme.api.tuproducto.com resolves tenant "acme"
+        // null → uses first subdomain segment of any host (less safe, fine for dev)
+        'api_domain' => env('INNERTIA_API_DOMAIN', null),
     ],
 
     /*

@@ -162,9 +162,10 @@ class InnertiaServiceProvider extends ServiceProvider
         $router->aliasMiddleware('app',            AppMiddleware::class);
         $router->aliasMiddleware('role',           RoleMiddleware::class);
         $router->aliasMiddleware('permission',     PermissionMiddleware::class);
-        $router->aliasMiddleware('tenant.resolve', \Innertia\Saas\Middleware\ResolveTenantFromHeader::class);
-        $router->aliasMiddleware('tenant.require', \Innertia\Saas\Middleware\RequireTenant::class);
-        $router->aliasMiddleware('apikey',         \Innertia\ApiKeys\Middleware\ApiKeyMiddleware::class);
+        $router->aliasMiddleware('tenant.resolve',    \Innertia\Saas\Middleware\ResolveTenantFromHeader::class);
+        $router->aliasMiddleware('tenant.subdomain',  \Innertia\Saas\Middleware\ResolveTenantFromSubdomain::class);
+        $router->aliasMiddleware('tenant.require',    \Innertia\Saas\Middleware\RequireTenant::class);
+        $router->aliasMiddleware('apikey',            \Innertia\ApiKeys\Middleware\ApiKeyMiddleware::class);
 
         // ── Console commands ──────────────────────────────────────────────────
         if ($this->app->runningInConsole()) {

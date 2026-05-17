@@ -24,8 +24,13 @@ use Illuminate\Support\Facades\Route;
 |
 */
 
-Route::prefix('v1')->middleware(['apikey'])->group(function () {
+// tenant.subdomain resuelve el tenant desde acme.api.tuproducto.com → "acme"
+// apikey          valida X-Api-Key y cross-valida que pertenezca al tenant del subdominio
+//
+// Config en .env:  INNERTIA_API_DOMAIN=api.tuproducto.com
+// Config en innertia.php → saas.api_domain
+Route::prefix('v1')->middleware(['tenant.subdomain', 'apikey'])->group(function () {
     // Agrega aquí tus rutas de API pública para clientes
-    // Route::get('/invoices',        [InvoicesClientController::class, 'index']);
-    // Route::get('/invoices/{id}',   [InvoicesClientController::class, 'show']);
+    // Route::middleware('apikey:invoices.read')->get('/invoices',      [InvoicesClientController::class, 'index']);
+    // Route::middleware('apikey:invoices.read')->get('/invoices/{id}', [InvoicesClientController::class, 'show']);
 });
