@@ -132,6 +132,16 @@ class Role extends Model
         return $this->belongsToMany(Permission::class, 'role_permissions');
     }
 
+    public function users(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            config('auth.providers.users.model', \App\Models\User::class),
+            'model_roles',
+            'role_id',
+            'model_id'
+        );
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private function resolvePermissionIds(array $permissions): array

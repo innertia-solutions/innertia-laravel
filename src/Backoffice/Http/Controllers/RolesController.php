@@ -10,6 +10,7 @@ use Innertia\Auth\RBAC\UseCases\CreateRole;
 use Innertia\Auth\RBAC\UseCases\DeleteRole;
 use Innertia\Auth\RBAC\UseCases\SyncRolePermissions;
 use Innertia\Auth\RBAC\UseCases\UpdateRole;
+use Innertia\Facades\DataTable;
 
 class RolesController extends Controller
 {
@@ -19,12 +20,12 @@ class RolesController extends Controller
     {
         $tenantId = $this->tenantId();
 
-        $roles = Role::where('tenant_id', $tenantId)
-            ->when($request->filled('search'), fn ($q) => $q->where('name', 'like', "%{$request->search}%"))
-            ->withCount('permissions')
-            ->get();
+        $query = Role::where('tenant_id', $tenantId)->withCount('permissions', 'users');
 
-        return response()->json($roles);
+        return DataTable::render($request, $query, [
+            'searchColumns' => ['name', 'description'],
+            'sortable'      => ['name', 'created_at', 'permissions_count', 'users_count'],
+        ]);
     }
 
     // ── Show ──────────────────────────────────────────────────────────────────
