@@ -319,19 +319,18 @@ return [
 
         'tenant' => [
             'available_permissions' => [
-                // Define here what a tenant API key can access:
-                // 'invoices.read',
-                // 'invoices.write',
-                // 'products.read',
-                // 'products.write',
+                // 'invoices.read'  => 'Consultar facturas',
+                // 'invoices.write' => 'Crear y actualizar facturas',
+                // 'products.read'  => 'Consultar productos',
+                // 'products.write' => 'Crear y actualizar productos',
             ],
         ],
 
         'user' => [
             'available_permissions' => [
                 // User keys typically get read-only access:
-                // 'invoices.read',
-                // 'products.read',
+                // 'invoices.read'  => 'Consultar facturas',
+                // 'products.read'  => 'Consultar productos',
             ],
         ],
     ],

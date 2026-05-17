@@ -53,9 +53,14 @@ class ApiKeyService
             ->revoke();
     }
 
+    /**
+     * Returns available permissions as [key => description].
+     * Supports both flat arrays (['perm']) and associative (['perm' => 'desc']).
+     */
     public function availablePermissions(string $type = 'tenant'): array
     {
-        return config("innertia.api_keys.{$type}.available_permissions", []);
+        $raw = config("innertia.api_keys.{$type}.available_permissions", []);
+        return $this->normalizePermissions($raw);
     }
 
     private function currentTenantId(): string
@@ -66,7 +71,7 @@ class ApiKeyService
 
     private function validatePermissions(string $type, array $permissions): void
     {
-        $available = config("innertia.api_keys.{$type}.available_permissions", []);
+        $available = array_keys($this->availablePermissions($type));
         $invalid   = array_diff($permissions, $available);
 
         if ($invalid) {
@@ -74,5 +79,14 @@ class ApiKeyService
                 "Invalid permissions for {$type} API key: " . implode(', ', $invalid)
             );
         }
+    }
+
+    private function normalizePermissions(array $raw): array
+    {
+        // If flat array (['perm.read', 'perm.write']), convert to ['perm.read' => '', ...]
+        if (array_is_list($raw)) {
+            return array_fill_keys($raw, '');
+        }
+        return $raw; // already ['perm.read' => 'description']
     }
 }

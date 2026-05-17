@@ -61,7 +61,8 @@ trait HasApiKeys
 
     private function validatePermissions(string $type, array $permissions): void
     {
-        $available = config("innertia.api_keys.{$type}.available_permissions", []);
+        $raw       = config("innertia.api_keys.{$type}.available_permissions", []);
+        $available = array_is_list($raw) ? $raw : array_keys($raw);
         $invalid   = array_diff($permissions, $available);
 
         if ($invalid) {
