@@ -71,7 +71,8 @@ class UsersController extends Controller
             'password' => 'required|string|min:8',
         ]);
 
-        $data['password'] = Hash::make($data['password']);
+        $data['password']   = Hash::make($data['password']);
+        $data['created_by'] = auth()->id();
 
         $user = $model::create($data);
 

@@ -36,6 +36,7 @@ abstract class User extends Authenticatable implements JWTSubject
         'force_password_change',
         'two_factor_secret',
         'two_factor_enabled',
+        'created_by',
     ];
 
     protected $hidden = [
@@ -50,6 +51,13 @@ abstract class User extends Authenticatable implements JWTSubject
         'force_password_change' => 'boolean',
         'two_factor_enabled'    => 'boolean',
     ];
+
+    /* ── Relations ── */
+
+    public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(static::class, 'created_by');
+    }
 
     /* ── JWTSubject ── */
 

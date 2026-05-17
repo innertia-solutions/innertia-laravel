@@ -34,6 +34,8 @@ return new class extends Migration
             $table->text('two_factor_secret')->nullable();
             $table->boolean('two_factor_enabled')->default(false);
 
+            $table->string('created_by')->nullable()->index();
+
             $table->rememberToken();
             $table->timestamps();
             $table->softDeletes();
