@@ -5,6 +5,7 @@ use Innertia\Auth\Http\Controllers\AuthController;
 use Innertia\Auth\Http\Controllers\EmailVerificationController;
 use Innertia\Auth\Http\Controllers\OtpController;
 use Innertia\Auth\Http\Controllers\PasswordController;
+use Innertia\Auth\Http\Controllers\PreferencesController;
 use Innertia\Auth\Http\Controllers\SocialAuthController;
 use Innertia\Auth\Http\Controllers\SocialSettingsController;
 use Innertia\Auth\Http\Controllers\TwoFactorController;
@@ -32,10 +33,12 @@ Route::prefix('auth')->group(function () {
 
     // Protected
     Route::middleware(Authenticate::class)->group(function () {
-        Route::get('me',                [AuthController::class, 'me']);
-        Route::get('me/permissions',    [AuthController::class, 'mePermissions']);
-        Route::put('me/appearance',     [AuthController::class, 'updateAppearance']);
-        Route::post('refresh',          [AuthController::class, 'refresh']);
+        Route::get('me',                    [AuthController::class, 'me']);
+        Route::get('me/permissions',        [AuthController::class, 'mePermissions']);
+        Route::get('me/preferences',        [PreferencesController::class, 'index']);
+        Route::put('me/preferences/{key}',  [PreferencesController::class, 'update']);
+        Route::delete('me/preferences/{key}', [PreferencesController::class, 'destroy']);
+        Route::post('refresh',              [AuthController::class, 'refresh']);
         Route::post('logout',           [AuthController::class, 'logout']);
         Route::post('2fa/enable',       [TwoFactorController::class, 'enable']);
         Route::post('2fa/disable',      [TwoFactorController::class, 'disable']);

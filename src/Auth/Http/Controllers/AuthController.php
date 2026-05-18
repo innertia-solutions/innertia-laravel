@@ -55,24 +55,17 @@ class AuthController extends Controller
         // Available contexts (app keys the user has access to)
         $availableContexts = method_exists($user, 'appKeys') ? $user->appKeys() : [];
 
+        // Public preferences (appearance, language, etc.)
+        $preferences = method_exists($user, 'preferences')
+            ? $user->preferences()->onlyPublic()->toArray()
+            : [];
+
         return response()->json([
             'user'               => $userData,
             'permissions'        => $permissions,
             'availableContexts'  => $availableContexts,
+            'preferences'        => $preferences,
         ]);
-    }
-
-    /**
-     * PUT /auth/me/appearance
-     *
-     * Persists the user's dark/light mode preference.
-     * Accepted values: "light" | "dark"
-     */
-    public function updateAppearance(Request $request): JsonResponse
-    {
-        $data = $request->validate(['appearance' => 'required|in:light,dark']);
-        $request->user()->update(['appearance' => $data['appearance']]);
-        return response()->json(['appearance' => $data['appearance']]);
     }
 
     /**

@@ -9,6 +9,7 @@ use Innertia\Auth\RBAC\Traits\HasApps;
 use Innertia\Auth\RBAC\Traits\HasRoles;
 use Innertia\Platform\Traits\Auditable;
 use Innertia\Platform\Traits\HasHistory;
+use Innertia\Platform\Traits\HasPreferences;
 use Innertia\Platform\Traits\HasUuid;
 use Tymon\JWTAuth\Contracts\JWTSubject;
 
@@ -26,14 +27,13 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
  */
 abstract class User extends Authenticatable implements JWTSubject
 {
-    use Auditable, HasApps, HasFactory, HasHistory, HasUuid, HasRoles, SoftDeletes;
+    use Auditable, HasApps, HasFactory, HasHistory, HasPreferences, HasUuid, HasRoles, SoftDeletes;
 
     protected $fillable = [
         'name',
         'email',
         'password',
         'seen_at',
-        'appearance',
         'force_password_change',
         'two_factor_secret',
         'two_factor_enabled',
