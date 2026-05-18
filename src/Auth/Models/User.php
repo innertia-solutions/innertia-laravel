@@ -33,6 +33,7 @@ abstract class User extends Authenticatable implements JWTSubject
         'email',
         'password',
         'seen_at',
+        'appearance',
         'force_password_change',
         'two_factor_secret',
         'two_factor_enabled',

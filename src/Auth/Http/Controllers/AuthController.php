@@ -63,6 +63,19 @@ class AuthController extends Controller
     }
 
     /**
+     * PUT /auth/me/appearance
+     *
+     * Persists the user's dark/light mode preference.
+     * Accepted values: "light" | "dark"
+     */
+    public function updateAppearance(Request $request): JsonResponse
+    {
+        $data = $request->validate(['appearance' => 'required|in:light,dark']);
+        $request->user()->update(['appearance' => $data['appearance']]);
+        return response()->json(['appearance' => $data['appearance']]);
+    }
+
+    /**
      * GET /auth/me/permissions
      *
      * Returns the authenticated user's roles and resolved permission names.

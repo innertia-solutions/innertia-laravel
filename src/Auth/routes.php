@@ -34,6 +34,7 @@ Route::prefix('auth')->group(function () {
     Route::middleware(Authenticate::class)->group(function () {
         Route::get('me',                [AuthController::class, 'me']);
         Route::get('me/permissions',    [AuthController::class, 'mePermissions']);
+        Route::put('me/appearance',     [AuthController::class, 'updateAppearance']);
         Route::post('refresh',          [AuthController::class, 'refresh']);
         Route::post('logout',           [AuthController::class, 'logout']);
         Route::post('2fa/enable',       [TwoFactorController::class, 'enable']);
