@@ -22,4 +22,7 @@ Route::prefix('olimpo')
 
         Route::put('tenants/{id}/demo',    [OlimpoController::class, 'enableDemo']);
         Route::delete('tenants/{id}/demo', [OlimpoController::class, 'disableDemo']);
+
+        // Telemetría — recibe batches de eventos de las apps cliente
+        Route::post('telemetry', [\Innertia\Telemetry\Http\Controllers\TelemetryController::class, 'receive']);
     });
