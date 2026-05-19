@@ -26,6 +26,7 @@ class TelemetryServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \Innertia\Telemetry\Console\PruneTelemetryCommand::class,
+                \Innertia\Telemetry\Console\InstallTelemetryCommand::class,
             ]);
 
             $this->publishes([
@@ -35,6 +36,15 @@ class TelemetryServiceProvider extends ServiceProvider
 
         if (! $this->shouldActivate()) {
             return;
+        }
+
+        // En modo standalone/both: cargar migraciones automáticamente (sin publish)
+        // El desarrollador puede también correr innertia:telemetry:install para publicarlas
+        $mode = config('telemetry.mode', 'remote');
+        if (in_array($mode, ['standalone', 'both'])) {
+            $isSaas = config('innertia.mode') === 'saas';
+            $stub   = $isSaas ? 'create_telemetry_events_table_saas.php' : 'create_telemetry_events_table.php';
+            $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations/telemetry');
         }
 
         // Singleton del collector para este request

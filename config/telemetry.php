@@ -2,6 +2,19 @@
 
 return [
     'enabled'         => env('TELEMETRY_ENABLED', false),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Telemetry Mode
+    |--------------------------------------------------------------------------
+    | 'remote'     — envía a Olimpo via HTTP, sin tabla local
+    | 'standalone' — guarda en DB local, no envía a Olimpo
+    | 'both'       — guarda local Y envía a Olimpo
+    |
+    | Para 'standalone' o 'both': php artisan innertia:telemetry:install
+    */
+    'mode'            => env('TELEMETRY_MODE', 'remote'),
+
     'app_name'        => env('APP_NAME', 'app'),
     'olimpo_url'      => env('OLIMPO_URL'),
     'olimpo_key'      => env('OLIMPO_KEY'),
