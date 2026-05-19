@@ -62,6 +62,7 @@ tests/Telemetry/
 - `src/DataTable/DataTable.php` — agregar hook estático `DataTable::$onRender` para que `TelemetryCollector` pueda capturar llamadas sin acoplar DataTable al módulo Telemetry
 - `src/Olimpo/OlimpoServiceProvider.php` — registrar `TelemetryServiceProvider` desde aquí como sub-provider cuando `TELEMETRY_ENABLED=true`
 - `src/Olimpo/routes.php` — agregar `Route::post('telemetry', ...)` al grupo existente
+- `packages/app/composables/useApi.js` (innertia-ui-kit) — agregar header `X-Innertia-Source: ssr|client` en cada request
 
 ---
 
@@ -485,6 +486,7 @@ class QueryCollector
             'user_id' => null, // se rellena en TelemetryMiddleware al inicializar
             'route'   => request()?->method() . ' ' . request()?->path(),
             'env'     => app()->environment(),
+            'source'  => request()?->header('X-Innertia-Source', 'cli'),
         ];
     }
 }
@@ -1097,10 +1099,13 @@ class TelemetryServiceProvider extends ServiceProvider
 
     private function resolveSessionId(): string
     {
-        return request()?->header('X-Devtools-Session')
-            ?? (string) request()?->cookie('innertia_session')
-            ?? (string) session()->getId()
-            ?? \Illuminate\Support\Str::uuid();
+        try {
+            return auth()->payload()->get('jti')
+                ?? \Illuminate\Support\Str::uuid()->toString();
+        } catch (\Throwable) {
+            // Sin auth (request público, CLI, queue)
+            return 'cli-' . \Illuminate\Support\Str::uuid()->toString();
+        }
     }
 
     private function resolveTenant(): ?string
@@ -1631,6 +1636,60 @@ Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>"
 
 ---
 
+## Task 12: Header X-Innertia-Source en useApi.js (nuxt-app)
+
+**Files:**
+- Modify: `innertia-ui-kit/packages/app/composables/useApi.js`
+
+- [ ] **Step 1: Agregar el header en useApi.js**
+
+En `/Users/guillermofarias/Sites/inertia/innertia-ui-kit/packages/app/composables/useApi.js`, dentro de la función que construye los headers de cada request, agregar:
+
+```js
+// Dentro del objeto de headers que se envía en cada request
+'X-Innertia-Source': import.meta.server ? 'ssr' : 'client',
+```
+
+El archivo actual construye headers así (buscar el bloque donde se arma `Authorization`):
+
+```js
+// Antes (sección de headers existente):
+const headers = {
+  'Authorization': `Bearer ${token}`,
+  'Content-Type': 'application/json',
+  // ... otros headers
+}
+
+// Después — agregar la línea:
+const headers = {
+  'Authorization': `Bearer ${token}`,
+  'Content-Type': 'application/json',
+  'X-Innertia-Source': import.meta.server ? 'ssr' : 'client',
+  // ... otros headers
+}
+```
+
+- [ ] **Step 2: Bump version de nuxt-app**
+
+En `innertia-ui-kit/packages/app/package.json`, incrementar patch version.
+
+- [ ] **Step 3: Publicar**
+
+```bash
+cd /Users/guillermofarias/Sites/inertia/innertia-ui-kit
+pnpm --filter @innertia-solutions/nuxt-app publish --no-git-checks
+```
+
+- [ ] **Step 4: Commit**
+
+```bash
+cd /Users/guillermofarias/Sites/inertia/innertia-ui-kit
+git add packages/app/composables/useApi.js packages/app/package.json
+git commit -m "feat(telemetry): add X-Innertia-Source header (ssr|client) to all API requests"
+```
+
+---
+
 ## Verificación de integración completa
 
 Después de implementar todos los tasks, verificar el pipeline end-to-end en documentia:
@@ -1675,3 +1734,4 @@ docker compose exec api php artisan tinker
 | `src/Telemetry/Http/Controllers/TelemetryController.php` | Crear | 10 |
 | `src/Olimpo/routes.php` | Modificar | 10 |
 | `src/Telemetry/Console/PruneTelemetryCommand.php` | Crear | 11 |
+| `innertia-ui-kit/packages/app/composables/useApi.js` | Modificar (header X-Innertia-Source) | 12 |

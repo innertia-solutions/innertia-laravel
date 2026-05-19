@@ -73,10 +73,18 @@ Cada evento tiene la siguiente estructura JSON:
     "tenant":   "acme",
     "user_id":  "uuid",
     "route":    "GET /api/backoffice/users",
-    "env":      "production"
+    "env":      "production",
+    "source":   "ssr | client | cli"
   }
 }
 ```
+
+**`source`** indica el origen de cada request:
+- `ssr` — Nuxt server-side rendering hizo el fetch (header `X-Innertia-Source: ssr`)
+- `client` — el browser hizo el request directamente (header `X-Innertia-Source: client`)
+- `cli` — llamada desde artisan, queue o sin contexto HTTP
+
+El header `X-Innertia-Source` lo envía `useApi.js` del paquete `nuxt-app` automáticamente usando `import.meta.server`. Permite en Olimpo filtrar "queries disparadas por SSR vs cliente" — útil para detectar waterfalls de hidratación.
 
 **Tipos de eventos capturados (primera versión):**
 
@@ -100,7 +108,8 @@ Cada evento tiene la siguiente estructura JSON:
 - Al recibir cada evento:
   1. Lo agrega al batch en memoria (`$this->batch[]`)
   2. Lo emite inmediatamente por WebSocket: `broadcast(new DevtoolsEvent($event))->toPrivate("innertia.devtools.{$sessionId}")`
-- El `sessionId` se extrae del header `X-Devtools-Session` o de la cookie `innertia_session`
+- El `sessionId` se extrae del claim `jti` del JWT via `auth()->payload()->get('jti')` (fallback a UUID para requests sin auth / CLI)
+- El frontend obtiene el `jti` decodificando el JWT que ya tiene almacenado: `JSON.parse(atob(token.split('.')[1])).jti` — sin llamadas extra
 
 ### `TelemetryExporter`
 
