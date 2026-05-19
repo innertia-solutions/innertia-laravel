@@ -22,7 +22,7 @@ class TelemetryController extends Controller
             'events.*.duration_ms' => 'nullable|numeric',
         ]);
 
-        ProcessTelemetryJob::dispatch($data)->onQueue(config('telemetry.queue', 'telemetry'));
+        ProcessTelemetryJob::dispatch($data)->onQueue(config('innertia.telemetry.queue', 'telemetry'));
 
         return response()->json(['accepted' => true, 'count' => count($data['events'])], 202);
     }

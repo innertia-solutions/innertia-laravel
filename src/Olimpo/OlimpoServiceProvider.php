@@ -41,7 +41,7 @@ class OlimpoServiceProvider extends ServiceProvider
         }
 
         // Activar telemetría si está habilitada
-        if (config('olimpo.url') || config('telemetry.enabled')) {
+        if (config('olimpo.url') || config('innertia.telemetry.enabled')) {
             $this->app->register(\Innertia\Telemetry\TelemetryServiceProvider::class);
         }
     }

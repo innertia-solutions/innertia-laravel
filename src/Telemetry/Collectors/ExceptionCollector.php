@@ -10,7 +10,7 @@ class ExceptionCollector
 {
     public static function handle(TelemetryCollector $collector, Throwable $e): void
     {
-        $except = config('telemetry.except', []);
+        $except = config('innertia.telemetry.except', []);
         foreach ($except as $class) {
             if ($e instanceof $class) return;
         }

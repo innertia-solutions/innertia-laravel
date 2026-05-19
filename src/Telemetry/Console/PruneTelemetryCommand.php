@@ -12,7 +12,7 @@ class PruneTelemetryCommand extends Command
 
     public function handle(): int
     {
-        $days = (int) ($this->option('days') ?? config('telemetry.retention_days', 7));
+        $days = (int) ($this->option('days') ?? config('innertia.telemetry.retention_days', 7));
 
         if ($days <= 0) {
             $this->error('El número de días debe ser mayor a 0.');

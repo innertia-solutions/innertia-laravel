@@ -15,7 +15,7 @@ class InstallTelemetryCommand extends Command
     public function handle(): int
     {
         $isSaas = config('innertia.mode') === 'saas';
-        $mode   = config('telemetry.mode', 'remote');
+        $mode   = config('innertia.telemetry.mode', 'remote');
 
         if ($mode === 'remote') {
             $this->warn('El modo de telemetría es "remote" — no necesitas tabla local.');

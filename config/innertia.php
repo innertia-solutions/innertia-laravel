@@ -374,4 +374,48 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Telemetry
+    |--------------------------------------------------------------------------
+    |
+    | Framework metrics (queries, logs, exceptions, events, requests, datatables)
+    | sent from apps to Olimpo for centralized monitoring.
+    |
+    | mode:
+    |   'remote'     — send to Olimpo via HTTP, no local table (default)
+    |   'standalone' — store in local DB only, no Olimpo
+    |   'both'       — store locally AND send to Olimpo
+    |
+    | For 'standalone' or 'both': php artisan innertia:telemetry:install
+    |
+    */
+
+    'telemetry' => [
+        'enabled'        => env('TELEMETRY_ENABLED', false),
+        'mode'           => env('TELEMETRY_MODE', 'remote'),
+        'app_name'       => env('APP_NAME', 'app'),
+        'olimpo_url'     => env('OLIMPO_URL'),
+        'olimpo_key'     => env('OLIMPO_KEY'),
+        'queue'          => env('TELEMETRY_QUEUE', 'telemetry'),
+        'timeout'        => 3,
+        'retention_days' => env('TELEMETRY_RETENTION_DAYS', 7),
+
+        'capture' => [
+            'queries'    => true,
+            'logs'       => true,
+            'exceptions' => true,
+            'datatables' => true,
+            'events'     => true,
+            'requests'   => true,
+        ],
+
+        'except' => [
+            \Illuminate\Validation\ValidationException::class,
+            \Illuminate\Auth\AuthenticationException::class,
+            \Illuminate\Auth\Access\AuthorizationException::class,
+            \Symfony\Component\HttpKernel\Exception\NotFoundHttpException::class,
+        ],
+    ],
+
 ];

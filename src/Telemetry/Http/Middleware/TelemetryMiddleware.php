@@ -30,10 +30,10 @@ class TelemetryMiddleware
         $sessionId = $collector->sessionId();
         $batch     = $collector->flush();
         $exporter  = new TelemetryExporter(
-            olimpoUrl: config('telemetry.olimpo_url'),
-            olimpoKey: config('telemetry.olimpo_key'),
-            appName:   config('telemetry.app_name', config('app.name', 'app')),
-            timeout:   config('telemetry.timeout', 3),
+            olimpoUrl: config('innertia.telemetry.olimpo_url'),
+            olimpoKey: config('innertia.telemetry.olimpo_key'),
+            appName:   config('innertia.telemetry.app_name', config('app.name', 'app')),
+            timeout:   config('innertia.telemetry.timeout', 3),
         );
 
         if (function_exists('defer')) {

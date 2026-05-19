@@ -18,7 +18,7 @@ class TelemetryServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
-        $this->mergeConfigFrom(__DIR__ . '/../../config/telemetry.php', 'telemetry');
+        $this->mergeConfigFrom(__DIR__ . '/../../config/innertia.php', 'innertia');
     }
 
     public function boot(): void
@@ -28,10 +28,6 @@ class TelemetryServiceProvider extends ServiceProvider
                 \Innertia\Telemetry\Console\PruneTelemetryCommand::class,
                 \Innertia\Telemetry\Console\InstallTelemetryCommand::class,
             ]);
-
-            $this->publishes([
-                __DIR__ . '/../../config/telemetry.php' => config_path('telemetry.php'),
-            ], 'telemetry-config');
         }
 
         if (! $this->shouldActivate()) {
@@ -40,17 +36,15 @@ class TelemetryServiceProvider extends ServiceProvider
 
         // En modo standalone/both: cargar migraciones automáticamente (sin publish)
         // El desarrollador puede también correr innertia:telemetry:install para publicarlas
-        $mode = config('telemetry.mode', 'remote');
+        $mode = config('innertia.telemetry.mode', 'remote');
         if (in_array($mode, ['standalone', 'both'])) {
-            $isSaas = config('innertia.mode') === 'saas';
-            $stub   = $isSaas ? 'create_telemetry_events_table_saas.php' : 'create_telemetry_events_table.php';
             $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations/telemetry');
         }
 
         // Singleton del collector para este request
         $this->app->singleton(TelemetryCollector::class, function () {
             return new TelemetryCollector(
-                appName:   config('telemetry.app_name', config('app.name', 'app')),
+                appName:   config('innertia.telemetry.app_name', config('app.name', 'app')),
                 sessionId: $this->resolveSessionId(),
                 tenant:    $this->resolveTenant(),
                 env:       app()->environment(),
@@ -70,7 +64,7 @@ class TelemetryServiceProvider extends ServiceProvider
 
     private function shouldActivate(): bool
     {
-        if (! config('telemetry.enabled', false)) {
+        if (! config('innertia.telemetry.enabled', false)) {
             return false;
         }
 
@@ -114,7 +108,7 @@ class TelemetryServiceProvider extends ServiceProvider
 
     private function registerQueryCapture(): void
     {
-        if (! config('telemetry.capture.queries', true)) return;
+        if (! config('innertia.telemetry.capture.queries', true)) return;
 
         DB::listen(function ($query) {
             $collector = $this->app->make(TelemetryCollector::class);
@@ -130,7 +124,7 @@ class TelemetryServiceProvider extends ServiceProvider
 
     private function registerLogCapture(): void
     {
-        if (! config('telemetry.capture.logs', true)) return;
+        if (! config('innertia.telemetry.capture.logs', true)) return;
 
         Log::listen(function ($message) {
             $collector = $this->app->make(TelemetryCollector::class);
@@ -145,7 +139,7 @@ class TelemetryServiceProvider extends ServiceProvider
 
     private function registerEventCapture(): void
     {
-        if (! config('telemetry.capture.events', true)) return;
+        if (! config('innertia.telemetry.capture.events', true)) return;
 
         Event::listen('*', function (string $eventName, array $payload) {
             $collector = $this->app->make(TelemetryCollector::class);
@@ -155,7 +149,7 @@ class TelemetryServiceProvider extends ServiceProvider
 
     private function registerDataTableCapture(): void
     {
-        if (! config('telemetry.capture.datatables', true)) return;
+        if (! config('innertia.telemetry.capture.datatables', true)) return;
 
         DataTable::$onRender = function (string $tableName, int $rowCount, float $durationMs) {
             $collector = $this->app->make(TelemetryCollector::class);
@@ -165,7 +159,7 @@ class TelemetryServiceProvider extends ServiceProvider
 
     private function registerExceptionCapture(): void
     {
-        if (! config('telemetry.capture.exceptions', true)) return;
+        if (! config('innertia.telemetry.capture.exceptions', true)) return;
 
         try {
             $this->app->extend(

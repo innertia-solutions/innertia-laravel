@@ -49,6 +49,6 @@ class ProcessTelemetryJob implements ShouldQueue
 
     public function queue(): string
     {
-        return config('telemetry.queue', 'telemetry');
+        return config('innertia.telemetry.queue', 'telemetry');
     }
 }
