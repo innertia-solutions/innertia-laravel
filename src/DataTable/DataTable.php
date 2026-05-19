@@ -58,6 +58,9 @@ class DataTable
 
     private bool $enableList = false;
 
+    /** @var callable|null Hook opcional para telemetría. Recibe: name, rows, duration_ms */
+    public static $onRender = null;
+
     private ?string $listKeyColumn = null;
 
     private $listValueColumns = null;
@@ -986,6 +989,16 @@ class DataTable
 
         if ($this->debug) {
             $response['meta']['query'] = $query->toRawSql();
+        }
+
+        // Hook de telemetría — no acopla DataTable con el módulo Telemetry
+        if (static::$onRender !== null) {
+            try {
+                $rowCount = is_array($response['data']) ? count($response['data']) : 0;
+                (static::$onRender)($this->name, $rowCount, 0.0);
+            } catch (\Throwable) {
+                // Silencioso
+            }
         }
 
         return response()->json($response);
