@@ -24,11 +24,9 @@ class TelemetryServiceProvider extends ServiceProvider
     public function boot(): void
     {
         if ($this->app->runningInConsole()) {
-            if (class_exists(\Innertia\Telemetry\Console\PruneTelemetryCommand::class)) {
-                $this->commands([
-                    \Innertia\Telemetry\Console\PruneTelemetryCommand::class,
-                ]);
-            }
+            $this->commands([
+                \Innertia\Telemetry\Console\PruneTelemetryCommand::class,
+            ]);
 
             $this->publishes([
                 __DIR__ . '/../../config/telemetry.php' => config_path('telemetry.php'),
