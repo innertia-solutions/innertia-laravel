@@ -44,5 +44,8 @@ class OlimpoServiceProvider extends ServiceProvider
         if (config('olimpo.url') || config('innertia.telemetry.enabled')) {
             $this->app->register(\Innertia\Telemetry\TelemetryServiceProvider::class);
         }
+
+        // Registrar devtools
+        $this->app->register(\Innertia\Devtools\DevtoolsServiceProvider::class);
     }
 }

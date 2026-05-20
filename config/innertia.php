@@ -418,4 +418,30 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Devtools
+    |--------------------------------------------------------------------------
+    |
+    | Remote DB browser and interactive Tinker session accessible from Olimpo.
+    | All endpoints are protected by olimpo.auth + devtools.guard.
+    |
+    | tinker.enabled — set to true to allow remote PHP eval. AUDIT LOGGED.
+    |                  Never enable on production without explicit intent.
+    | tinker.session_ttl — seconds before an idle Tinker session expires (Redis TTL).
+    | tinker.cache_store — explicit cache store (never 'octane' — worker-local).
+    |
+    */
+
+    'devtools' => [
+        'enabled' => env('DEVTOOLS_ENABLED', false),
+
+        'tinker' => [
+            'enabled'     => env('DEVTOOLS_TINKER_ENABLED', false),
+            'session_ttl' => (int) env('DEVTOOLS_TINKER_SESSION_TTL', 1800), // 30 min
+            // Never use 'octane' — it's in-memory and not shared between workers
+            'cache_store' => env('DEVTOOLS_TINKER_CACHE_STORE', 'redis'),
+        ],
+    ],
+
 ];
