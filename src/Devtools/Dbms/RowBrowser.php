@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\DB;
 
 class RowBrowser
 {
+    private const ALLOWED_OPERATORS = ['=', '!=', '<>', '<', '>', '<=', '>=', 'like', 'not like'];
+
     /**
      * @param  array<int, array{column: string, operator: string, value: mixed}>  $filters
      */
@@ -18,14 +20,27 @@ class RowBrowser
         string  $sortDir    = 'asc',
         ?string $connection = null,
     ): array {
-        $query = DB::connection($connection)->table($table);
+        $db      = DB::connection($connection);
+        $columns = $db->getSchemaBuilder()->getColumnListing($table);
+
+        // Sanitize sort: direction whitelisted, column validated against schema
+        $sortDir = strtolower($sortDir) === 'desc' ? 'desc' : 'asc';
+        $sortBy  = in_array($sortBy, $columns, true) ? $sortBy : 'id';
+
+        $query = $db->table($table);
 
         foreach ($filters as $filter) {
-            $query->where(
-                $filter['column'],
-                $filter['operator'] ?? '=',
-                $filter['value'],
-            );
+            $col      = $filter['column'];
+            $operator = strtolower($filter['operator'] ?? '=');
+
+            if (! in_array($col, $columns, true)) {
+                continue; // skip filters on unknown columns
+            }
+            if (! in_array($operator, self::ALLOWED_OPERATORS, true)) {
+                $operator = '=';
+            }
+
+            $query->where($col, $operator, $filter['value']);
         }
 
         $total = $query->count();
@@ -41,7 +56,7 @@ class RowBrowser
             'total'        => $total,
             'per_page'     => $perPage,
             'current_page' => $page,
-            'last_page'    => (int) ceil($total / max($perPage, 1)),
+            'last_page'    => max(1, (int) ceil($total / max($perPage, 1))),
         ];
     }
 }
