@@ -29,7 +29,9 @@ class TinkerSandbox
     public static function validate(string $code): void
     {
         foreach (self::BLOCKED as $fn) {
-            if (preg_match('/\b' . preg_quote($fn, '/') . '\s*\(/i', $code)) {
+            // Negative lookbehinds prevent false positives on method calls (->exec, ::exec)
+            // and also catch namespace-qualified calls (\exec) which bypass plain \b anchors.
+            if (preg_match('/(?<!->)(?<!::)(?<!\\\\)\b' . preg_quote($fn, '/') . '\s*\(/i', $code)) {
                 throw new \RuntimeException(
                     "Function '{$fn}' is not allowed in remote Tinker sessions."
                 );

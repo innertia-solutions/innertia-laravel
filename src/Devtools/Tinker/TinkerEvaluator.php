@@ -35,10 +35,12 @@ class TinkerEvaluator
             // Capture everything in this closure's scope after eval ran
             $__all = get_defined_vars();
 
-            // Strip evaluator internals — keep only user variables
-            foreach (['session', 'code', '__return', '__error', '__output', '__all', '__e'] as $__k) {
-                unset($__all[$__k]);
-            }
+            // Strip evaluator internals — keep only user variables.
+            // '__k' itself is used as the loop var below, so it must be listed here.
+            $__all = array_diff_key($__all, array_flip([
+                'session', 'code', '__return', '__error', '__output', '__all', '__e',
+                '__k', '__key', '__val', '__saveable',
+            ]));
 
             // Persist only serializable values
             $__saveable = [];
