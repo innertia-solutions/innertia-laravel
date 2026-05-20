@@ -12,14 +12,15 @@ class TableInspector
      */
     public static function tables(?string $connection = null): array
     {
-        $schema = DB::connection($connection)->getSchemaBuilder();
+        $db     = DB::connection($connection);
+        $schema = $db->getSchemaBuilder();
         $tables = $schema->getTableListing();
 
         return array_values(array_map(
             fn (string $table) => [
                 'name'      => $table,
-                'row_count' => DB::connection($connection)->table($table)->count(),
-                'columns'   => self::columns($table, $connection),
+                'row_count' => $db->table($table)->count(),
+                'columns'   => $schema->getColumns($table),
             ],
             $tables,
         ));
