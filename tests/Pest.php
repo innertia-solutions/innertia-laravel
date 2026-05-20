@@ -20,4 +20,4 @@ class BaseTestCase extends TestCase
     }
 }
 
-uses(BaseTestCase::class)->in('tests');
+uses(BaseTestCase::class)->in(__DIR__);
