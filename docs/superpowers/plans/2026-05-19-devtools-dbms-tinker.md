@@ -6,7 +6,7 @@
 
 **Architecture:** A new `DevtoolsServiceProvider` registers a `devtools.guard` middleware and loads `src/Devtools/routes.php` only when `DEVTOOLS_ENABLED=true`. DB Browser is pure HTTP (request/response). Tinker uses HTTP for input (POST code) and WebSocket (Soketi broadcast) for output streaming, with variable state persisted in Redis between evals. All routes sit under `innertia/devtools/` prefix and require `olimpo.auth` + `devtools.guard`.
 
-**Tech Stack:** Laravel 11+, PHP 8.2+, Orchestra Testbench + Pest for tests, Redis for Tinker session state, Soketi (Pusher protocol) for WebSocket output.
+**Tech Stack:** Laravel 11+, PHP 8.2+, Orchestra Testbench + Pest for tests, Redis for Tinker session state, Soketi (Pusher protocol) for WebSocket output, PHP-FPM (dedicated devtools Docker worker in prod, isolated from Octane/Swoole).
 
 ---
 
@@ -28,11 +28,18 @@
 - `src/Devtools/Events/TinkerOutputEvent.php` — ShouldBroadcastNow to `private-innertia.tinker.{id}`
 
 **Modify:**
-- `config/innertia.php` — add `devtools` section
+- `config/innertia.php` — add `devtools` section (with `tinker.cache_store` defaulting to `'redis'`)
 - `src/Olimpo/OlimpoServiceProvider.php` — register `DevtoolsServiceProvider`
 - `templates/app/backend/.env.example` (innertia-setup) — add `DEVTOOLS_ENABLED=false`
 - `templates/saas/backend/.env.example` (innertia-setup) — add `DEVTOOLS_ENABLED=false`
 - `templates/laravel-api/.env.example` (innertia-setup) — add `DEVTOOLS_ENABLED=false`
+
+**Infrastructure (innertia-setup — already done):**
+- `templates/app/backend/docker/prod/Dockerfile.devtools` — PHP-FPM worker sin Swoole
+- `templates/app/backend/docker/prod/nginx.devtools.conf` — nginx solo para `/innertia/devtools/`
+- `templates/app/backend/docker/prod/supervisord.devtools.conf` — supervisor nginx + fpm
+- `templates/app/compose.prod.yml` — servicio `devtools` con `profiles: [devtools]`
+- Mismos 4 archivos en `templates/saas/`
 
 **Tests:**
 - `tests/Devtools/Dbms/TableInspectorTest.php`
@@ -884,18 +891,30 @@ class TinkerSession
 
     public function variables(): array
     {
-        return cache()->get(self::cacheKey($this->id), []);
+        return self::store()->get(self::cacheKey($this->id), []);
     }
 
     public function save(array $variables): void
     {
         $ttl = config('innertia.devtools.tinker.session_ttl', 1800);
-        cache()->put(self::cacheKey($this->id), $variables, $ttl);
+        self::store()->put(self::cacheKey($this->id), $variables, $ttl);
     }
 
     public function destroy(): void
     {
-        cache()->forget(self::cacheKey($this->id));
+        self::store()->forget(self::cacheKey($this->id));
+    }
+
+    /**
+     * Usa el store configurado explícitamente — nunca el default del app,
+     * que podría ser 'octane' (in-memory, worker-local) y romper sesiones
+     * cuando los requests caen en workers distintos.
+     */
+    private static function store(): \Illuminate\Contracts\Cache\Repository
+    {
+        return cache()->store(
+            config('innertia.devtools.tinker.cache_store', 'redis')
+        );
     }
 
     private static function cacheKey(string $id): string
