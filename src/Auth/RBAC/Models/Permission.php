@@ -38,17 +38,15 @@ class Permission extends Model
      */
     public static function findOrCreate(string $name, ?string $description = null): static
     {
-        $tenantId = Innertia::tenant() ? (string) Innertia::tenant()->getKey() : null;
+        $isSaas = config('innertia.mode') === 'saas';
 
-        return static::firstOrCreate(
-            [
-                'name'      => $name,
-                'tenant_id' => $tenantId,
-            ],
-            [
-                'description' => $description,
-            ],
-        );
+        $lookup = ['name' => $name];
+
+        if ($isSaas) {
+            $lookup['tenant_id'] = Innertia::tenant() ? (string) Innertia::tenant()->getKey() : null;
+        }
+
+        return static::firstOrCreate($lookup, ['description' => $description]);
     }
 
     // ── Scopes ────────────────────────────────────────────────────────────────
