@@ -25,13 +25,15 @@ class ListTenantsCommand extends Command
         $tenants = $query->orderBy('created_at')->get();
 
         if ($this->option('json')) {
+            // Outputs [] when no tenants exist — intentional for machine consumers.
             $this->line(json_encode(
                 $tenants->map(fn ($t) => [
                     'id'     => $t->id,
                     'key'    => $t->key,
                     'name'   => $t->name,
                     'status' => $t->status,
-                ])->values()->toArray()
+                ])->values()->toArray(),
+                JSON_THROW_ON_ERROR
             ));
             return self::SUCCESS;
         }
