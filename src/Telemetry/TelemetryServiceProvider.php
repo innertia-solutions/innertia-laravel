@@ -38,7 +38,8 @@ class TelemetryServiceProvider extends ServiceProvider
         // El desarrollador puede también correr innertia:telemetry:install para publicarlas
         $mode = config('innertia.telemetry.mode', 'remote');
         if (in_array($mode, ['standalone', 'both'])) {
-            $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations/telemetry');
+            $appMode = config('innertia.mode', 'app');
+            $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations/telemetry/' . $appMode);
         }
 
         // Singleton del collector para este request
