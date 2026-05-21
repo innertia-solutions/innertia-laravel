@@ -161,14 +161,21 @@ class PermissionsService
     public function sync(bool $prune = false): array
     {
         $definitions = $this->definitions();
-        $tenantId    = \Innertia\Facades\Innertia::tenant() ? (string) \Innertia\Facades\Innertia::tenant()->getKey() : null;
+        $isSaas      = config('innertia.mode') === 'saas';
+        $tenantId    = $isSaas && \Innertia\Facades\Innertia::tenant()
+            ? (string) \Innertia\Facades\Innertia::tenant()->getKey()
+            : null;
 
         $created = $updated = $skipped = 0;
 
         foreach ($definitions as $name => $description) {
-            $existing = Permission::where('name', $name)
-                ->where('tenant_id', $tenantId)
-                ->first();
+            $query = Permission::where('name', $name);
+
+            if ($isSaas) {
+                $query->where('tenant_id', $tenantId);
+            }
+
+            $existing = $query->first();
 
             if ($existing) {
                 if ($existing->description !== $description) {
@@ -178,7 +185,13 @@ class PermissionsService
                     $skipped++;
                 }
             } else {
-                Permission::create(['tenant_id' => $tenantId, 'name' => $name, 'description' => $description]);
+                $attributes = ['name' => $name, 'description' => $description];
+
+                if ($isSaas) {
+                    $attributes['tenant_id'] = $tenantId;
+                }
+
+                Permission::create($attributes);
                 $created++;
             }
         }
@@ -186,9 +199,13 @@ class PermissionsService
         $deleted = 0;
 
         if ($prune) {
-            $deleted = Permission::where('tenant_id', $tenantId)
-                ->whereNotIn('name', array_keys($definitions))
-                ->delete();
+            $query = Permission::whereNotIn('name', array_keys($definitions));
+
+            if ($isSaas) {
+                $query->where('tenant_id', $tenantId);
+            }
+
+            $deleted = $query->delete();
         }
 
         return compact('created', 'updated', 'skipped', 'deleted');

@@ -36,14 +36,17 @@ class Role extends Model
     // ── Static lookups ────────────────────────────────────────────────────────
 
     /**
-     * Find a role by name, optionally scoped to a tenant.
-     * In app mode pass null (or omit) for tenant_id.
+     * Find a role by name, optionally scoped to a tenant (SaaS mode only).
      */
     public static function findByName(string $name, ?string $tenantId = null): ?static
     {
-        return static::where('name', $name)
-            ->where('tenant_id', $tenantId)
-            ->first();
+        $query = static::where('name', $name);
+
+        if (config('innertia.mode') === 'saas') {
+            $query->where('tenant_id', $tenantId);
+        }
+
+        return $query->first();
     }
 
     /**
@@ -56,7 +59,7 @@ class Role extends Model
     }
 
     /**
-     * Create a role, enforcing uniqueness per (name, tenant_id).
+     * Create a role, enforcing uniqueness per name (+ tenant_id in SaaS mode).
      */
     public static function createUnique(string $name, ?string $description = null, ?string $tenantId = null): static
     {
@@ -64,11 +67,13 @@ class Role extends Model
             throw new ConflictException("A role with name \"{$name}\" already exists.");
         }
 
-        return static::create([
-            'name'        => $name,
-            'description' => $description,
-            'tenant_id'   => $tenantId,
-        ]);
+        $attributes = ['name' => $name, 'description' => $description];
+
+        if (config('innertia.mode') === 'saas') {
+            $attributes['tenant_id'] = $tenantId;
+        }
+
+        return static::create($attributes);
     }
 
     // ── Permission management ─────────────────────────────────────────────────
