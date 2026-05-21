@@ -6,7 +6,9 @@ use Illuminate\Console\Command;
 
 class ListTenantsCommand extends Command
 {
-    protected $signature = 'tenant:list {--status= : Filter by status (trial, active, inactive)}';
+    protected $signature = 'tenant:list
+        {--status= : Filter by status (trial, active, inactive)}
+        {--json : Output as JSON array}';
 
     protected $description = 'List all tenants';
 
@@ -21,6 +23,18 @@ class ListTenantsCommand extends Command
         }
 
         $tenants = $query->orderBy('created_at')->get();
+
+        if ($this->option('json')) {
+            $this->line(json_encode(
+                $tenants->map(fn ($t) => [
+                    'id'     => $t->id,
+                    'key'    => $t->key,
+                    'name'   => $t->name,
+                    'status' => $t->status,
+                ])->values()->toArray()
+            ));
+            return self::SUCCESS;
+        }
 
         if ($tenants->isEmpty()) {
             $this->info('No tenants found.');
