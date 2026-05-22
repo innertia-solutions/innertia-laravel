@@ -11,6 +11,11 @@ use Innertia\Workflow\Exceptions\WorkflowRestrictionException;
 use Innertia\Workflow\Models\WorkflowDefinition;
 use Innertia\Workflow\Models\WorkflowInstance;
 use Innertia\Workflow\Models\WorkflowTransitionLog;
+use Innertia\Workflow\Events\WorkflowCancelled;
+use Innertia\Workflow\Events\WorkflowFinished;
+use Innertia\Workflow\Events\WorkflowStarted;
+use Innertia\Workflow\Events\WorkflowTransitionBlocked;
+use Innertia\Workflow\Events\WorkflowTransitioned;
 use Innertia\Workflow\Restrictions\ApprovalRestriction;
 use Innertia\Workflow\Restrictions\ChecklistRestriction;
 use Innertia\Workflow\Restrictions\CustomRestriction;
@@ -55,7 +60,10 @@ class WorkflowEngine
             'started_at'        => now(),
         ]);
 
-        // TODO: WorkflowStarted::dispatch(instance: $instance, startedBy: $startedBy);
+        WorkflowStarted::dispatch(
+            instance:  $instance,
+            startedBy: $startedBy,
+        );
 
         return $instance;
     }
@@ -86,7 +94,14 @@ class WorkflowEngine
         try {
             $this->checkRestrictions($transition['restrictions'] ?? [], $instance, $performedBy);
         } catch (WorkflowRestrictionException $e) {
-            // TODO: WorkflowTransitionBlocked::dispatch(...)
+            WorkflowTransitionBlocked::dispatch(
+                instance:    $instance,
+                fromStep:    $instance->current_step,
+                toStep:      $toStep,
+                blockedBy:   $e->restrictionType,
+                reason:      $e->getMessage(),
+                attemptedBy: $performedBy,
+            );
             throw $e;
         }
 
@@ -107,7 +122,14 @@ class WorkflowEngine
             'performed_at' => now(),
         ]);
 
-        // TODO: WorkflowTransitioned::dispatch(instance: $instance, fromStep: $fromStep, toStep: $toStep, ...)
+        WorkflowTransitioned::dispatch(
+            instance:    $instance,
+            fromStep:    $fromStep,
+            fromLabel:   $fromStepConfig['label'] ?? $fromStep,
+            toStep:      $toStep,
+            toLabel:     $toStepConfig['label'] ?? $toStep,
+            performedBy: $performedBy,
+        );
 
         // Si llegamos a un step terminal, cerrar la instancia
         $stepType = WorkflowStepType::from($toStepConfig['type']);
@@ -117,13 +139,19 @@ class WorkflowEngine
                 'status'      => WorkflowStatus::Finished->value,
                 'finished_at' => now(),
             ]);
-            // TODO: WorkflowFinished::dispatch(instance: $instance, performedBy: $performedBy);
+            WorkflowFinished::dispatch(
+                instance:    $instance,
+                performedBy: $performedBy,
+            );
         } elseif ($stepType === WorkflowStepType::Cancelled) {
             $instance->update([
                 'status'      => WorkflowStatus::Cancelled->value,
                 'finished_at' => now(),
             ]);
-            // TODO: WorkflowCancelled::dispatch(instance: $instance, performedBy: $performedBy);
+            WorkflowCancelled::dispatch(
+                instance:    $instance,
+                performedBy: $performedBy,
+            );
         }
 
         return $instance->fresh();
