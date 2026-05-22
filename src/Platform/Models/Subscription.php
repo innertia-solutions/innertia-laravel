@@ -33,7 +33,23 @@ class Subscription extends Model
 
     public function matchesEvent(string $eventKey): bool
     {
-        return in_array('*', $this->events, true)
-            || in_array($eventKey, $this->events, true);
+        return collect($this->events)->some(function (string $pattern) use ($eventKey) {
+            if ($pattern === '*') {
+                return true;
+            }
+
+            if ($pattern === $eventKey) {
+                return true;
+            }
+
+            // 'workflow.*'              → any event under workflow
+            // 'workflow.transitioned.*' → any step of transitioned
+            if (str_ends_with($pattern, '.*')) {
+                $prefix = substr($pattern, 0, -2);
+                return str_starts_with($eventKey, $prefix . '.');
+            }
+
+            return false;
+        });
     }
 }
