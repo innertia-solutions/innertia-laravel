@@ -78,6 +78,7 @@ class InnertiaServiceProvider extends ServiceProvider
 
         $this->app->register(AuthServiceProvider::class);
         $this->app->singleton(WebhookService::class);
+        $this->app->singleton(\Innertia\Workflow\WorkflowEngine::class);
     }
 
     public function boot(): void
