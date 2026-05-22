@@ -36,8 +36,18 @@ test('WorkflowEvent has correct keys', function () {
     expect(WorkflowEvent::Cancelled->value)->toBe('workflow.cancelled');
 });
 
-test('WorkflowEvent forStep returns granular key', function () {
+test('WorkflowEvent forStep returns granular key for any case', function () {
+    // Transitioned — primary use case
     expect(WorkflowEvent::Transitioned->forStep('findings'))->toBe('workflow.transitioned.findings');
     expect(WorkflowEvent::Transitioned->forStep('planning'))->toBe('workflow.transitioned.planning');
+
+    // forStep is intentionally valid on all cases (any event can be step-granular)
     expect(WorkflowEvent::Started->forStep('start'))->toBe('workflow.started.start');
+    expect(WorkflowEvent::Cancelled->forStep('closure'))->toBe('workflow.cancelled.closure');
+    expect(WorkflowEvent::Finished->forStep('done'))->toBe('workflow.finished.done');
+    expect(WorkflowEvent::TransitionBlocked->forStep('execution'))->toBe('workflow.transition_blocked.execution');
 });
+
+test('WorkflowEvent forStep throws on empty step key', function () {
+    WorkflowEvent::Transitioned->forStep('');
+})->throws(\InvalidArgumentException::class, 'Step key must not be empty.');
