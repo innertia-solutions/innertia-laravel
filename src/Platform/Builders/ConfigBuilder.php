@@ -84,7 +84,12 @@ class ConfigBuilder
 
         /** @var Config $config */
         $config = $this->baseQuery()->updateOrCreate(
-            ['key' => $key],
+            [
+                'owner_type' => get_class($this->owner),
+                'owner_id'   => $this->owner->getKey(),
+                'type'       => $this->type,
+                'key'        => $key,
+            ],
             ['value' => $encoded, 'cast' => $cast, 'privacy' => $privacy],
         );
 
