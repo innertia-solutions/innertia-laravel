@@ -33,7 +33,7 @@ class Subscription extends Model
 
     public function matchesEvent(string $eventKey): bool
     {
-        return collect($this->events)->some(function (string $pattern) use ($eventKey) {
+        return collect($this->events ?? [])->some(function (string $pattern) use ($eventKey) {
             if ($pattern === '*') {
                 return true;
             }
