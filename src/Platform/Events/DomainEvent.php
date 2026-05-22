@@ -146,6 +146,33 @@ abstract class DomainEvent implements ShouldBroadcast
         return Str::snake(class_basename(static::class), '.');
     }
 
+    /**
+     * Clave canónica específica de esta instancia del evento.
+     * Usada por DomainEventRouter para matching de suscripciones.
+     *
+     * Por defecto igual a webhookKey(). Los eventos con variantes dinámicas
+     * (ej. WorkflowTransitioned) lo sobrescriben para añadir especificidad.
+     *
+     * Convención: define const KEY en cada evento concreto y sobrescribe
+     * resolvedKey() solo si necesitás especificidad dinámica.
+     */
+    public function resolvedKey(): string
+    {
+        return $this->webhookKey();
+    }
+
+    /**
+     * Modelos padre que también deben recibir notificación de este evento.
+     * Los suscriptores de estos modelos son notificados igual que los del subscribable().
+     *
+     * Ejemplo: un WorkflowTransitioned sobre un Project retorna [$project->program]
+     * para que el manager suscrito al Program también sea notificado.
+     */
+    public function ancestors(): array
+    {
+        return [];
+    }
+
     // ── Mail ──────────────────────────────────────────────────────────────────
 
     /**

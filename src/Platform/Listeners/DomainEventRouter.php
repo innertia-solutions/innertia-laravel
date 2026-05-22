@@ -29,31 +29,32 @@ class DomainEventRouter
             $this->webhooks->dispatchForEvent($event);
         }
 
+        // Colecciona subscribable + ancestors para fan-out
+        $targets = collect([$event->subscribable()])
+            ->merge($event->ancestors())
+            ->filter();
+
         if (in_array('mail', $channels, true)) {
-            $this->routeMail($event);
+            foreach ($targets as $target) {
+                $this->routeMail($event, $target);
+            }
         }
 
         if (in_array('web', $channels, true)) {
-            $this->routeWeb($event);
+            foreach ($targets as $target) {
+                $this->routeWeb($event, $target);
+            }
         }
     }
 
-    private function routeMail(DomainEvent $event): void
+    private function routeMail(DomainEvent $event, \Illuminate\Database\Eloquent\Model $subscribable): void
     {
         $mailable = $event->toMail();
-
         if ($mailable === null) {
             return;
         }
 
-        $subscribable = $event->subscribable();
-
-        if ($subscribable === null) {
-            return;
-        }
-
-        $subscribers = $subscribable->subscribersByChannel($event->webhookKey())['mail'] ?? collect();
-
+        $subscribers = $subscribable->subscribersByChannel($event->resolvedKey())['mail'] ?? collect();
         foreach ($subscribers as $user) {
             if (! empty($user->email)) {
                 Mail::to($user->email)->queue(clone $mailable);
@@ -61,27 +62,19 @@ class DomainEventRouter
         }
     }
 
-    private function routeWeb(DomainEvent $event): void
+    private function routeWeb(DomainEvent $event, \Illuminate\Database\Eloquent\Model $subscribable): void
     {
         $webData = $event->toWeb();
-
         if ($webData === null) {
             return;
         }
 
-        $subscribable = $event->subscribable();
-
-        if ($subscribable === null) {
-            return;
-        }
-
-        $subscribers = $subscribable->subscribersByChannel($event->webhookKey())['web'] ?? collect();
-
+        $subscribers = $subscribable->subscribersByChannel($event->resolvedKey())['web'] ?? collect();
         foreach ($subscribers as $user) {
             Notification::create([
                 'user_id'    => (string) $user->getAuthIdentifier(),
                 'type'       => get_class($event),
-                'key'        => $event->webhookKey(),
+                'key'        => $event->resolvedKey(),
                 'title'      => $webData['title'] ?? null,
                 'body'       => $webData['body'] ?? null,
                 'data'       => $event->payload(),
