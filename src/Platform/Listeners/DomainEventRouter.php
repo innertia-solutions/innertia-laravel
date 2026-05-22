@@ -2,7 +2,9 @@
 
 namespace Innertia\Platform\Listeners;
 
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Mail;
+use Innertia\Mail\InnertiaMailable;
 use Innertia\Notifications\Models\Notification;
 use Innertia\Platform\Events\DomainEvent;
 use Innertia\Webhooks\WebhookService;
@@ -29,31 +31,34 @@ class DomainEventRouter
             $this->webhooks->dispatchForEvent($event);
         }
 
-        // Colecciona subscribable + ancestors para fan-out
+        // Colecciona subscribable + ancestors para fan-out.
+        // Solo modelos con el trait Subscribable (tienen subscribersByChannel).
         $targets = collect([$event->subscribable()])
             ->merge($event->ancestors())
-            ->filter();
+            ->filter()
+            ->filter(fn ($m) => method_exists($m, 'subscribersByChannel'));
 
         if (in_array('mail', $channels, true)) {
-            foreach ($targets as $target) {
-                $this->routeMail($event, $target);
+            $mailable = $event->toMail();
+            if ($mailable !== null) {
+                foreach ($targets as $target) {
+                    $this->routeMail($event, $target, $mailable);
+                }
             }
         }
 
         if (in_array('web', $channels, true)) {
-            foreach ($targets as $target) {
-                $this->routeWeb($event, $target);
+            $webData = $event->toWeb();
+            if ($webData !== null) {
+                foreach ($targets as $target) {
+                    $this->routeWeb($event, $target, $webData);
+                }
             }
         }
     }
 
-    private function routeMail(DomainEvent $event, \Illuminate\Database\Eloquent\Model $subscribable): void
+    private function routeMail(DomainEvent $event, Model $subscribable, InnertiaMailable $mailable): void
     {
-        $mailable = $event->toMail();
-        if ($mailable === null) {
-            return;
-        }
-
         $subscribers = $subscribable->subscribersByChannel($event->resolvedKey())['mail'] ?? collect();
         foreach ($subscribers as $user) {
             if (! empty($user->email)) {
@@ -62,13 +67,8 @@ class DomainEventRouter
         }
     }
 
-    private function routeWeb(DomainEvent $event, \Illuminate\Database\Eloquent\Model $subscribable): void
+    private function routeWeb(DomainEvent $event, Model $subscribable, array $webData): void
     {
-        $webData = $event->toWeb();
-        if ($webData === null) {
-            return;
-        }
-
         $subscribers = $subscribable->subscribersByChannel($event->resolvedKey())['web'] ?? collect();
         foreach ($subscribers as $user) {
             Notification::create([
