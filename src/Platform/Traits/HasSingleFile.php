@@ -28,25 +28,27 @@ trait HasSingleFile
     {
         $this->file?->delete();
         $file = File::fromRequest($request, $field, $disk);
-        $file->update(['owner_type' => static::class, 'owner_id' => $this->id]);
+        $file->update(['owner_type' => $this->getMorphClass(), 'owner_id' => $this->getKey()]);
         return $file;
     }
 
     /**
      * Replace the current file with a new UploadedFile instance.
      * Deletes the existing file if one exists.
+     * Must be called inside DB::transaction() to avoid orphan files.
      */
     public function replaceFile(UploadedFile $uploaded, string $disk = ''): File
     {
         $this->file?->delete();
         $file = File::fromUploadedFile($uploaded, $disk);
-        $file->update(['owner_type' => static::class, 'owner_id' => $this->id]);
+        $file->update(['owner_type' => $this->getMorphClass(), 'owner_id' => $this->getKey()]);
         return $file;
     }
 
     /**
      * Delete the associated file from storage and the files table.
      * The model itself is NOT deleted.
+     * Safe to call when no file is associated — no-ops silently.
      */
     public function deleteFile(): void
     {
