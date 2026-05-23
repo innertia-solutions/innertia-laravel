@@ -10,6 +10,7 @@ use Innertia\Saas\Models\Tenant;
  * @method static Tenant|null tenant(?string $key = null)
  * @method static Tenant|null activate(string $key)
  * @method static void        deactivate()
+ * @method static \Innertia\Platform\Organizations\OrganizationContext|null organization()
  *
  * @see InnertiaManager
  */

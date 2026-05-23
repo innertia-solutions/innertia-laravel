@@ -53,10 +53,17 @@ class InnertiaServiceProvider extends ServiceProvider
         // TenantContext + InnertiaManager — siempre registrados; no-op en App mode.
         $this->app->singleton(\Innertia\Saas\TenantContext::class);
 
+        if (config('innertia.organizations.enabled')) {
+            $this->app->singleton(\Innertia\Platform\Organizations\OrganizationContext::class);
+        }
+
         $this->app->singleton(\Innertia\InnertiaManager::class, function ($app) {
             return new \Innertia\InnertiaManager(
                 $app->make(\Innertia\Saas\TenantContext::class),
                 $this->isSaas(),
+                config('innertia.organizations.enabled')
+                    ? $app->make(\Innertia\Platform\Organizations\OrganizationContext::class)
+                    : null,
             );
         });
 
