@@ -12,7 +12,7 @@ return new class extends Migration
     {
         Schema::create('organizations', function (Blueprint $table) {
             $table->bigIncrements('id');
-            $table->unsignedBigInteger('tenant_id')->index();
+            $table->unsignedBigInteger('tenant_id');
             $table->string('name');
             $table->string('key');
             $table->boolean('active')->default(true);

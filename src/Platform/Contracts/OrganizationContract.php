@@ -38,5 +38,5 @@ interface OrganizationContract
      *
      * @return static|null
      */
-    public static function findByKey(string $key);
+    public static function findByKey(string $key): ?static;
 }
