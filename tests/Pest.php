@@ -14,6 +14,13 @@ use Orchestra\Testbench\TestCase;
 
 class BaseTestCase extends TestCase
 {
+    protected function getPackageProviders($app)
+    {
+        return [
+            \Innertia\InnertiaServiceProvider::class,
+        ];
+    }
+
     protected function defineEnvironment($app)
     {
         $app['config']->set('broadcasting.default', 'log');
