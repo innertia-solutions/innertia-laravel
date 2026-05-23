@@ -14,7 +14,7 @@ trait HasTenant
 
         static::creating(function ($model) {
             if (empty($model->tenant_id) && Innertia::tenant()) {
-                $model->tenant_id = (string) Innertia::tenant()->getKey();
+                $model->tenant_id = Innertia::tenant()->getKey();
             }
         });
 

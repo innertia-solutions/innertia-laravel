@@ -28,7 +28,8 @@ return new class extends Migration
             $table->enum('visibility', ['public', 'auth', 'restricted'])->default('auth');
 
             // Propietario polimórfico (User, Process, Invoice, etc.)
-            $table->nullableMorphs('owner');
+            // UUIDs: los modelos del dominio usan uuid como PK
+            $table->nullableUuidMorphs('owner');
 
             $table->string('created_by')->nullable();
             $table->timestamps();
