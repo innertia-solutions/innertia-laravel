@@ -49,11 +49,24 @@ class OrganizationContext
     /**
      * Override scope without touching current. Used by consolidated view.
      *
+     * All ids MUST be non-negative integers. Use this at request boundaries
+     * (middleware, controllers) after the values have been validated upstream.
+     *
      * @param array<int> $ids
+     * @throws \InvalidArgumentException when any element is not a non-negative int
      */
     public function setScope(array $ids): void
     {
-        $this->scope = array_values(array_unique(array_map('intval', $ids)));
+        foreach ($ids as $id) {
+            if (! is_int($id) || $id < 0) {
+                throw new \InvalidArgumentException(
+                    'OrganizationContext::setScope() expects an array of non-negative integers; got '
+                    . (is_object($id) ? get_class($id) : gettype($id) . '(' . var_export($id, true) . ')')
+                );
+            }
+        }
+
+        $this->scope = array_values(array_unique($ids));
     }
 
     public function clear(): void

@@ -55,3 +55,27 @@ it('inConsolidatedView() is true only when scope has more than one or differs fr
     $ctx->setScope([5, 6]);
     expect($ctx->inConsolidatedView())->toBeTrue();
 });
+
+it('withOrganization() restores state even if callback throws', function () {
+    $ctx = new OrganizationContext();
+    $ctx->set(1);
+
+    expect(fn () => $ctx->withOrganization(99, function () {
+        throw new \RuntimeException('boom');
+    }))->toThrow(\RuntimeException::class, 'boom');
+
+    expect($ctx->current())->toBe(1);
+    expect($ctx->scope())->toBe([1]);
+});
+
+it('setScope() throws when given non-int values', function () {
+    $ctx = new OrganizationContext();
+    expect(fn () => $ctx->setScope(['abc', 1]))
+        ->toThrow(\InvalidArgumentException::class);
+});
+
+it('setScope() throws when given negative ints', function () {
+    $ctx = new OrganizationContext();
+    expect(fn () => $ctx->setScope([1, -2]))
+        ->toThrow(\InvalidArgumentException::class);
+});
