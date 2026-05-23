@@ -759,7 +759,7 @@ class DataTable
         }
     }
 
-    public function getQuery(string|Builder $source, ?string $search = '', array $sortColumns = [], bool $includeTrashed = false, bool $onlyTrashed = false): Builder
+    public function getQuery(string|Builder $source, ?string $search = '', array $sortColumns = [], bool $includeTrashed = false, bool $onlyTrashed = false, array $filters = []): Builder
     {
         $this->sourceClass = $source;
 
@@ -821,6 +821,11 @@ class DataTable
             $this->applyOptimizedSearch($query, $search);
         }
 
+        // Filtros enriquecidos (field + operator + value)
+        if (!empty($filters)) {
+            $this->applyEnrichedFilters($query, $filters);
+        }
+
         foreach ($sortColumns as $sort) {
             $column = $sort['column'] ?? null;
             $direction = $sort['direction'] ?? 'asc';
@@ -872,7 +877,8 @@ class DataTable
             // Exportar con filtros (lo que se ve en la tabla)
             $search = $request->input('search', '') ?? '';
             $sortColumns = $request->input('sortColumns', []) ?? [];
-            $query = $this->getQuery($source, $search, $sortColumns, $includeTrashed, $onlyTrashed);
+            $filters = $request->input('filters', []) ?? [];
+            $query = $this->getQuery($source, $search, $sortColumns, $includeTrashed, $onlyTrashed, $filters);
 
             if ($exportPagination) {
                 // Exportar solo la página actual
@@ -937,7 +943,8 @@ class DataTable
 
         $includeTrashed = $request->boolean('include_trashed', false);
         $onlyTrashed = $request->boolean('trashed', false);
-        $query = $this->getQuery($source, $search, $sortColumns, $includeTrashed, $onlyTrashed);
+        $filters = $request->input('filters', []) ?? [];
+        $query = $this->getQuery($source, $search, $sortColumns, $includeTrashed, $onlyTrashed, $filters);
 
         if ($list) {
             $results = $query->get();
@@ -1002,6 +1009,95 @@ class DataTable
         }
 
         return response()->json($response);
+    }
+
+    /**
+     * Aplica filtros enriquecidos: [{ field, operator, value }, ...]
+     * Soporta columnas directas y columnas calculadas (addCalculatedColumn).
+     */
+    private function applyEnrichedFilters(Builder $query, array $filters): void
+    {
+        // Build a normalized map: 'status' => raw SQL expression (or null for direct columns)
+        $allowedFields = [];
+
+        foreach ($this->columns as $col) {
+            $allowedFields[$col] = null;
+        }
+        foreach (array_keys($this->relationships) as $rel) {
+            $allowedFields[$rel] = null;
+        }
+        foreach ($this->calculatedColumns as $quotedKey => $expr) {
+            // Keys are stored as '"status"' (PostgreSQL-quoted) — normalize to 'status'
+            $normalized = trim($quotedKey, '"');
+            $allowedFields[$normalized] = $expr;
+        }
+        foreach (array_keys($this->pluckColumns) as $key) {
+            $allowedFields[$key] = null;
+        }
+
+        foreach ($filters as $filter) {
+            $field    = $filter['field']    ?? null;
+            $operator = $filter['operator'] ?? null;
+            $value    = $filter['value']    ?? null;
+
+            if (! $field || ! $operator || $value === null || $value === '') {
+                continue;
+            }
+
+            if (! array_key_exists($field, $allowedFields)) {
+                continue;
+            }
+
+            $rawExpr = $allowedFields[$field]; // null = direct column, string = SQL expression
+            $this->applyFilterOperator($query, $field, $operator, $value, $rawExpr);
+        }
+    }
+
+    private function applyFilterOperator(Builder $query, string $field, string $operator, mixed $value, ?string $rawExpr = null): void
+    {
+        $isPgsql = DB::getDriverName() === 'pgsql';
+
+        if ($rawExpr !== null) {
+            // Calculated column — filter using the raw SQL expression
+            match ($operator) {
+                'contains'           => $isPgsql
+                    ? $query->whereRaw("({$rawExpr})::text ILIKE ?", ["%{$value}%"])
+                    : $query->whereRaw("CAST(({$rawExpr}) AS CHAR) LIKE ?", ["%{$value}%"]),
+                'starts_with'        => $isPgsql
+                    ? $query->whereRaw("({$rawExpr})::text ILIKE ?", ["{$value}%"])
+                    : $query->whereRaw("CAST(({$rawExpr}) AS CHAR) LIKE ?", ["{$value}%"]),
+                'equals', 'is', 'eq' => $query->whereRaw("({$rawExpr}) = ?", [$value]),
+                'is_not', 'neq'      => $query->whereRaw("({$rawExpr}) != ?", [$value]),
+                'before'             => $isPgsql
+                    ? $query->whereRaw("({$rawExpr})::date < ?", [$value])
+                    : $query->whereRaw("DATE({$rawExpr}) < ?", [$value]),
+                'after'              => $isPgsql
+                    ? $query->whereRaw("({$rawExpr})::date > ?", [$value])
+                    : $query->whereRaw("DATE({$rawExpr}) > ?", [$value]),
+                'gt'                 => $query->whereRaw("({$rawExpr}) > ?", [$value]),
+                'lt'                 => $query->whereRaw("({$rawExpr}) < ?", [$value]),
+                default              => null,
+            };
+
+            return;
+        }
+
+        // Direct column
+        match ($operator) {
+            'contains'           => $isPgsql
+                ? $query->whereRaw("CAST(\"{$field}\" AS text) ILIKE ?", ["%{$value}%"])
+                : $query->where($field, 'like', "%{$value}%"),
+            'starts_with'        => $isPgsql
+                ? $query->whereRaw("CAST(\"{$field}\" AS text) ILIKE ?", ["{$value}%"])
+                : $query->where($field, 'like', "{$value}%"),
+            'equals', 'is', 'eq' => $query->where($field, $value),
+            'is_not', 'neq'      => $query->where($field, '!=', $value),
+            'before'             => $query->whereDate($field, '<', $value),
+            'after'              => $query->whereDate($field, '>', $value),
+            'gt'                 => $query->where($field, '>', $value),
+            'lt'                 => $query->where($field, '<', $value),
+            default              => null,
+        };
     }
 
     private function toSnakeCase($item)
