@@ -210,6 +210,7 @@ class InnertiaServiceProvider extends ServiceProvider
             // command's own guard (config('innertia.organizations.enabled')) is the
             // single source of truth and tests can flip the flag at runtime.
             $commands[] = \Innertia\Platform\Organizations\Console\OrganizationInstallCommand::class;
+            $commands[] = \Innertia\Platform\Organizations\Console\OrganizationCheckCommand::class;
 
             $this->commands($commands);
         }
