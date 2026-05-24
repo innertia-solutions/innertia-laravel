@@ -223,9 +223,13 @@ class InnertiaServiceProvider extends ServiceProvider
             // single source of truth and tests can flip the flag at runtime.
             $commands[] = \Innertia\Platform\Organizations\Console\OrganizationInstallCommand::class;
             $commands[] = \Innertia\Platform\Organizations\Console\OrganizationCheckCommand::class;
+            $commands[] = \Innertia\Platform\Organizations\Console\CreateOrganizationCommand::class;
+            $commands[] = \Innertia\Platform\Organizations\Console\ListOrganizationsCommand::class;
 
             // Teams install command — same pattern: registered always, guard runs at execution.
             $commands[] = \Innertia\Platform\Teams\Console\TeamsInstallCommand::class;
+            $commands[] = \Innertia\Platform\Teams\Console\CreateTeamCommand::class;
+            $commands[] = \Innertia\Platform\Teams\Console\ListTeamsCommand::class;
 
             $this->commands($commands);
         }
