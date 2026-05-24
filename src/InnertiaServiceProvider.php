@@ -224,6 +224,9 @@ class InnertiaServiceProvider extends ServiceProvider
             $commands[] = \Innertia\Platform\Organizations\Console\OrganizationInstallCommand::class;
             $commands[] = \Innertia\Platform\Organizations\Console\OrganizationCheckCommand::class;
 
+            // Teams install command — same pattern: registered always, guard runs at execution.
+            $commands[] = \Innertia\Platform\Teams\Console\TeamsInstallCommand::class;
+
             $this->commands($commands);
         }
 

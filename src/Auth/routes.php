@@ -12,6 +12,7 @@ use Innertia\Auth\Http\Controllers\TwoFactorController;
 use Innertia\Auth\Middleware\Authenticate;
 use Innertia\Notifications\Http\NotificationsController;
 use Innertia\Platform\Http\Controllers\SubscriptionController;
+use Innertia\Settings\Http\Controllers\PreferencesController as PreferencesV2Controller;
 
 Route::prefix('auth')->group(function () {
 
@@ -70,4 +71,14 @@ Route::middleware(Authenticate::class)->prefix('admin/auth')->group(function () 
         ->where('provider', 'google|microsoft|github');
     Route::put('{provider}/settings',   [SocialSettingsController::class, 'update'])
         ->where('provider', 'google|microsoft|github');
+});
+
+// Preferences — recurso del user logueado (fuera de /auth/* porque NO es auth flow)
+// Soporta filtrado por módulo: /preferences/tables → prefs con key 'tables.*'
+Route::middleware(Authenticate::class)->prefix('preferences')->group(function () {
+    Route::get('/',           [PreferencesV2Controller::class, 'index']);
+    Route::get('{module}',    [PreferencesV2Controller::class, 'showByModule'])
+        ->where('module', '[a-z0-9_-]+');
+    Route::put('{key}',       [PreferencesV2Controller::class, 'update']);
+    Route::delete('{key}',    [PreferencesV2Controller::class, 'destroy']);
 });

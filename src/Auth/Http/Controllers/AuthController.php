@@ -28,6 +28,22 @@ class AuthController extends Controller
         return response()->json($result);
     }
 
+    /**
+     * GET /auth/me
+     *
+     * Devuelve la identidad completa del usuario autenticado.
+     *
+     * Shape:
+     *   {
+     *     user:          { id, name, email, ... },
+     *     permissions:   ['users.view', ...],    // direct + via roles + via teams (si features activos)
+     *     contexts:      ['backoffice', 'technician'],
+     *     organizations: { backoffice: [...], technician: [...] }  // solo si OrganizationsFeature activo
+     *     preferences:   { ... }                  // subset público para boot rápido
+     *   }
+     *
+     * Backward compat: incluye `availableContexts` (alias de `contexts`) por 1-2 versiones.
+     */
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -37,7 +53,7 @@ class AuthController extends Controller
             $userData['apps'] = $user->appKeys();
         }
 
-        // Permissions — from roles + direct grants
+        // Permissions consolidadas — direct + via roles + via teams (si feature activo)
         $permissions = [];
         if (method_exists($user, 'roles')) {
             $viaRoles = $user->roles()
@@ -49,23 +65,80 @@ class AuthController extends Controller
                 ? $user->directPermissions()->pluck('name')
                 : collect();
 
-            $permissions = $viaRoles->merge($direct)->unique()->values()->all();
+            $viaTeams = method_exists($user, 'permissionsViaTeams') && \Innertia\Platform\Teams\TeamsFeature::isActive()
+                ? collect($user->permissionsViaTeams())
+                : collect();
+
+            $permissions = $viaRoles->merge($direct)->merge($viaTeams)->unique()->values()->all();
         }
 
-        // Available contexts (app keys the user has access to)
-        $availableContexts = method_exists($user, 'appKeys') ? $user->appKeys() : [];
+        // Contexts (app keys del user)
+        $contexts = method_exists($user, 'appKeys') ? $user->appKeys() : [];
+
+        // Organizations por contexto (solo si feature activo)
+        $organizations = null;
+        if (\Innertia\Platform\Organizations\OrganizationsFeature::isActive()
+            && method_exists($user, 'accessibleOrganizationsByApp')) {
+            $organizations = $this->buildOrganizationsByApp($user);
+        }
 
         // Public preferences (appearance, language, etc.)
         $preferences = method_exists($user, 'preferences')
             ? $user->preferences()->onlyPublic()->toArray()
             : [];
 
-        return response()->json([
-            'user'               => $userData,
-            'permissions'        => $permissions,
-            'availableContexts'  => $availableContexts,
-            'preferences'        => $preferences,
-        ]);
+        $payload = [
+            'user'        => $userData,
+            'permissions' => $permissions,
+            'contexts'    => $contexts,
+            'preferences' => $preferences,
+        ];
+
+        if ($organizations !== null) {
+            $payload['organizations'] = $organizations;
+        }
+
+        // Backward compat — alias `availableContexts`
+        $payload['availableContexts'] = $contexts;
+
+        return response()->json($payload);
+    }
+
+    /**
+     * Transforma `accessibleOrganizationsByApp(): array<app, array<orgId|null>>` en
+     * shape para el frontend: `{ app: [{ id, key, name }, ...] }`.
+     * Los NULL en organization_id se interpretan como "todas las orgs accesibles" del user
+     * (heredado del tenant) → se expande a todas las orgs que el user tiene visibility.
+     */
+    private function buildOrganizationsByApp($user): array
+    {
+        $byApp = $user->accessibleOrganizationsByApp(); // ['backoffice' => [1, 2], 'technician' => [null]]
+        if (empty($byApp)) return [];
+
+        // Resolve all org ids involved (sin NULLs)
+        $allOrgIds = collect($byApp)->flatten()->filter(fn ($v) => $v !== null)->unique()->values();
+
+        $orgModel = config('innertia.organizations.model', \Innertia\Platform\Organizations\Models\Organization::class);
+        $orgs = $orgModel::whereIn('id', $allOrgIds)->get(['id', 'key', 'name'])->keyBy('id');
+
+        // Si hay alguna entrada con NULL (= "todas"), traer todas las orgs accesibles al user
+        $hasNullFallback = collect($byApp)->flatten()->contains(null);
+        $allUserOrgs = collect();
+        if ($hasNullFallback && method_exists($user, 'accessibleOrganizationIds')) {
+            $ids = $user->accessibleOrganizationIds();
+            $allUserOrgs = $orgModel::whereIn('id', $ids)->get(['id', 'key', 'name']);
+        }
+
+        $result = [];
+        foreach ($byApp as $app => $orgIds) {
+            $list = collect($orgIds)->flatMap(function ($id) use ($orgs, $allUserOrgs) {
+                if ($id === null) return $allUserOrgs;
+                return $orgs->has($id) ? [$orgs->get($id)] : [];
+            })->unique('id')->values()->toArray();
+            $result[$app] = $list;
+        }
+
+        return $result;
     }
 
     /**

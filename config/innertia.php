@@ -131,6 +131,26 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Teams — agrupación de usuarios para asignación de roles colectiva
+    |--------------------------------------------------------------------------
+    |
+    | Independiente de Organizations. Cuando ambos están activos, teams pueden
+    | scoperse por organización (teams.organization_id). Cuando solo teams está
+    | activo, los teams son tenant-wide.
+    |
+    | Pasos para habilitar:
+    |   1. INNERTIA_TEAMS_ENABLED=true
+    |   2. php artisan innertia:teams:install
+    |   3. php artisan migrate
+    |
+    */
+    'teams' => [
+        'enabled' => env('INNERTIA_TEAMS_ENABLED', false),
+        'model'   => \Innertia\Platform\Teams\Models\Team::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | SaaS / Tenancy Settings
     |--------------------------------------------------------------------------
     |

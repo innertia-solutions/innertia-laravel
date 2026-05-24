@@ -40,8 +40,13 @@ class OrganizationInstallCommand extends Command
             return self::FAILURE;
         }
 
-        // RBAC always scoped — non-negotiable when feature is enabled.
-        $rbacTables = ['roles', 'model_roles'];
+        // RBAC + identity always scoped — non-negotiable when feature is enabled.
+        // Includes:
+        //   - roles / model_roles    → roles per-org (existing)
+        //   - model_permissions      → direct permission grants per-org
+        //   - user_apps              → app access per-org (un user puede ser técnico en
+        //                              org A pero backoffice en org B)
+        $rbacTables = ['roles', 'model_roles', 'model_permissions', 'user_apps'];
         $allTables  = array_values(array_unique(array_merge($tables, $rbacTables)));
 
         $dir = $this->option('path') ?: database_path('migrations');

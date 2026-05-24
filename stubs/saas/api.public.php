@@ -14,11 +14,16 @@ use Innertia\Auth\Http\Controllers\TwoFactorController;
 use Innertia\Saas\Http\Controllers\TenantController;
 use Innertia\Saas\Middleware\ResolveTenantFromHeader;
 
-// ── Tenant ping ───────────────────────────────────────────────────────────────
-// Usado por el middleware SSR del frontend para validar que el tenant existe y el backend responde.
+// ── Tenant status ─────────────────────────────────────────────────────────────
+// Usado por el middleware SSR del frontend para validar tenant + features habilitadas.
 // ResolveTenantFromHeader lee X-Tenant: {slug} y retorna 404 si no existe.
-Route::middleware(ResolveTenantFromHeader::class)
-    ->get('ping', [TenantController::class, 'ping']);
+//
+// /status devuelve: tenant info + features (organizations, teams, twoFactor, oauth) + branding.
+// /ping queda como alias deprecated (shape antiguo) por backward compat — remover en v0.2.
+Route::middleware(ResolveTenantFromHeader::class)->group(function () {
+    Route::get('status', [TenantController::class, 'status']);
+    Route::get('ping',   [TenantController::class, 'ping']); // DEPRECATED
+});
 
 // ── Backoffice (contexto) ──────────────────────────────────────────────────────
 Route::middleware(ResolveTenantFromHeader::class)->prefix('backoffice/auth')->group(function () {
