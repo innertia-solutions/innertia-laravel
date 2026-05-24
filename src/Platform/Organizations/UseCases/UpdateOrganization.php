@@ -13,19 +13,32 @@ class UpdateOrganization extends UseCase
         public readonly ?string    $name   = null,
         public readonly ?string    $key    = null,
         public readonly ?bool      $active = null,
+        public readonly array      $extra  = [],
     ) {}
+
+    /**
+     * Atributos a actualizar. NULL-filtered: solo se aplican los campos pasados.
+     * Override en subclases para custom mapping. El array $extra ya viene mergeado
+     * (se aplican tal cual, sin filtro de null — la app decide qué pasa).
+     */
+    protected function attributes(): array
+    {
+        return array_merge(
+            array_filter([
+                'name'   => $this->name,
+                'key'    => $this->key,
+                'active' => $this->active,
+            ], fn ($v) => $v !== null),
+            $this->extra,
+        );
+    }
 
     public function execute(): OrganizationContract
     {
         $model = config('innertia.organizations.model', Organization::class);
         $org   = $model::findOrFail($this->id);
 
-        $org->fill(array_filter([
-            'name'   => $this->name,
-            'key'    => $this->key,
-            'active' => $this->active,
-        ], fn ($v) => $v !== null));
-
+        $org->fill($this->attributes());
         $org->save();
 
         return $org;

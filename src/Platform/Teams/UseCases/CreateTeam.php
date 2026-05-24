@@ -13,18 +13,25 @@ class CreateTeam extends UseCase
         public readonly ?string     $description    = null,
         public readonly ?string     $parentTeamId   = null,
         public readonly int|string|null $organizationId = null,
+        public readonly array       $extra          = [],
     ) {}
 
-    public function execute(): Team
+    /** Atributos a persistir. Override para agregar campos custom. */
+    protected function attributes(): array
     {
-        $model = config('innertia.teams.model', Team::class);
-
-        return $model::create([
+        return array_merge([
             'tenant_id'       => $this->tenantId,
             'organization_id' => $this->organizationId,
             'name'            => $this->name,
             'description'     => $this->description,
             'parent_team_id'  => $this->parentTeamId,
-        ]);
+        ], $this->extra);
+    }
+
+    public function execute(): Team
+    {
+        $model = config('innertia.teams.model', Team::class);
+
+        return $model::create($this->attributes());
     }
 }

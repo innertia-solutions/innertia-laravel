@@ -29,6 +29,21 @@ class TeamsController
         return config('innertia.teams.model', Team::class);
     }
 
+    /* ── Hooks de extensión (ver OrganizationsController para el patrón completo) ── */
+    protected function extraStoreRules(): array { return []; }
+    protected function extraUpdateRules(): array { return []; }
+    protected function extraFields(Request $request, $team = null): array { return []; }
+
+    /** Relaciones a incluir en show() — override para agregar relaciones app-specific. */
+    protected function showRelations(): array
+    {
+        return [
+            'members:id,name,email',
+            'parent:id,name',
+            'children:id,name,parent_team_id',
+        ];
+    }
+
     /**
      * Lista plana de teams del tenant + organization activa, con members_count.
      * El cliente arma el árbol via parent_team_id.
@@ -47,14 +62,14 @@ class TeamsController
     {
         $tenantId = Innertia::tenant()?->getKey();
 
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'name'           => 'required|string|max:255',
             'description'    => 'nullable|string|max:255',
             'parent_team_id' => [
                 'nullable', 'uuid',
                 Rule::exists('teams', 'id')->whereNull('deleted_at'),
             ],
-        ]);
+        ], $this->extraStoreRules()));
 
         $orgId = Innertia::organization()?->current();
 
@@ -64,6 +79,7 @@ class TeamsController
             description:    $data['description']    ?? null,
             parentTeamId:   $data['parent_team_id'] ?? null,
             organizationId: $orgId,
+            extra:          $this->extraFields($request),
         ))->execute();
 
         return response()->json($team, 201);
@@ -71,18 +87,15 @@ class TeamsController
 
     public function show(string $id): JsonResponse
     {
-        $team = $this->model()::with([
-            'members:id,name,email',
-            'parent:id,name',
-            'children:id,name,parent_team_id',
-        ])->findOrFail($id);
-
+        $team = $this->model()::with($this->showRelations())->findOrFail($id);
         return response()->json($team);
     }
 
     public function update(Request $request, string $id): JsonResponse
     {
-        $data = $request->validate([
+        $team = $this->model()::findOrFail($id);
+
+        $data = $request->validate(array_merge([
             'name'           => 'sometimes|string|max:255',
             'description'    => 'nullable|string|max:255',
             'parent_team_id' => [
@@ -90,7 +103,7 @@ class TeamsController
                 Rule::notIn([$id]),
                 Rule::exists('teams', 'id')->whereNull('deleted_at'),
             ],
-        ]);
+        ], $this->extraUpdateRules()));
 
         $team = (new UpdateTeam(
             teamId:       $id,
@@ -98,6 +111,7 @@ class TeamsController
             description:  $data['description'] ?? null,
             parentTeamId: $data['parent_team_id'] ?? null,
             clearParent:  array_key_exists('parent_team_id', $data) && $data['parent_team_id'] === null,
+            extra:        $this->extraFields($request, $team),
         ))->execute();
 
         return response()->json($team);
