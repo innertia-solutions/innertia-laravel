@@ -36,12 +36,71 @@ src/
 
 | Feature | Flag | Install | Schema |
 |---|---|---|---|
-| Organizations | `INNERTIA_ORGANIZATIONS_ENABLED=true` | `php artisan innertia:organization:install` | Crea `organizations`, agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_apps`, y tablas declaradas |
-| Teams | `INNERTIA_TEAMS_ENABLED=true` | `php artisan innertia:teams:install` | Crea `teams`, `team_members` |
+| Organizations | `INNERTIA_ORGANIZATIONS_ENABLED=true` | `php artisan innertia:organization:install [--force]` | Crea `organizations`, agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_apps`, y tablas declaradas |
+| Teams | `INNERTIA_TEAMS_ENABLED=true` | `php artisan innertia:teams:install [--force]` | Crea `teams`, `team_members` |
 
 Cada feature tiene un gate único:
 - `\Innertia\Platform\Organizations\OrganizationsFeature::isActive()`
 - `\Innertia\Platform\Teams\TeamsFeature::isActive()`
+
+`--force` regenera la migration con timestamp fresco. La migration usa `Schema::hasColumn()` para saltar tablas ya scopeadas — segura de re-aplicar cuando agregás tablas a `config('innertia.organizations.tables')`.
+
+### HTTP layer (opt-in)
+
+Ambos features traen controller default + helper para montar las rutas CRUD:
+
+```php
+// routes/api.private.php
+Route::middleware(['auth:api', 'tenant.require'])->group(function () {
+    \Innertia\Platform\Organizations\Routes::register();  // /organizations CRUD
+    \Innertia\Platform\Teams\Routes::register();          // /teams CRUD + /teams/{id}/members
+});
+```
+
+Argumentos: `Routes::register(prefix, controller)`.
+
+### Patrón de extensión (template method)
+
+Cada UseCase (`Create/Update {Organization,Team}`) acepta `$extra = []` y expone `attributes()` protected. Cada Controller expone hooks `extraStoreRules()`, `extraUpdateRules()`, `extraFields(Request, ?Model)`.
+
+Para agregar `owner_id` a Organizations:
+
+1. Migration de la app: `alter table organizations add owner_id`
+2. Modelo extendido: `class Organization extends \Innertia\...\Organization { protected $fillable = [...parent::$fillable, 'owner_id']; }`
+3. `config('innertia.organizations.model') = App\Models\Organization::class`
+4. Controller extendido:
+   ```php
+   class OrganizationsController extends \Innertia\...\OrganizationsController {
+       protected function extraStoreRules(): array { return ['owner_id' => 'required|uuid|exists:users,id']; }
+       protected function extraFields(Request $r, $org = null): array { return ['owner_id' => $r->input('owner_id')]; }
+   }
+   ```
+5. `Routes::register('organizations', App\Http\OrganizationsController::class)`
+
+Niveles:
+- **Columnas + validación**: hooks del controller (lo de arriba)
+- **Mapping de atributos / transform**: extender UseCase, override `attributes()`
+- **Side-effects post-create**: extender UseCase, override `execute()`
+- **Reemplazo total del controller**: forkear y mountar con `Routes::register(prefix, App\Controller::class)`
+
+### Artisan commands
+
+```bash
+innertia:organization:create {tenant} {key} {name} [--inactive]
+innertia:organization:list [--tenant=]
+innertia:organization:check          # coherencia trait ↔ config ↔ schema
+innertia:team:create {tenant} {name} [--description=] [--parent=] [--org=]
+innertia:team:list [--tenant=]
+innertia:skills:install [--force]    # copia skills del paquete a .claude/skills/innertia/
+```
+
+### Claude Code skills
+
+El paquete trae skills versionados en `src/Skills/*.md`. Cada proyecto consumidor los instala con `php artisan innertia:skills:install`. Skills disponibles: `innertia-framework`, `innertia-organizations`, `innertia-teams`, `innertia-config`, `innertia-storage`, `innertia-extending`. Mantenerlos sincronizados con la realidad del código es responsabilidad del paquete — cualquier feature/refactor que cambia uso público debería actualizar el skill correspondiente.
+
+### Auto-traits en User base
+
+`\Innertia\Auth\Models\User` aplica `HasTeams` automáticamente. Si TeamsFeature está disabled el trait es no-op (cero overhead). `HasOrganization` NO se aplica al User — los users son tenant-level y el contexto multi-org se mediza vía `HasApps` (la tabla `user_apps` tiene `organization_id`).
 
 ## Sistema de permisos — combinaciones posibles
 
@@ -127,8 +186,10 @@ Aplicables a modelos de negocio:
 |---|---|---|
 | `GET /status` | Público + X-Tenant | tenant info + features (organizations, teams, oauth, 2FA) + branding |
 | `GET /ping` | Público + X-Tenant | Alias deprecated de /status (shape antiguo) |
-| `GET /auth/me` | Privado | user + permissions + contexts + organizations (si feature on) + preferences |
+| `GET /auth/me` | Privado | user + permissions + contexts + organizations + current_organization + teams + preferences (los últimos 3 condicionales al feature) |
 | `GET /auth/me/permissions` | Privado | roles + permisos consolidados |
+| CRUD `/organizations` | Privado | Solo si la app llamó `\Innertia\Platform\Organizations\Routes::register()` |
+| CRUD `/teams` + `/teams/{id}/members` | Privado | Solo si la app llamó `\Innertia\Platform\Teams\Routes::register()` |
 | `GET /preferences` | Privado | Todas las prefs del user |
 | `GET /preferences/{module}` | Privado | Prefs con prefix `{module}.` |
 | `PUT /preferences/{key}` | Privado | Upsert |

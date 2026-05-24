@@ -98,6 +98,31 @@ class AuthController extends Controller
             $payload['organizations'] = $organizations;
         }
 
+        // Current organization resolved from X-Organization header (si feature activo)
+        if (\Innertia\Platform\Organizations\OrganizationsFeature::isActive()) {
+            $currentId = \Innertia\Facades\Innertia::organization()?->current();
+            if ($currentId !== null) {
+                $orgModel = config('innertia.organizations.model', \Innertia\Platform\Organizations\Models\Organization::class);
+                $payload['current_organization'] = $orgModel::query()
+                    ->select(['id', 'key', 'name', 'active'])
+                    ->find($currentId);
+            }
+        }
+
+        // Teams del user (si feature activo)
+        if (\Innertia\Platform\Teams\TeamsFeature::isActive() && method_exists($user, 'teams')) {
+            $payload['teams'] = $user->teams()
+                ->select(['teams.id', 'teams.name', 'teams.parent_team_id', 'teams.organization_id'])
+                ->get()
+                ->map(fn ($t) => [
+                    'id'              => $t->id,
+                    'name'            => $t->name,
+                    'parent_team_id'  => $t->parent_team_id,
+                    'organization_id' => $t->organization_id,
+                    'role_in_team'    => $t->pivot->role_in_team ?? 'member',
+                ]);
+        }
+
         // Backward compat — alias `availableContexts`
         $payload['availableContexts'] = $contexts;
 

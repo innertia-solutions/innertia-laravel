@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Innertia\Auth\RBAC\Traits\HasApps;
 use Innertia\Auth\RBAC\Traits\HasRoles;
+use Innertia\Platform\Teams\Traits\HasTeams;
 use Innertia\Platform\Traits\Auditable;
 use Innertia\Platform\Traits\HasHistory;
 use Innertia\Platform\Traits\HasPreferences;
@@ -24,10 +25,13 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
  * - UUID as primary key
  * - Audit trail + entity history (innertia-laravel)
  * - Soft deletes
+ * - Teams membership (HasTeams — auto no-op cuando el feature está disabled
+ *   via TeamsFeature::isActive()). Users son tenant-level; el contexto de
+ *   organization se mediza vía user_apps (HasApps), no via HasOrganization.
  */
 abstract class User extends Authenticatable implements JWTSubject
 {
-    use Auditable, HasApps, HasFactory, HasHistory, HasPreferences, HasUuid, HasRoles, SoftDeletes;
+    use Auditable, HasApps, HasFactory, HasHistory, HasPreferences, HasRoles, HasTeams, HasUuid, SoftDeletes;
 
     protected $fillable = [
         'name',
