@@ -793,6 +793,10 @@ Skills incluidos:
 | `innertia-framework` | overview general, modes, estructura DDD |
 | `innertia-organizations` | trabajo con Organizations, multi-org scoping |
 | `innertia-teams` | trabajo con Teams, members, RBAC por grupo |
+| `innertia-permissions` | RBAC, las 8 fuentes de permisos, DomainGates, EntityPermission, HasApps |
+| `innertia-events` | DomainEvents, channels (realtime/webhook/mail/web), Subscribable |
+| `innertia-webhooks` | outbound webhooks, HMAC signing, retry, WebhookLog |
+| `innertia-mail` | InnertiaMailable, branding por tenant, NotificationMail fluent builder |
 | `innertia-config` | edición de config/innertia.php |
 | `innertia-storage` | HasSingleFile, HasFiles, disks |
 | `innertia-extending` | extender modelos/controllers/UseCases del paquete |
