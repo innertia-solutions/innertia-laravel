@@ -188,6 +188,17 @@ class InnertiaServiceProvider extends ServiceProvider
         $router->aliasMiddleware('tenant.require',    \Innertia\Saas\Middleware\RequireTenant::class);
         $router->aliasMiddleware('apikey',            \Innertia\ApiKeys\Middleware\ApiKeyMiddleware::class);
 
+        if (config('innertia.organizations.enabled')) {
+            $router->aliasMiddleware(
+                'organization.resolve',
+                \Innertia\Platform\Organizations\Middleware\ResolveOrganizationFromHeader::class
+            );
+            $router->aliasMiddleware(
+                'organization.require',
+                \Innertia\Platform\Organizations\Middleware\RequireOrganization::class
+            );
+        }
+
         // ── Console commands ──────────────────────────────────────────────────
         if ($this->app->runningInConsole()) {
             $commands = [
