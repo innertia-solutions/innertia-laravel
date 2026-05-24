@@ -57,9 +57,19 @@ class PermissionsService
                 return [];
             }
 
-            $viaRoles = $user->roles()
-                ->with('permissions')
-                ->get()
+            $rolesQuery = $user->roles()->with('permissions');
+
+            if (config('innertia.organizations.enabled')) {
+                $orgId = \Innertia\Facades\Innertia::organization()?->current();
+                $rolesQuery->where(function ($q) use ($orgId) {
+                    $q->whereNull('model_roles.organization_id');
+                    if ($orgId !== null) {
+                        $q->orWhere('model_roles.organization_id', $orgId);
+                    }
+                });
+            }
+
+            $viaRoles = $rolesQuery->get()
                 ->flatMap(fn ($role) => $role->permissions->pluck('name'));
 
             $direct = $user->directPermissions()->pluck('name');
@@ -270,13 +280,32 @@ class PermissionsService
 
     private function cacheKey(string $userId): string
     {
-        $tenantId = \Innertia\Facades\Innertia::tenant()
-            ? (string) \Innertia\Facades\Innertia::tenant()->getKey()
-            : null;
-
-        return $tenantId
+        $tenantId = $this->currentTenantId();
+        $base     = $tenantId
             ? "innertia.perms.{$tenantId}.{$userId}"
             : "innertia.perms.{$userId}";
+
+        if (config('innertia.organizations.enabled')) {
+            $ctx = \Innertia\Facades\Innertia::organization();
+            $org = $ctx?->current();
+            if ($org !== null) {
+                // innertia.perms.{tenantId}.{orgId}.{userId}
+                $parts = explode('.', $base);
+                $userPart = array_pop($parts);
+                $parts[]  = (string) $org;
+                $parts[]  = $userPart;
+                return implode('.', $parts);
+            }
+        }
+
+        return $base;
+    }
+
+    private function currentTenantId(): ?string
+    {
+        return \Innertia\Facades\Innertia::tenant()
+            ? (string) \Innertia\Facades\Innertia::tenant()->getKey()
+            : null;
     }
 
     private function checkHierarchy(array $userPermissions, string $needed): bool
