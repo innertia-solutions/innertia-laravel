@@ -24,7 +24,7 @@ php artisan vendor:publish --tag=innertia-config
 
 ```php
 return [
-    'mode' => 'app',   // 'app' | 'saas'
+    'mode' => 'app',   // 'app' | 'saas' | 'api'
 
     'saas' => [
         'tenant_model'    => null,      // defaults to Innertia\Models\Tenant
@@ -41,6 +41,29 @@ return [
     ],
 ];
 ```
+
+---
+
+## Organizations (opt-in)
+
+Optional **second-level scoping** layer that sits on top of (or in place of) the Tenant layer. Enable it when you need to isolate data between business units, departments, client orgs, or subsidiaries — without forcing the full multi-tenant model on every request. Off by default; apps that don't opt in behave byte-identical to pre-0.3.0.
+
+| Mode | Organizations support |
+|---|---|
+| `app` | ✅ Works — single-layer scoping |
+| `saas` | ✅ Works — second-layer scoping inside tenant |
+| `api` | ❌ Forcibly inactive — API consumers manage isolation |
+
+**Activation checklist:**
+
+1. Set `organizations.enabled => true` in `config/innertia.php`.
+2. List your domain tables under `organizations.tables`.
+3. Run `php artisan innertia:organization:install` then `php artisan migrate`.
+4. Add the `HasOrganization` trait to scoped models.
+5. Add `organization.resolve` + `organization.require` middleware to protected routes.
+6. Clients send the `X-Organization: <slug>` header per request.
+
+For the full guide, see [docs/organizations.md](docs/organizations.md).
 
 ---
 
