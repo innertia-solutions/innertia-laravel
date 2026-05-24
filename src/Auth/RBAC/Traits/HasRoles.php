@@ -7,6 +7,7 @@ use Innertia\Exceptions\NotFoundException;
 use Innertia\Facades\Permissions;
 use Innertia\Auth\RBAC\Models\Permission;
 use Innertia\Auth\RBAC\Models\Role;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 
 /**
  * Add to your User model to enable role-based access control.
@@ -43,7 +44,7 @@ trait HasRoles
             'role_id',
         );
 
-        if (config('innertia.organizations.enabled')) {
+        if (OrganizationsFeature::isActive()) {
             $relation->withPivot('organization_id');
         }
 
@@ -75,7 +76,7 @@ trait HasRoles
         $role = $this->resolveRole($role);
 
         $pivot = [];
-        if (config('innertia.organizations.enabled')) {
+        if (OrganizationsFeature::isActive()) {
             $orgId = $organizationId;
             if ($orgId === null) {
                 $ctx   = \Innertia\Facades\Innertia::organization();
@@ -128,7 +129,7 @@ trait HasRoles
     {
         if ($role instanceof Role) {
             $q = $this->roles()->where('roles.id', $role->id);
-            if (config('innertia.organizations.enabled')) {
+            if (OrganizationsFeature::isActive()) {
                 $q = $this->applyOrgPivotFilter($q, $organizationId);
             }
             return $q->exists();
@@ -146,7 +147,7 @@ trait HasRoles
                 }
             });
 
-        if (config('innertia.organizations.enabled')) {
+        if (OrganizationsFeature::isActive()) {
             $q = $this->applyOrgPivotFilter($q, $organizationId);
         }
 

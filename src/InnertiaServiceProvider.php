@@ -23,6 +23,7 @@ use Innertia\DataTable\DataTableService;
 use Innertia\Exports\ExportPipeline;
 use Innertia\Platform\Events\DomainEvent;
 use Innertia\Platform\Listeners\DomainEventRouter;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 use Innertia\Webhooks\WebhookService;
 use Innertia\Auth\RBAC\Models\EntityPermission;
 use Innertia\Platform\Services\ActivityLogService;
@@ -53,7 +54,7 @@ class InnertiaServiceProvider extends ServiceProvider
         // TenantContext + InnertiaManager — siempre registrados; no-op en App mode.
         $this->app->singleton(\Innertia\Saas\TenantContext::class);
 
-        if (config('innertia.organizations.enabled')) {
+        if (OrganizationsFeature::isActive()) {
             $this->app->singleton(\Innertia\Platform\Organizations\OrganizationContext::class);
         }
 
@@ -61,7 +62,7 @@ class InnertiaServiceProvider extends ServiceProvider
             return new \Innertia\InnertiaManager(
                 $app->make(\Innertia\Saas\TenantContext::class),
                 $this->isSaas(),
-                config('innertia.organizations.enabled')
+                OrganizationsFeature::isActive()
                     ? $app->make(\Innertia\Platform\Organizations\OrganizationContext::class)
                     : null,
             );
@@ -188,7 +189,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $router->aliasMiddleware('tenant.require',    \Innertia\Saas\Middleware\RequireTenant::class);
         $router->aliasMiddleware('apikey',            \Innertia\ApiKeys\Middleware\ApiKeyMiddleware::class);
 
-        if (config('innertia.organizations.enabled')) {
+        if (OrganizationsFeature::isActive()) {
             $router->aliasMiddleware(
                 'organization.resolve',
                 \Innertia\Platform\Organizations\Middleware\ResolveOrganizationFromHeader::class
@@ -218,7 +219,7 @@ class InnertiaServiceProvider extends ServiceProvider
             }
 
             // Organizations install command — always registered in console so the
-            // command's own guard (config('innertia.organizations.enabled')) is the
+            // command's own guard (OrganizationsFeature::isActive()) is the
             // single source of truth and tests can flip the flag at runtime.
             $commands[] = \Innertia\Platform\Organizations\Console\OrganizationInstallCommand::class;
             $commands[] = \Innertia\Platform\Organizations\Console\OrganizationCheckCommand::class;

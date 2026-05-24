@@ -2,6 +2,10 @@
 
 `innertia-laravel` ships an optional second-level scoping layer that sits ON TOP of the existing Tenant layer. Until you flip the master switch, the library behaves exactly as it did before 0.3.0.
 
+## Mode compatibility
+
+Organizations work in `app` and `saas` modes. **In `api` mode the feature is forcibly inactive** — API consumers are expected to handle their own isolation. Setting `organizations.enabled=true` in `api` mode is a no-op: traits, middleware, commands, and the facade all behave as if the feature were disabled.
+
 ## When you want this
 
 You need it when a single tenant has multiple **independent business units** that:
@@ -106,9 +110,11 @@ Innertia::organization()->withOrganization(99, fn () => ...); // scoped run
 | Mode                          | `roles.tenant_id` | `roles.organization_id` | `model_roles.organization_id` |
 |-------------------------------|-------------------|--------------------------|--------------------------------|
 | `app`                         | always NULL       | always NULL              | always NULL                    |
+| `app`, org enabled            | always NULL       | NULL or numeric          | NULL or numeric                |
 | `saas`, org disabled          | tenant uuid       | always NULL              | always NULL                    |
 | `saas`, org enabled (global)  | tenant uuid       | NULL (tenant-wide)       | NULL (applies in every org)    |
 | `saas`, org enabled (scoped)  | tenant uuid       | numeric org id           | numeric org id                 |
+| `api` (any setting)           | always NULL       | always NULL              | always NULL                    |
 
 ## Consolidated view
 

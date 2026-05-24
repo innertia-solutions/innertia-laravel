@@ -3,6 +3,7 @@
 namespace Innertia;
 
 use Innertia\Exceptions\NotFoundException;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 use Innertia\Saas\Models\Tenant;
 use Innertia\Saas\TenantContext;
 
@@ -99,7 +100,7 @@ class InnertiaManager
      */
     public function organization(): ?\Innertia\Platform\Organizations\OrganizationContext
     {
-        if (! config('innertia.organizations.enabled')) {
+        if (! OrganizationsFeature::isActive()) {
             return null;
         }
         return $this->organizationContext;

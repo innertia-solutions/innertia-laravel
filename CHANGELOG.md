@@ -45,3 +45,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Apps that have already published `config/innertia.php` must add the
   `organizations` block manually OR re-publish with `--force`.
 - `user_apps` table is unchanged — app-access is orthogonal to organizations.
+- Organizations feature is forcibly inactive in `api` mode regardless of
+  `organizations.enabled` — API consumers manage their own isolation.
+  Centralised via `Innertia\Platform\Organizations\OrganizationsFeature::isActive()`.

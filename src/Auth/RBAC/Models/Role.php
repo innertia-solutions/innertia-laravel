@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Innertia\Exceptions\ConflictException;
 use Innertia\Exceptions\NotFoundException;
 use Innertia\Facades\Permissions;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 use Innertia\Platform\Traits\HasHistory;
 
 /**
@@ -54,7 +55,7 @@ class Role extends Model
             $query->where('tenant_id', $tenantId);
         }
 
-        if (config('innertia.organizations.enabled')) {
+        if (OrganizationsFeature::isActive()) {
             $orgId = $organizationId;
             if ($orgId === null) {
                 $ctx   = \Innertia\Facades\Innertia::organization();
@@ -99,7 +100,7 @@ class Role extends Model
             $attributes['tenant_id'] = $tenantId;
         }
 
-        if (config('innertia.organizations.enabled')) {
+        if (OrganizationsFeature::isActive()) {
             $attributes['organization_id'] = $organizationId;
         }
 

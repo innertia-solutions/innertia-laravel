@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Innertia\Auth\RBAC\Models\Permission;
 use Innertia\Auth\RBAC\Models\Role;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 
 /**
  * Manages named (app-level) permissions from config + the permission cache.
@@ -59,7 +60,7 @@ class PermissionsService
 
             $rolesQuery = $user->roles()->with('permissions');
 
-            if (config('innertia.organizations.enabled')) {
+            if (OrganizationsFeature::isActive()) {
                 $orgId = \Innertia\Facades\Innertia::organization()?->current();
                 $rolesQuery->where(function ($q) use ($orgId) {
                     $q->whereNull('model_roles.organization_id');
@@ -285,7 +286,7 @@ class PermissionsService
             ? "innertia.perms.{$tenantId}.{$userId}"
             : "innertia.perms.{$userId}";
 
-        if (config('innertia.organizations.enabled')) {
+        if (OrganizationsFeature::isActive()) {
             $ctx = \Innertia\Facades\Innertia::organization();
             $org = $ctx?->current();
             if ($org !== null) {

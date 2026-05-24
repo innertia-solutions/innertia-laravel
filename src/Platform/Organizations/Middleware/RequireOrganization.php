@@ -5,6 +5,7 @@ namespace Innertia\Platform\Organizations\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Innertia\Facades\Innertia;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -13,13 +14,13 @@ use Symfony\Component\HttpFoundation\Response;
  *   Route::middleware(['tenant.require', 'organization.resolve', 'organization.require'])
  *        ->group(fn () => ...);
  *
- * No-op when config('innertia.organizations.enabled') is false.
+ * No-op when the Organizations feature is inactive (disabled or in api mode).
  */
 class RequireOrganization
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! config('innertia.organizations.enabled')) {
+        if (! OrganizationsFeature::isActive()) {
             return $next($request);
         }
 

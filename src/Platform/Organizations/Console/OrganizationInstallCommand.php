@@ -4,6 +4,7 @@ namespace Innertia\Platform\Organizations\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 
 /**
  * Generates a single consolidated migration that:
@@ -13,7 +14,8 @@ use Illuminate\Support\Facades\File;
  *   - Adds a composite (tenant_id, organization_id) index when the table has tenant_id,
  *     otherwise a single-column index on organization_id.
  *
- * Guard: refuses to run unless config('innertia.organizations.enabled') is true.
+ * Guard: refuses to run unless the Organizations feature is active
+ * (config('innertia.organizations.enabled')=true AND config('innertia.mode')!=='api').
  * Idempotent: re-running detects existing `*_add_organization_id_*.php` and skips.
  */
 class OrganizationInstallCommand extends Command
@@ -23,8 +25,12 @@ class OrganizationInstallCommand extends Command
 
     public function handle(): int
     {
-        if (! config('innertia.organizations.enabled')) {
-            $this->error('Refusing to run: config(innertia.organizations.enabled) is not true.');
+        if (! OrganizationsFeature::isActive()) {
+            if (config('innertia.mode') === 'api') {
+                $this->error('Refusing to run: Organizations feature is inactive in api mode.');
+            } else {
+                $this->error('Refusing to run: config(innertia.organizations.enabled) is not true.');
+            }
             return self::FAILURE;
         }
 

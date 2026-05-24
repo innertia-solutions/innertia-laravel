@@ -3,11 +3,12 @@
 namespace Innertia\Platform\Traits;
 
 use Innertia\Facades\Innertia;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 
 /**
  * Sister trait of HasTenant. Opt-in second-level scoping.
  *
- *   - When config('innertia.organizations.enabled') is false → no-op.
+ *   - When the Organizations feature is inactive (disabled or api mode) → no-op.
  *   - On `creating`: if Innertia::organization()->current() is set and the
  *     attribute is not yet assigned, it is injected.
  *   - addGlobalScope('organization'): WHERE organization_id IN (scope()).
@@ -31,7 +32,7 @@ trait HasOrganization
         $column = config('innertia.organizations.column', 'organization_id');
 
         static::creating(function ($model) use ($column) {
-            if (! config('innertia.organizations.enabled')) {
+            if (! OrganizationsFeature::isActive()) {
                 return;
             }
             $ctx = Innertia::organization();
@@ -44,7 +45,7 @@ trait HasOrganization
         });
 
         static::addGlobalScope('organization', function ($query) use ($column) {
-            if (! config('innertia.organizations.enabled')) {
+            if (! OrganizationsFeature::isActive()) {
                 return;
             }
             $ctx = Innertia::organization();

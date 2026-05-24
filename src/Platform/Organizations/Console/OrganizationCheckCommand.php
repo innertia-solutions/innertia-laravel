@@ -4,6 +4,7 @@ namespace Innertia\Platform\Organizations\Console;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\Schema;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 use Innertia\Platform\Traits\HasOrganization;
 
 /**
@@ -24,8 +25,8 @@ class OrganizationCheckCommand extends Command
 
     public function handle(): int
     {
-        if (! config('innertia.organizations.enabled')) {
-            $this->warn('organizations.enabled is false — nothing to check.');
+        if (! OrganizationsFeature::isActive()) {
+            $this->warn('Organizations feature is inactive — nothing to check.');
             return self::SUCCESS;
         }
 

@@ -5,6 +5,7 @@ namespace Innertia\Platform\Organizations\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Innertia\Facades\Innertia;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 use Symfony\Component\HttpFoundation\Response;
 
 /**
@@ -24,7 +25,7 @@ class ResolveOrganizationFromHeader
 {
     public function handle(Request $request, Closure $next): Response
     {
-        if (! config('innertia.organizations.enabled')) {
+        if (! OrganizationsFeature::isActive()) {
             return $next($request);
         }
 
