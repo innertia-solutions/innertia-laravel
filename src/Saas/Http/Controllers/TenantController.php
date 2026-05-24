@@ -49,32 +49,6 @@ class TenantController
         ]);
     }
 
-    /**
-     * DEPRECATED: GET /ping — mantiene shape antiguo para backward compat.
-     * Será removido en una versión mayor. Usar /status en su lugar.
-     */
-    public function ping(Request $request): JsonResponse
-    {
-        $tenant = $this->resolveTenant($request);
-        if (! $tenant) return response()->json(['ok' => false], 404);
-
-        $isActive = $tenant->isActive() || $tenant->isOnTrial();
-
-        return response()->json([
-            'ok'     => $isActive,
-            'tenant' => [
-                'id'     => $tenant->id,
-                'status' => $tenant->status,
-                'config' => [
-                    'oauthProviders' => $tenant->configs['oauthProviders'] ?? [],
-                    'features'       => $tenant->configs['features'] ?? [],
-                    'isActive'       => $isActive,
-                    'demo'           => $tenant->configs['demo'] ?? null,
-                ],
-            ],
-        ]);
-    }
-
     private function resolveTenant(Request $request)
     {
         $model = config('innertia.saas.tenant_model', \Innertia\Saas\Models\Tenant::class);
