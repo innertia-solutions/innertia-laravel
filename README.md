@@ -777,6 +777,36 @@ Persiste en `activity_log` table. Visible vía `EntityHistory` trait.
 
 ---
 
+## Claude Code skills
+
+El paquete trae un set de skills (`.md` con frontmatter YAML) que documentan cada feature para Claude Code. Cada proyecto que consume el paquete los instala con:
+
+```bash
+php artisan innertia:skills:install
+# → instala en .claude/skills/innertia/
+```
+
+Skills incluidos:
+
+| Skill | Cuándo se activa |
+|---|---|
+| `innertia-framework` | overview general, modes, estructura DDD |
+| `innertia-organizations` | trabajo con Organizations, multi-org scoping |
+| `innertia-teams` | trabajo con Teams, members, RBAC por grupo |
+| `innertia-config` | edición de config/innertia.php |
+| `innertia-storage` | HasSingleFile, HasFiles, disks |
+| `innertia-extending` | extender modelos/controllers/UseCases del paquete |
+
+```bash
+# Sobrescribir skills existentes (p.ej. tras composer update del paquete)
+php artisan innertia:skills:install --force
+
+# Cambiar destino
+php artisan innertia:skills:install --path=.claude/skills/platform
+```
+
+Se recomienda **commitear `.claude/skills/innertia/`** al repo del proyecto para que el equipo comparta el mismo contexto de Claude.
+
 ## Releasing
 
 Workflow `Release` de GitHub Actions (`workflow_dispatch`). Elegir `patch`, `minor` o `major`. El

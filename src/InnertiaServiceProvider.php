@@ -231,6 +231,9 @@ class InnertiaServiceProvider extends ServiceProvider
             $commands[] = \Innertia\Platform\Teams\Console\CreateTeamCommand::class;
             $commands[] = \Innertia\Platform\Teams\Console\ListTeamsCommand::class;
 
+            // Claude Code skills installer — instala skills del paquete en .claude/skills/innertia/
+            $commands[] = \Innertia\Console\SkillsInstallCommand::class;
+
             $this->commands($commands);
         }
 

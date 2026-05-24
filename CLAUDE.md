@@ -91,7 +91,12 @@ innertia:organization:list [--tenant=]
 innertia:organization:check          # coherencia trait ↔ config ↔ schema
 innertia:team:create {tenant} {name} [--description=] [--parent=] [--org=]
 innertia:team:list [--tenant=]
+innertia:skills:install [--force]    # copia skills del paquete a .claude/skills/innertia/
 ```
+
+### Claude Code skills
+
+El paquete trae skills versionados en `src/Skills/*.md`. Cada proyecto consumidor los instala con `php artisan innertia:skills:install`. Skills disponibles: `innertia-framework`, `innertia-organizations`, `innertia-teams`, `innertia-config`, `innertia-storage`, `innertia-extending`. Mantenerlos sincronizados con la realidad del código es responsabilidad del paquete — cualquier feature/refactor que cambia uso público debería actualizar el skill correspondiente.
 
 ### Auto-traits en User base
 
