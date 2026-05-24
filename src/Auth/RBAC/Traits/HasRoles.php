@@ -7,6 +7,7 @@ use Innertia\Exceptions\NotFoundException;
 use Innertia\Facades\Permissions;
 use Innertia\Auth\RBAC\Models\Permission;
 use Innertia\Auth\RBAC\Models\Role;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 
 /**
  * Add to your User model to enable role-based access control.
@@ -35,13 +36,19 @@ trait HasRoles
      */
     public function roles(): \Illuminate\Database\Eloquent\Relations\MorphToMany
     {
-        return $this->morphToMany(
+        $relation = $this->morphToMany(
             Role::class,
             'model',
             'model_roles',
             'model_id',
             'role_id',
         );
+
+        if (OrganizationsFeature::isActive()) {
+            $relation->withPivot('organization_id');
+        }
+
+        return $relation;
     }
 
     /**
@@ -64,10 +71,21 @@ trait HasRoles
      * Assign a role by name or Role model.
      * In SaaS mode the role is resolved within the current tenant's context.
      */
-    public function assignRole(string|Role $role): void
+    public function assignRole(string|Role $role, ?int $organizationId = null): void
     {
         $role = $this->resolveRole($role);
-        $this->roles()->syncWithoutDetaching([$role->id]);
+
+        $pivot = [];
+        if (OrganizationsFeature::isActive()) {
+            $orgId = $organizationId;
+            if ($orgId === null) {
+                $ctx   = \Innertia\Facades\Innertia::organization();
+                $orgId = $ctx?->current();
+            }
+            $pivot['organization_id'] = $orgId;
+        }
+
+        $this->roles()->syncWithoutDetaching([$role->id => $pivot]);
         Permissions::flushUser($this);
     }
 
@@ -107,15 +125,19 @@ trait HasRoles
      * Check if the model has the given role.
      * Matches by role name within the current tenant context.
      */
-    public function hasRole(string|Role $role): bool
+    public function hasRole(string|Role $role, ?int $organizationId = null): bool
     {
         if ($role instanceof Role) {
-            return $this->roles()->where('roles.id', $role->id)->exists();
+            $q = $this->roles()->where('roles.id', $role->id);
+            if (OrganizationsFeature::isActive()) {
+                $q = $this->applyOrgPivotFilter($q, $organizationId);
+            }
+            return $q->exists();
         }
 
         $tenantId = $this->currentTenantId();
 
-        return $this->roles()
+        $q = $this->roles()
             ->where('roles.name', $role)
             ->where(function ($q) use ($tenantId) {
                 $q->whereNull('roles.tenant_id');
@@ -123,8 +145,39 @@ trait HasRoles
                 if ($tenantId !== null) {
                     $q->orWhere('roles.tenant_id', $tenantId);
                 }
-            })
-            ->exists();
+            });
+
+        if (OrganizationsFeature::isActive()) {
+            $q = $this->applyOrgPivotFilter($q, $organizationId);
+        }
+
+        return $q->exists();
+    }
+
+    /**
+     * Apply organization scoping at the model_roles pivot level.
+     *
+     * Resolution:
+     *   - If $explicit is provided, match exactly that pivot.organization_id
+     *     OR a globally-assigned role (pivot.organization_id IS NULL).
+     *   - If $explicit is null, use OrganizationContext::current() with the
+     *     same OR-NULL fallback. When context has no current(), only NULL
+     *     pivots match.
+     */
+    private function applyOrgPivotFilter($query, ?int $explicit)
+    {
+        $orgId = $explicit;
+        if ($orgId === null) {
+            $ctx   = \Innertia\Facades\Innertia::organization();
+            $orgId = $ctx?->current();
+        }
+
+        return $query->where(function ($q) use ($orgId) {
+            $q->whereNull('model_roles.organization_id');
+            if ($orgId !== null) {
+                $q->orWhere('model_roles.organization_id', $orgId);
+            }
+        });
     }
 
     /**

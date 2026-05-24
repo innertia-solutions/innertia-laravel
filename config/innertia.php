@@ -91,6 +91,46 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Organizations (opt-in)
+    |--------------------------------------------------------------------------
+    |
+    | Opt-in second-level scoping ON TOP of tenant. When `enabled = false`
+    | the library behaves identically to versions before 0.3.0.
+    |
+    |   enabled    — Master switch. Until true, all Organization code paths
+    |                are no-op and middleware/commands are not registered.
+    |   tables     — Domain tables that must carry `organization_id`. The
+    |                `innertia:organization:install` command will generate
+    |                the migration for these tables (plus `roles` and
+    |                `model_roles`, which are added automatically).
+    |   column     — Column name used on every scoped table. Default
+    |                `organization_id`. Almost never overridden.
+    |   with_index — When true, the install command adds a composite index
+    |                `(tenant_id, organization_id)` to each table that has
+    |                a `tenant_id`, otherwise a single-column index.
+    |   model      — FQCN of the Organization model. Defaults to the concrete
+    |                model shipped by this library
+    |                (Innertia\Platform\Organizations\Models\Organization).
+    |                Apps MAY override this with their own class — typically a
+    |                subclass that extends the library model, or any class
+    |                implementing Innertia\Platform\Contracts\OrganizationContract.
+    |                The middleware uses ::findByKey($slug) to resolve from the
+    |                X-Organization header.
+    |
+    | See docs/organizations.md for adoption recipe.
+    |
+    */
+
+    'organizations' => [
+        'enabled'    => env('INNERTIA_ORGANIZATIONS_ENABLED', false),
+        'tables'     => [],
+        'column'     => 'organization_id',
+        'with_index' => true,
+        'model'      => \Innertia\Platform\Organizations\Models\Organization::class,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | SaaS / Tenancy Settings
     |--------------------------------------------------------------------------
     |

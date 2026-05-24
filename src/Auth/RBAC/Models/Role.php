@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Innertia\Exceptions\ConflictException;
 use Innertia\Exceptions\NotFoundException;
 use Innertia\Facades\Permissions;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 use Innertia\Platform\Traits\HasHistory;
 
 /**
@@ -31,39 +32,65 @@ class Role extends Model
 {
     use HasUuids, HasHistory;
 
-    protected $fillable = ['name', 'description', 'tenant_id'];
+    protected $fillable = ['name', 'description', 'tenant_id', 'organization_id'];
 
     // ── Static lookups ────────────────────────────────────────────────────────
 
     /**
-     * Find a role by name, optionally scoped to a tenant (SaaS mode only).
+     * Find a role by name with two-axis scoping:
+     *
+     *   - $tenantId       — explicit tenant scope (SaaS mode only).
+     *   - $organizationId — explicit org scope. If null, resolves implicitly:
+     *                       active org from OrganizationContext → scoped role,
+     *                       falling back to a global (org_id IS NULL) role.
      */
-    public static function findByName(string $name, ?string $tenantId = null): ?static
-    {
+    public static function findByName(
+        string $name,
+        ?string $tenantId = null,
+        ?int $organizationId = null,
+    ): ?static {
         $query = static::where('name', $name);
 
         if (config('innertia.mode') === 'saas') {
             $query->where('tenant_id', $tenantId);
         }
 
+        if (OrganizationsFeature::isActive()) {
+            $orgId = $organizationId;
+            if ($orgId === null) {
+                $ctx   = \Innertia\Facades\Innertia::organization();
+                $orgId = $ctx?->current();
+            }
+
+            if ($orgId !== null) {
+                $scoped = (clone $query)->where('organization_id', $orgId)->first();
+                if ($scoped) {
+                    return $scoped;
+                }
+            }
+
+            return (clone $query)->whereNull('organization_id')->first();
+        }
+
         return $query->first();
     }
 
-    /**
-     * Find by name or throw NotFoundException.
-     */
-    public static function findByNameOrFail(string $name, ?string $tenantId = null): static
-    {
-        return static::findByName($name, $tenantId)
+    public static function findByNameOrFail(
+        string $name,
+        ?string $tenantId = null,
+        ?int $organizationId = null,
+    ): static {
+        return static::findByName($name, $tenantId, $organizationId)
             ?? throw new NotFoundException("Role \"{$name}\" not found.");
     }
 
-    /**
-     * Create a role, enforcing uniqueness per name (+ tenant_id in SaaS mode).
-     */
-    public static function createUnique(string $name, ?string $description = null, ?string $tenantId = null): static
-    {
-        if (static::findByName($name, $tenantId)) {
+    public static function createUnique(
+        string $name,
+        ?string $description = null,
+        ?string $tenantId = null,
+        ?int $organizationId = null,
+    ): static {
+        if (static::findByName($name, $tenantId, $organizationId)) {
             throw new ConflictException("A role with name \"{$name}\" already exists.");
         }
 
@@ -71,6 +98,10 @@ class Role extends Model
 
         if (config('innertia.mode') === 'saas') {
             $attributes['tenant_id'] = $tenantId;
+        }
+
+        if (OrganizationsFeature::isActive()) {
+            $attributes['organization_id'] = $organizationId;
         }
 
         return static::create($attributes);
