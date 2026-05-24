@@ -38,6 +38,11 @@
             "Innertia\\Tests\\": "tests/"
         }
     },
+    "scripts": {
+        "test:disabled": "INNERTIA_ORGANIZATIONS_ENABLED=false ./vendor/bin/pest --exclude-group=org-enabled",
+        "test:enabled":  "INNERTIA_ORGANIZATIONS_ENABLED=true  ./vendor/bin/pest --group=org-enabled",
+        "test":          ["@test:disabled", "@test:enabled"]
+    },
     "extra": {
         "laravel": {
             "providers": [

@@ -6,6 +6,8 @@ use Innertia\Facades\Innertia;
 use Innertia\Platform\Organizations\OrganizationContext;
 use Innertia\Platform\Traits\HasOrganization;
 
+pest()->group('org-enabled');
+
 class TestOrgScopedModel extends Model
 {
     use HasOrganization;

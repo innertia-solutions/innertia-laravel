@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\File;
 
+pest()->group('org-enabled');
+
 beforeEach(function () {
     config()->set('innertia.organizations.enabled', true);
     config()->set('innertia.organizations.tables', ['documents', 'normativas']);

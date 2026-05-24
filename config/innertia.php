@@ -122,7 +122,7 @@ return [
     */
 
     'organizations' => [
-        'enabled'    => false,
+        'enabled'    => env('INNERTIA_ORGANIZATIONS_ENABLED', false),
         'tables'     => [],
         'column'     => 'organization_id',
         'with_index' => true,

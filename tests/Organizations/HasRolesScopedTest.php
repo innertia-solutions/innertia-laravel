@@ -7,6 +7,8 @@ use Innertia\Auth\RBAC\Traits\HasRoles;
 use Innertia\Facades\Innertia;
 use Innertia\Platform\Organizations\OrganizationContext;
 
+pest()->group('org-enabled');
+
 class TestUserModel extends Model
 {
     use HasRoles;

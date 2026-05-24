@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Schema;
 
+pest()->group('org-enabled');
+
 beforeEach(function () {
     config()->set('innertia.organizations.enabled', true);
     config()->set('innertia.organizations.tables', ['org_check_things']);

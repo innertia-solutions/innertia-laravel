@@ -5,6 +5,8 @@ use Innertia\Auth\RBAC\Models\Role;
 use Innertia\Facades\Innertia;
 use Innertia\Platform\Organizations\OrganizationContext;
 
+pest()->group('org-enabled');
+
 beforeEach(function () {
     config()->set('innertia.mode', 'saas');
     config()->set('innertia.organizations.enabled', true);

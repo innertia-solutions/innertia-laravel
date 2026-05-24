@@ -4,6 +4,8 @@ use Innertia\Facades\Innertia;
 use Innertia\Platform\Organizations\OrganizationContext;
 use Innertia\InnertiaManager;
 
+pest()->group('org-enabled');
+
 beforeEach(function () {
     config()->set('innertia.organizations.enabled', true);
     $this->app->singleton(OrganizationContext::class);

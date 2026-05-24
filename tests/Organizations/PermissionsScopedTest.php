@@ -4,6 +4,8 @@ use Innertia\Auth\RBAC\Services\PermissionsService;
 use Innertia\Facades\Innertia;
 use Innertia\Platform\Organizations\OrganizationContext;
 
+pest()->group('org-enabled');
+
 beforeEach(function () {
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);

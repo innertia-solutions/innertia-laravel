@@ -5,6 +5,8 @@ use Illuminate\Support\Facades\Schema;
 use Innertia\Platform\Organizations\Models\Organization;
 use Innertia\Platform\Contracts\OrganizationContract;
 
+pest()->group('org-enabled');
+
 beforeEach(function () {
     // Manually create the schema required by Organization. The saas-mode
     // migration auto-loads when the host app sets mode=saas; in the lib's

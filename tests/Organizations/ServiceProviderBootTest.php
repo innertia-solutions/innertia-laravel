@@ -20,4 +20,4 @@ it('registers organization middleware aliases when feature enabled', function ()
     expect($aliases['organization.resolve'])->toBe(
         \Innertia\Platform\Organizations\Middleware\ResolveOrganizationFromHeader::class
     );
-});
+})->group('org-enabled');

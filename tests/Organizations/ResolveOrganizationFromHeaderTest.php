@@ -5,6 +5,8 @@ use Innertia\Facades\Innertia;
 use Innertia\Platform\Organizations\OrganizationContext;
 use Innertia\Platform\Organizations\Middleware\ResolveOrganizationFromHeader;
 
+pest()->group('org-enabled');
+
 class FakeOrganization implements \Innertia\Platform\Contracts\OrganizationContract
 {
     public function __construct(public int $id, public string $key, public ?int $tenantId = 1) {}
