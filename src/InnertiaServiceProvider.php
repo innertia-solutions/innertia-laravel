@@ -206,6 +206,11 @@ class InnertiaServiceProvider extends ServiceProvider
                 ]);
             }
 
+            // Organizations install command — always registered in console so the
+            // command's own guard (config('innertia.organizations.enabled')) is the
+            // single source of truth and tests can flip the flag at runtime.
+            $commands[] = \Innertia\Platform\Organizations\Console\OrganizationInstallCommand::class;
+
             $this->commands($commands);
         }
 
