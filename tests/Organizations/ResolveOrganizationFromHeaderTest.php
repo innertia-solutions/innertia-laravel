@@ -53,6 +53,9 @@ it('returns 401 when X-Organization header refers to unknown slug', function () 
     $resp = $mw->handle($req, fn () => new \Illuminate\Http\Response('ok'));
 
     expect($resp->getStatusCode())->toBe(401);
+    // Context must remain untouched when the slug doesn't resolve.
+    expect(Innertia::organization()->current())->toBeNull();
+    expect(Innertia::organization()->scope())->toBe([]);
 });
 
 it('passes through when no header present', function () {
@@ -87,4 +90,14 @@ it('honours X-Consolidated:true by leaving current() and asking RBAC for the use
     expect(Innertia::organization()->current())->toBe(10);
     expect(Innertia::organization()->scope())->toBe([10, 20, 30]);
     expect(Innertia::organization()->inConsolidatedView())->toBeTrue();
+});
+
+it('returns 500 when configured model does not implement OrganizationContract', function () {
+    config()->set('innertia.organizations.model', \stdClass::class);
+
+    $req = Request::create('/foo', 'GET', server: ['HTTP_X_ORGANIZATION' => 'acme']);
+    $mw  = new ResolveOrganizationFromHeader();
+    $resp = $mw->handle($req, fn () => new \Illuminate\Http\Response('ok'));
+
+    expect($resp->getStatusCode())->toBe(500);
 });

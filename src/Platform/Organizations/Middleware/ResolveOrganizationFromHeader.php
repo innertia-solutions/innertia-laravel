@@ -28,9 +28,9 @@ class ResolveOrganizationFromHeader
             return $next($request);
         }
 
-        $slug = $request->header('X-Organization');
+        $slug = trim((string) $request->header('X-Organization', ''));
 
-        if (! $slug) {
+        if ($slug === '') {
             return $next($request);
         }
 
@@ -49,6 +49,12 @@ class ResolveOrganizationFromHeader
         if (! $modelClass || ! class_exists($modelClass)) {
             return response()->json([
                 'message' => 'innertia.organizations.model is not configured.',
+            ], 500);
+        }
+
+        if (! is_subclass_of($modelClass, \Innertia\Platform\Contracts\OrganizationContract::class)) {
+            return response()->json([
+                'message' => 'innertia.organizations.model must implement OrganizationContract.',
             ], 500);
         }
 
