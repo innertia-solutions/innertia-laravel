@@ -154,32 +154,33 @@ return [
     | SaaS / Tenancy Settings
     |--------------------------------------------------------------------------
     |
-    | Only relevant when mode = 'saas'. Configures stancl/tenancy
-    | programmatically — no need to publish config/tenancy.php.
+    | Only relevant when mode = 'saas'. Configura el manager de tenants propio
+    | de Innertia (sin dependencias externas). El modelo Tenant es Eloquent puro
+    | con scope automático por X-Tenant header.
     |
     */
 
     'saas' => [
-        // Eloquent model representing a tenant
-        'tenant_model' => null, // defaults to Stancl\Tenancy\Database\Models\Tenant
+        // Eloquent model que representa un tenant. Default: \Innertia\Saas\Models\Tenant
+        'tenant_model' => null,
 
-        // 'single' — all tenants share one database, models use BelongsToTenant + TenantScope
-        // 'multi'  — each tenant gets its own database (requires db_prefix)
+        // 'single' — todos los tenants comparten una DB; modelos usan HasTenant + TenantScope
+        // 'multi'  — cada tenant tiene su propia DB (requiere db_prefix)
         'db_strategy' => 'single',
 
-        // Only used when db_strategy = 'multi'. Tenant DB name: {prefix}{tenant_id}
+        // Solo usado cuando db_strategy = 'multi'. Tenant DB name: {prefix}{tenant_id}
         // 'db_prefix' => 'tenant_',
 
-        // Domains that host the central (landlord) application
+        // Dominios que sirven la app central (landlord), sin scoping por tenant.
         'central_domains' => [
             'localhost',
             '127.0.0.1',
         ],
 
-        // Base domain for client-facing API subdomain resolution.
-        // Set this to your API domain so only subdomains of it are resolved as tenants.
-        // e.g. 'api.tuproducto.com' → acme.api.tuproducto.com resolves tenant "acme"
-        // null → uses first subdomain segment of any host (less safe, fine for dev)
+        // Dominio base para resolución de tenants vía subdominio API.
+        // Setear al dominio del API para que solo sus subdominios resuelvan tenant.
+        // ej. 'api.tuproducto.com' → acme.api.tuproducto.com resuelve tenant "acme"
+        // null → usa primer segmento de subdominio de cualquier host (menos seguro, OK en dev)
         'api_domain' => env('INNERTIA_API_DOMAIN', null),
     ],
 

@@ -1,0 +1,204 @@
+# innertia-laravel — Contexto para Claude
+
+Framework Laravel interno de Innertia Solutions. Proporciona la capa de plataforma para
+backends single-app y SaaS. **No depende de stancl/tenancy** — manager de tenants propio.
+
+## Composición
+
+```
+src/
+├── Auth/                 # JWT, OTP, 2FA, OAuth, RBAC (roles, permissions, apps)
+├── Saas/                 # Multitenancy propio (Innertia::tenant(), HasTenant trait)
+├── Platform/             # Core: UseCase, DomainEvent, DomainGate, Organizations, Teams
+│   ├── Organizations/
+│   └── Teams/
+├── Settings/             # Config per-tenant + /preferences endpoints
+├── Notifications/        # Web notification center
+├── Webhooks/
+├── Mail/                 # InnertiaMailable con branding por-tenant
+├── Workflow/             # Engine de máquinas de estado
+├── Files/                # Storage + HasSingleFile trait
+├── DataTable/            # Server-side tables (paginación, sort, search, export)
+└── Telemetry/            # Métricas + logs internos
+```
+
+## Modos de operación
+
+`config('innertia.mode')`:
+
+| Modo | Multitenancy | Auth | Description |
+|------|-------------|------|-------------|
+| `app` | ❌ | ✅ | Single-tenant. App interna. |
+| `saas` | ✅ | ✅ | Multi-tenant via `X-Tenant` header. |
+| `api` | ❌ | ✅ JWT | API mode. Consumers manejan su propio scope. |
+
+## Features opt-in (config flags)
+
+| Feature | Flag | Install | Schema |
+|---|---|---|---|
+| Organizations | `INNERTIA_ORGANIZATIONS_ENABLED=true` | `php artisan innertia:organization:install` | Crea `organizations`, agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_apps`, y tablas declaradas |
+| Teams | `INNERTIA_TEAMS_ENABLED=true` | `php artisan innertia:teams:install` | Crea `teams`, `team_members` |
+
+Cada feature tiene un gate único:
+- `\Innertia\Platform\Organizations\OrganizationsFeature::isActive()`
+- `\Innertia\Platform\Teams\TeamsFeature::isActive()`
+
+## Sistema de permisos — combinaciones posibles
+
+RBAC con multiples fuentes de permisos. Cada usuario puede tener permisos asignados por:
+
+| # | Fuente | Cómo | Scope tenant | Scope org | Scope team | Ejemplo |
+|---|---|---|---|---|---|---|
+| 1 | **Direct grant** | `$user->givePermission('users.view')` | tenant actual | si activo, org actual | n/a | Pepe puede ver users en este tenant |
+| 2 | **Direct grant por org** | `$user->givePermission('users.view', $orgId)` | tenant | org específica | n/a | Pepe puede ver users SOLO en org A |
+| 3 | **Via rol del user** | `$user->assignRole('admin')` | tenant | org actual (si activo) | n/a | Pepe es admin → hereda permisos del rol |
+| 4 | **Via rol del user en org** | `$user->assignRole('admin', $orgId)` | tenant | org específica | n/a | Pepe es admin SOLO en org A |
+| 5 | **Via team membership** | `$user->teams()->attach($team)` + team con rol | tenant | org del team | team | Pepe en team Marketing → hereda roles del team |
+| 6 | **Via team con rol por org** | `model_roles(team_id, role_id, org=X)` | tenant | org X | team | Team Marketing tiene rol editor en org A |
+| 7 | **Entity grant directo** | `entity_permissions(entity, user_id, action)` | tenant | org del entity | n/a | Pepe tiene access al doc #42 específicamente |
+| 8 | **Entity grant via team** | `entity_permissions(entity, team_id, action)` | tenant | org del entity | team | Team Operations tiene edit en folder X |
+
+### Resolución
+
+`$user->resolvedPermissions()` o `/auth/me` consolida:
+```
+direct grants ∪ permisos de roles del user ∪ permisos de roles de teams del user
+filtered by OrganizationContext::scope() cuando organizations activo
+```
+
+`entity_permissions` se evalúan **por recurso** desde Gates, no entran en el array plano.
+
+### Apps (contexts)
+
+Capa independiente del RBAC: define qué áreas del sistema puede entrar el user.
+
+```
+user_apps (user_id, app, tenant_id, organization_id?)
+```
+
+Con orgs activo, un user puede tener acceso a apps distintas según la org:
+- `(pepe, technician, tenant_1, org_a)` — técnico en org A
+- `(pepe, backoffice, tenant_1, org_b)` — backoffice en org B
+
+## Tablas RBAC
+
+```
+permissions        (id, name, description)
+roles              (id, tenant_id?, organization_id?, name, description)
+role_permissions   (role_id, permission_id)
+model_roles        (model_type, model_id, role_id, organization_id?) ← polimórfico User|Team
+model_permissions  (model_type, model_id, permission_id, organization_id?) ← polimórfico
+entity_permissions (entity_type, entity_id, grantable_type, grantable_id, action) ← polimórfico
+user_apps          (user_id, app, tenant_id, organization_id?)
+teams              (id, tenant_id, organization_id?, name, parent_team_id?)
+team_members       (team_id, user_id, role_in_team [member|lead])
+```
+
+## Traits clave
+
+Aplicables al User model:
+
+```php
+use Innertia\Auth\RBAC\Traits\HasRoles;
+use Innertia\Auth\RBAC\Traits\HasApps;
+use Innertia\Platform\Traits\HasOrganization;    // si orgs ON
+use Innertia\Platform\Teams\Traits\HasTeams;     // si teams ON
+use Innertia\Platform\Traits\HasPreferences;
+
+class User extends Authenticatable {
+    use HasRoles, HasApps, HasOrganization, HasTeams, HasPreferences;
+}
+```
+
+Aplicables a modelos de negocio:
+
+| Trait | Función |
+|---|---|
+| `HasTenant` | Global scope por tenant_id, auto-inject al crear |
+| `HasOrganization` | Global scope por organization_id (cuando feature activo) |
+| `HasUuid` / `HasNanoId` | IDs no auto-incrementales |
+| `Auditable` | created_by / updated_by automático |
+| `HasHistory` | Registra cambios en entity_history |
+| `HasSingleFile` | Relación 1:1 con File |
+
+## Endpoints estándar
+
+| Endpoint | Acceso | Devuelve |
+|---|---|---|
+| `GET /status` | Público + X-Tenant | tenant info + features (organizations, teams, oauth, 2FA) + branding |
+| `GET /ping` | Público + X-Tenant | Alias deprecated de /status (shape antiguo) |
+| `GET /auth/me` | Privado | user + permissions + contexts + organizations (si feature on) + preferences |
+| `GET /auth/me/permissions` | Privado | roles + permisos consolidados |
+| `GET /preferences` | Privado | Todas las prefs del user |
+| `GET /preferences/{module}` | Privado | Prefs con prefix `{module}.` |
+| `PUT /preferences/{key}` | Privado | Upsert |
+| `DELETE /preferences/{key}` | Privado | Eliminar |
+
+Backward compat: `/auth/me/preferences*` siguen activas como aliases.
+
+## Use Cases
+
+```php
+class CreateOrder extends \Innertia\Platform\Contracts\UseCase
+{
+    public function __construct(public readonly string $customerId) {}
+    public function execute(): Order { /* ... */ }
+}
+
+$order = (new CreateOrder($id))->execute();
+(new CreateOrder($id))->onQueue();          // async
+```
+
+En SaaS, el `tenant_key` se captura en construcción y se restaura en queue.
+
+## Eventos
+
+```php
+class OrderCreated extends \Innertia\Platform\Events\DomainEvent {
+    public function key(): string { return 'orders.created'; }
+    public function audience(): array { return ['user:'.$this->order->customer_id]; }
+}
+
+event(new OrderCreated($order));
+```
+
+Broadcast vía Pusher/Reverb. Frontend recibe vía `useRealtime()`. `Subscription::matchesEvent('orders.*')` soporta wildcards.
+
+## Configuración
+
+```bash
+php artisan vendor:publish --tag=innertia-config
+php artisan vendor:publish --tag=innertia-routes  # si extiendes routes
+php artisan migrate
+```
+
+Variables principales:
+```env
+INNERTIA_MODE=saas
+INNERTIA_ORGANIZATIONS_ENABLED=false
+INNERTIA_TEAMS_ENABLED=false
+INNERTIA_API_DOMAIN=null
+```
+
+## Convenciones backend (productos que usan esta lib)
+
+```
+app/
+├── Domains/{Domain}/
+│   ├── Models/        # Eloquent
+│   ├── UseCases/      # Lógica de negocio
+│   ├── Services/      # Helpers
+│   ├── Events/        # DomainEvents
+│   ├── Listeners/     # Escuchas
+│   ├── Gates/         # Autorización
+│   ├── Enums/         # PHP 8.1+ backed enums
+│   ├── Mails/         # InnertiaMailable
+│   └── Observers/     # Eloquent observers
+└── Apps/{AppName}/
+    └── {Domain}/Controllers/  # Solo HTTP — delegan a UseCases
+```
+
+Reglas:
+- Controllers solo validan y delegan a UseCases. Sin lógica de negocio.
+- Models viven en `Domains/`, nunca en `app/Models/`.
+- IDs UUID via `HasUuid` o nanoid via `HasNanoId`.

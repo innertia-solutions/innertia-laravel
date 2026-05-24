@@ -1,482 +1,602 @@
 # innertia-solutions/laravel-innertia
 
-The Innertia internal framework. Provides the full platform layer for single-app and SaaS Laravel backends: auth, settings, gates, use cases, realtime events, exceptions, and mail.
-
-## Installation
+Framework interno de Innertia. Plataforma completa para backends Laravel single-app y SaaS:
+auth + RBAC, organizations, teams, settings, gates, use cases, eventos realtime, exceptions,
+mail, datatable, telemetry. Sin dependencias externas de multitenancy — manager propio.
 
 ```bash
 composer require innertia-solutions/laravel-innertia
 ```
 
-Auto-discovered by Laravel. Migrations load automatically.
+Auto-discovered por Laravel. Migrations cargan automáticamente.
 
 ---
 
-## Configuration
+## Tabla de contenidos
 
-Publish the config file:
+1. [Configuración](#configuración)
+2. [Modos de operación](#modos-de-operación)
+3. [SaaS / Multitenancy](#saas--multitenancy)
+4. [Sistema de permisos](#sistema-de-permisos)
+5. [Auth](#auth)
+6. [Organizations](#organizations)
+7. [Teams](#teams)
+8. [Endpoints estándar](#endpoints-estándar)
+9. [Use Cases](#use-cases)
+10. [Gates (Domain Permissions)](#gates-domain-permissions)
+11. [Settings](#settings)
+12. [Eventos realtime](#eventos-realtime)
+13. [Exceptions](#exceptions)
+14. [Mail](#mail)
+15. [DataTable](#datatable)
+16. [Activity Logger](#activity-logger)
+17. [Traits utilitarios](#traits-utilitarios)
+18. [Releasing](#releasing)
+
+---
+
+## Configuración
 
 ```bash
 php artisan vendor:publish --tag=innertia-config
+php artisan vendor:publish --tag=innertia-routes  # solo si extiendes routes
+php artisan migrate
 ```
 
-`config/innertia.php` controls the entire framework. The `mode` key is **hardcoded** (not an env var):
+Variables de entorno principales:
 
-```php
-return [
-    'mode' => 'app',   // 'app' | 'saas' | 'api'
-
-    'saas' => [
-        'tenant_model'    => null,      // defaults to Innertia\Models\Tenant
-        'db_strategy'     => 'single',  // 'single' | 'multi'
-        'db_prefix'       => 'tenant_',
-        'central_domains' => ['localhost', '127.0.0.1'],
-    ],
-
-    'auth' => [
-        'email_verification' => ['enabled' => false],
-        'otp'                => ['enabled' => false, 'ttl' => 10],
-        '2fa'                => ['enabled' => false],
-        'sessions'           => ['restrict_concurrent' => false],
-    ],
-];
+```env
+INNERTIA_MODE=saas                       # 'app' | 'saas' | 'api'
+INNERTIA_ORGANIZATIONS_ENABLED=false     # opt-in
+INNERTIA_TEAMS_ENABLED=false             # opt-in
+INNERTIA_API_DOMAIN=null                 # restringe resolución de tenants por subdominio
 ```
 
 ---
 
-## Organizations (opt-in)
+## Modos de operación
 
-Optional **second-level scoping** layer that sits on top of (or in place of) the Tenant layer. Enable it when you need to isolate data between business units, departments, client orgs, or subsidiaries — without forcing the full multi-tenant model on every request. Off by default; apps that don't opt in behave byte-identical to pre-0.3.0.
+Controlado por `config('innertia.mode')`:
 
-| Mode | Organizations support |
-|---|---|
-| `app` | ✅ Works — single-layer scoping |
-| `saas` | ✅ Works — second-layer scoping inside tenant |
-| `api` | ❌ Forcibly inactive — API consumers manage isolation |
+| Modo | Multitenancy | Auth | Use Cases | Eventos | Description |
+|------|-------------|------|-----------|---------|-------------|
+| `app` | ❌ | ✅ | ✅ | ✅ | Single-tenant. App interna. Sin X-Tenant header. |
+| `saas` | ✅ | ✅ | ✅ | ✅ | Multi-tenant. Identificación vía X-Tenant header + scoping automático. |
+| `api` | ❌ | ✅ (JWT) | ✅ | ✅ | API mode. Sin tenancy ni organizations (los API consumers manejan su scope). |
 
-**Activation checklist:**
+---
 
-1. Set `organizations.enabled => true` in `config/innertia.php`.
-2. List your domain tables under `organizations.tables`.
-3. Run `php artisan innertia:organization:install` then `php artisan migrate`.
-4. Add the `HasOrganization` trait to scoped models.
-5. Add `organization.resolve` + `organization.require` middleware to protected routes.
-6. Clients send the `X-Organization: <slug>` header per request.
+## SaaS / Multitenancy
 
-For the full guide, see [docs/organizations.md](docs/organizations.md).
+Manager propio basado en `Innertia::tenant()` — sin dependencias externas (stancl/tenancy se eliminó).
+
+### Cómo funciona
+
+1. Frontend (o cliente API) envía `X-Tenant: <slug>` en cada request
+2. Middleware `ResolveTenantFromHeader` busca el tenant por `key` y lo activa
+3. Modelos con `HasTenant` aplican global scope automático por `tenant_id`
+4. UseCases capturan el `tenant_key` en construcción y lo restauran al ejecutarse en queue
+
+### API
+
+```php
+use Innertia\Facades\Innertia;
+
+Innertia::tenant()           // Tenant|null — tenant activo
+Innertia::activate('acme')   // activa manualmente (CLI/tinker/jobs)
+Innertia::deactivate()
+Innertia::withTenant('acme', fn() => ...)  // scope temporal
+```
+
+### Routes públicas vs privadas
+
+- `routes/api.public.php` — sin auth (login, /status, OAuth callbacks)
+- `routes/api.private.php` — con auth (resto del API)
+
+### Trait `HasTenant`
+
+```php
+use Innertia\Saas\Traits\HasTenant;
+
+class Invoice extends Model {
+    use HasTenant;  // global scope por tenant_id, auto-fill al crear
+}
+```
+
+---
+
+## Sistema de permisos
+
+RBAC completo basado en roles + permisos nombrados, con herencia opcional via teams y scoping
+opcional por organización. Las tablas se crean por `php artisan migrate` (vienen en las migrations
+del paquete).
+
+### Estructura de tablas
+
+```
+permissions            (id uuid, name, description)
+roles                  (id uuid, tenant_id?, organization_id?, name, description)
+role_permissions       (role_id, permission_id)
+model_roles            (model_type, model_id, role_id, organization_id?)   ← polimórfico
+model_permissions      (model_type, model_id, permission_id, organization_id?) ← polimórfico
+entity_permissions     (entity_type, entity_id, grantable_type, grantable_id, action) ← polimórfico
+```
+
+**Polimorfismo:**
+- `model_roles.model_type` puede ser `User` **o `Team`** → roles asignables a equipos
+- `entity_permissions.grantable_type` puede ser `User` **o `Team`** → grants directos sobre recursos a un equipo
+
+### Combinaciones posibles de permisos
+
+Tabla completa de cómo un usuario puede tener acceso a algo:
+
+| # | Fuente del permiso | Cómo se asigna | Scope tenant | Scope org | Scope team | Ejemplo |
+|---|---|---|---|---|---|---|
+| 1 | **Direct grant** | `$user->givePermission('users.view')` | tenant actual | si activo, org actual | n/a | Pepe puede ver users en este tenant |
+| 2 | **Direct grant por org** | `$user->givePermission('users.view', $orgId)` | tenant | org específica | n/a | Pepe puede ver users SOLO en org A |
+| 3 | **Via rol del user** | `$user->assignRole('admin')` | tenant | org actual (si activo) | n/a | Pepe es admin → hereda permisos del rol admin |
+| 4 | **Via rol del user en org** | `$user->assignRole('admin', $orgId)` | tenant | org específica | n/a | Pepe es admin SOLO en org A |
+| 5 | **Via team membership** | `$user->teams()->attach($team)` + team tiene rol | tenant | org del team | team activo | Pepe en team Marketing → hereda roles del team |
+| 6 | **Via team con rol por org** | team tiene `model_roles(team_id, role_id, org=X)` | tenant | org X | team | Team Marketing tiene rol editor en org A |
+| 7 | **Entity grant directo** | `entity_permissions(entity, user_id, action)` | tenant | org del entity | n/a | Pepe tiene acceso al doc #42 específicamente |
+| 8 | **Entity grant via team** | `entity_permissions(entity, team_id, action)` | tenant | org del entity | team | Team Operations tiene edit-access a folder X |
+
+### Resolución de permisos en runtime
+
+Cuando consultas `$user->resolvedPermissions()` o `/auth/me`, el sistema **consolida** todas las fuentes:
+
+```
+resolved = direct grants ∪ permisos de roles del user ∪ permisos de roles de teams del user
+         filtered by OrganizationContext::scope() cuando organizations está activo
+```
+
+Los `entity_permissions` se consultan **caso por caso** desde Gates (no entran en el array plano de permisos),
+porque dependen del recurso específico que se accede.
+
+### Apps y contextos
+
+Capa independiente de los permisos: define **a qué áreas del sistema puede entrar un usuario**.
+
+```
+user_apps              (user_id, app, tenant_id, organization_id?)
+```
+
+Tabla con un row por (user, app, [organization]). El user "puede entrar a la app backoffice" — los
+permisos finos los resuelve el RBAC anterior. Con organizations activo, un user puede tener acceso
+a apps distintas según la org.
+
+```php
+$user->grantApp('backoffice')                  // sin org
+$user->grantApp('technician', organizationId: 5)
+$user->appKeys()                                // ['backoffice', 'technician'] (en scope actual)
+$user->appKeysInOrganization(5)                // apps que tiene en org 5
+$user->accessibleOrganizationsByApp()          // { backoffice: [1,2], technician: [5] }
+```
+
+### Helpers en User model
+
+```php
+use Innertia\Auth\RBAC\Traits\HasRoles;
+use Innertia\Auth\RBAC\Traits\HasApps;
+use Innertia\Platform\Traits\HasOrganization;       // si orgs activo
+use Innertia\Platform\Teams\Traits\HasTeams;        // si teams activo
+
+class User extends Authenticatable {
+    use HasRoles, HasApps, HasOrganization, HasTeams;
+}
+```
+
+### Cache
+
+Permisos y apps tienen cache por TTL configurable (`innertia.cache.ttl` minutos, default 60). El
+cache key incluye `tenant_id` y un fingerprint del `OrganizationContext::scope()` para no servir
+resultados stale cuando el user cambia de org.
 
 ---
 
 ## Auth
 
-Drop-in JWT auth layer. Register routes from `routes/api.php`:
+JWT-based. Configurable, soporta OTP, 2FA, email verification, OAuth (Google/Microsoft/GitHub),
+password recovery, demo mode.
+
+### Configuración
+
+Vive en `config('innertia.auth')` y en `settings` de DB (publicables por tenant).
+
+### Endpoints incluidos
+
+```
+POST   /auth/login                     # email + password
+POST   /auth/logout
+POST   /auth/refresh
+GET    /auth/me                        # identidad completa (ver sección)
+GET    /auth/me/permissions            # roles + permisos consolidados
+POST   /auth/otp/send
+POST   /auth/otp/verify
+POST   /auth/2fa/enable
+POST   /auth/2fa/disable
+POST   /auth/2fa/verify
+POST   /auth/email/verify/send
+GET    /auth/email/verify
+POST   /auth/password/change
+POST   /auth/password/set
+POST   /auth/password/forgot
+POST   /auth/password/reset
+GET    /auth/{provider}/redirect       # OAuth: google|microsoft|github
+GET    /auth/{provider}/callback
+```
+
+### Flujos de login
+
+| Flujo | Trigger | Pasos |
+|---|---|---|
+| **A — Estándar** | features mínimas | login → token |
+| **B — OTP enabled** | tenant tiene OTP on | login → 200 `{ otp_required: true }` → verify OTP → token |
+| **C — Force password change** | admin seteo `force_password_change=true` | login → 200 `{ requires_password_change: true }` → change → token |
+| **D — Email verification** | invitación sin password | invitación con token → set password → email verify → token |
+| **E — Force change + email verify** | combo | login → password change → email verify → token |
+| **F — Todo activo** | features completas | login + 2FA + OTP + email verify |
+
+### Flags del User
+
+| Campo | Significado |
+|---|---|
+| `force_password_change` | Próximo login pide cambio |
+| `two_factor_enabled` | 2FA TOTP activo |
+| `email_verified_at` | Email confirmado |
+| `seen_at` | Última actividad |
+
+---
+
+## Organizations
+
+Sub-tenant scoping. Opt-in via `innertia.organizations.enabled`. Cada tenant puede tener N orgs;
+modelos con `HasOrganization` se filtran automáticamente por la org activa.
+
+### Activación
+
+```bash
+INNERTIA_ORGANIZATIONS_ENABLED=true
+php artisan innertia:organization:install
+php artisan migrate
+```
+
+El install crea:
+- Tabla `organizations`
+- Agrega `organization_id` (nullable) a las tablas declaradas en `innertia.organizations.tables`
+- Agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_apps` (RBAC + identity scoping)
+
+### Headers
+
+```
+X-Organization: <slug>     # org activa (writes + reads scope)
+X-Consolidated: true       # opcional: scope expandido a todas las orgs accesibles del user
+```
+
+### Conceptos
 
 ```php
-\Innertia\Auth\AuthManager::routes();
-// or with prefix + middleware:
-\Innertia\Auth\AuthManager::routes(prefix: 'v1/auth', middleware: ['throttle:10,1']);
+Innertia::organization()->current()   // int|null — UNA org para writes
+Innertia::organization()->scope()     // array<int> — set de org ids para reads
+Innertia::organization()->withOrganization(5, fn() => ...)
 ```
 
-Configure `config/auth.php` to use the JWT guard:
+`current` se usa al crear (HasOrganization auto-inyecta). `scope` se usa al leer (global scope).
+Default: `scope = [current]`. En vista consolidada: `scope` puede contener N orgs (el set que el
+user puede ver).
+
+### Trait `HasOrganization`
 
 ```php
-'guards' => [
-    'api' => ['driver' => 'jwt', 'provider' => 'users'],
-],
+use Innertia\Platform\Traits\HasOrganization;
+
+class Asset extends Model {
+    use HasTenant, HasOrganization;
+}
+
+// Al crear: organization_id = current() automáticamente
+// Al leer: WHERE organization_id IN (scope())
 ```
 
-Protected routes use the `Innertia\Auth\Middleware\Authenticate` middleware.
+### Middlewares
 
-### Auth settings are stored in the database
+- `organization.resolve` — lee `X-Organization` y popula context
+- `organization.require` — 400 si no hay org activa cuando se requiere
 
-All auth feature flags are read from the **Settings system** at runtime, not from `config/innertia.php`. This means each app (or each tenant in saas mode) can have its own auth configuration without a deployment.
+---
 
-Set them via `Settings::set()` — typically from an admin panel or via the Olimpo API:
+## Teams
+
+Agrupación de usuarios para asignación colectiva de roles y permisos. Opt-in via `innertia.teams.enabled`.
+**Independiente de Organizations** — teams pueden ser tenant-wide (sin orgs) o org-scoped (con orgs).
+
+### Activación
+
+```bash
+INNERTIA_TEAMS_ENABLED=true
+php artisan innertia:teams:install
+php artisan migrate
+```
+
+Crea tablas:
+- `teams (id uuid, tenant_id, organization_id NULLABLE, parent_team_id, name, description)`
+- `team_members (team_id, user_id, role_in_team [member|lead], joined_at)`
+
+### Combinaciones
+
+| Orgs | Teams | Resultado |
+|---|---|---|
+| OFF | OFF | Solo users + roles individuales |
+| OFF | ON | Teams a nivel tenant. Pattern típico para SaaS pequeño con grupos de permisos |
+| ON | OFF | Multi-org con users sueltos. Cada user permisos individuales |
+| ON | ON | Enterprise. Teams pueden ser tenant-wide (`organization_id=NULL`) o por org |
+
+### Trait `HasTeams`
 
 ```php
-Settings::set('auth.email_verification.enabled', true);
-Settings::set('auth.otp.enabled', true);
-Settings::set('auth.otp.ttl', 10);           // minutes
-Settings::set('auth.2fa.enabled', true);
-Settings::set('auth.sessions.restrict_concurrent', true);
+use Innertia\Platform\Teams\Traits\HasTeams;
+
+class User extends Authenticatable {
+    use HasTeams;
+}
+
+$user->teams()                  // BelongsToMany
+$user->teamIds()                // array<string>
+$user->rolesViaTeams()          // Collection<Role>
+$user->permissionsViaTeams()    // array<string>
 ```
 
-The values in `config/innertia.php` under `auth` are fallback defaults used only when no DB value has been set.
+### Asignar roles a teams
 
-### Sessions
-
-Every successful login is recorded in the `user_sessions` table with `user_id`, `tenant_id` (saas only), `token_hash`, `device_id` (from `X-Device-Id` header), `ip`, `browser`, and `expires_at`. With `sessions.restrict_concurrent = true`, older sessions from other devices are invalidated on each new login.
-
-### Routes
-
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| POST | `/auth/login` | — | Credentials → token or challenge |
-| POST | `/auth/otp/send` | — | Send OTP to user's email |
-| POST | `/auth/otp/verify` | — | Verify OTP → token or next challenge |
-| POST | `/auth/2fa/verify` | — | Verify TOTP code → token |
-| POST | `/auth/email/verify/send` | — | Send email verification OTP |
-| POST | `/auth/email/verify` | — | Verify email OTP → token or next challenge |
-| POST | `/auth/password/change` | — | Change password after force_password_change (post-OTP) |
-| POST | `/auth/password/set` | — | Set password from invitation flow (post-OTP) |
-| GET  | `/auth/me` | ✓ | Authenticated user |
-| POST | `/auth/refresh` | ✓ | Refresh JWT |
-| POST | `/auth/logout` | ✓ | Invalidate token + session |
-| POST | `/auth/2fa/enable` | ✓ | Enrol in 2FA (returns QR code URL) |
-| POST | `/auth/2fa/disable` | ✓ | Disable 2FA |
-
-### Login check order
-
-On every login attempt the following checks run in strict order. The first match returns a challenge instead of a token:
-
-```
-1. Invalid credentials              → 422
-
-2. force_password_change = true     → OTP always sent (proves email ownership)
-                                    → { requires_password_change: true, user_id }
-
-3. email_verified_at = null
-   + email_verification.enabled     → { requires_email_verification: true, user_id }
-
-4. otp.enabled                      → OTP sent
-                                    → { requires_otp: true, user_id }
-
-5. user.two_factor_enabled = true   → { requires_2fa: true, user_id }
-
-6.                                  → { token, user }
+```php
+$team = Team::find('...');
+$team->assignRole('editor');   // ahora todos los members heredan permisos de 'editor'
 ```
 
-`force_password_change` OTP implicitly covers email verification — completing the password change marks `email_verified_at` as well, so a second OTP is never sent.
+### Recursos a teams
 
-### Flow A — Standard login
+`entity_permissions` es polimórfico, así que se puede dar acceso directo a una entidad a un team:
 
-```
-POST /auth/login  { email, password, app }
-→ { token, user }
-```
-
-### Flow B — OTP enabled
-
-```
-POST /auth/login  { email, password, app }
-→ { requires_otp: true, user_id }
-
-POST /auth/otp/verify  { user_id, code, action: "login", app }
-→ { token, user }
-  | { requires_2fa: true, user_id }      ← if user has 2FA enrolled
-
-POST /auth/2fa/verify  { user_id, code }
-→ { token, user }
+```php
+// Dar acceso de edit al folder #42 al team Marketing
+EntityPermission::create([
+    'entity_type'   => Folder::class,
+    'entity_id'     => 42,
+    'grantable_type' => Team::class,
+    'grantable_id'  => $marketingTeam->id,
+    'action'        => 'edit',
+]);
 ```
 
-### Flow C — force_password_change (admin set a temporary password)
+Todos los miembros del team heredan ese acceso vía resolución de gates.
 
-OTP is **always** sent on login regardless of `otp.enabled`. Completing the flow also marks the email as verified.
+---
 
-```
-POST /auth/login  { email, password, app }
-→ OTP sent automatically
-→ { requires_password_change: true, user_id }
+## Endpoints estándar
 
-POST /auth/otp/verify  { user_id, code, action: "login", app }
-→ { requires_password_change: true, user_id }   ← force_password_change still active
+Disponibles automáticamente. Combinables con las routes propias de cada producto.
 
-POST /auth/password/change  { user_id, password, password_confirmation, app }
-→ clears force_password_change, marks email_verified_at
-→ { token, user }
-  | { requires_2fa: true, user_id }
+### Estado del tenant
 
-POST /auth/2fa/verify  { user_id, code }
-→ { token, user }
+```http
+GET /status                            # con header X-Tenant
 ```
 
-### Flow D — Email verification enabled, no password on user creation (invitation)
-
-Used when `email_verification.enabled = true` and the user is created without a password (invitation flow).
-
-```
-POST /auth/email/verify/send  { user_id }
-→ signed email link sent (action: email_verification)
-
-GET /auth/email/verify?user_id=...&signature=...&app=...
-→ marks email_verified_at
-→ { token, user }
-  | { requires_otp: true, user_id }   ← if otp.enabled
-  | { requires_2fa: true, user_id }   ← if 2fa.enabled
-
-── Invitation (user has no password yet) ──
-
-POST /auth/otp/verify  { user_id, code, action: "login", app }
-→ { requires_password_set: true, user_id }   ← user has no password
-
-POST /auth/password/set  { user_id, password, password_confirmation, app }
-→ marks email_verified_at
-→ { token, user }
-  | { requires_2fa: true, user_id }
-
-POST /auth/2fa/verify  { user_id, code }
-→ { token, user }
+Response:
+```json
+{
+  "ok": true,
+  "tenant": { "id": 1, "key": "acme", "name": "Acme", "status": "active", "isActive": true },
+  "features": {
+    "organizations": true,
+    "teams": false,
+    "twoFactor": true,
+    "oauth": ["google", "microsoft"]
+  },
+  "branding": { "demo": { "email": "demo@acme.com", "password": "demo123" } }
+}
 ```
 
-### Flow E — force_password_change + email_verification enabled
+`GET /ping` queda como alias deprecated (shape antiguo) por backward compat.
 
-Collapses into Flow C — the OTP from `force_password_change` covers email verification. No second OTP is sent.
+### Identidad
 
-### Flow F — All features active (email verified, OTP + 2FA enabled)
-
-```
-POST /auth/login  { email, password, app }
-→ { requires_otp: true, user_id }
-
-POST /auth/otp/verify  { user_id, code, action: "login", app }
-→ { requires_2fa: true, user_id }
-
-POST /auth/2fa/verify  { user_id, code }
-→ { token, user }
+```http
+GET /auth/me                          # con auth
 ```
 
-### User flags
+Response:
+```json
+{
+  "user": { "id": "...", "name": "...", "email": "...", "apps": [...] },
+  "permissions": ["users.view", "users.manage", ...],
+  "contexts": ["backoffice", "technician"],
+  "organizations": {
+    "backoffice": [{ "id": 1, "key": "acme-cl", "name": "Acme Chile" }],
+    "technician": [
+      { "id": 1, "key": "acme-cl", "name": "Acme Chile" },
+      { "id": 2, "key": "acme-pe", "name": "Acme Perú" }
+    ]
+  },
+  "preferences": { "appearance": "dark", "language": "es" }
+}
+```
 
-| Column | Type | Description |
-|--------|------|-------------|
-| `email_verified_at` | timestamp nullable | Set when email is verified |
-| `force_password_change` | boolean | Forces password change + OTP on next login |
-| `two_factor_secret` | text nullable | Encrypted TOTP secret |
-| `two_factor_enabled` | boolean | Whether 2FA is active for this user |
+- `contexts` reemplaza a `availableContexts` (mantenido como alias deprecated)
+- `organizations` solo aparece cuando feature está activo
+
+### Preferencias del usuario
+
+```http
+GET    /preferences                   # todas las prefs públicas
+GET    /preferences/{module}          # filtradas por prefix '{module}.*'
+PUT    /preferences/{key}             # upsert
+DELETE /preferences/{key}             # eliminar
+```
+
+Convención: las keys se nombran `{module}.{key}` (ej. `tables.workers.columns`, `dashboard.layout`).
+`GET /preferences/tables` devuelve solo las del módulo tables, con keys sin el prefix.
+
+Las rutas viejas `/auth/me/preferences*` siguen activas como aliases deprecated.
 
 ---
 
 ## Use Cases
 
-Single class: typed constructor params, typed return, sync or async.
+Capa de lógica de negocio. Extienden `\Innertia\Platform\Contracts\UseCase`. Reciben parámetros en
+constructor, devuelven resultado desde `execute()`. Soportan ejecución sincrónica o en queue.
 
 ```php
+namespace App\Domains\Orders\UseCases;
+
+use App\Domains\Orders\Models\Order;
 use Innertia\Platform\Contracts\UseCase;
 
 class CreateOrder extends UseCase
 {
     public function __construct(
-        public readonly string  $customerId,
-        public readonly array   $items,
-        public readonly ?string $notes = null,
+        public readonly string $customerId,
+        public readonly float  $total,
     ) {}
 
-    public function execute(): Order
-    {
+    public function execute(): Order {
         return Order::create([
             'customer_id' => $this->customerId,
-            'items'       => $this->items,
-            'notes'       => $this->notes,
+            'total'       => $this->total,
         ]);
     }
 }
 ```
 
+Ejecución:
+
 ```php
-// Sync
-$order = (new CreateOrder(customerId: '...', items: [...]))->execute();
+// Sincrónico:
+$order = (new CreateOrder('...', 99.9))->execute();
 
-// Async — default 'use-cases' queue
-(new CreateOrder(customerId: '...', items: [...]))->onQueue();
-
-// Async — specific queue
-(new CreateOrder(customerId: '...', items: [...]))->onQueue('critical');
-
-// Async — with delay
-(new CreateOrder(customerId: '...', items: [...]))->delay(now()->addMinutes(5));
+// Cola:
+(new CreateOrder('...', 99.9))->onQueue();
+(new CreateOrder('...', 99.9))->onQueue('critical');
+(new CreateOrder('...', 99.9))->delay(now()->addMinutes(5));
 ```
 
-Run the dedicated worker:
-
-```bash
-php artisan queue:work --queue=use-cases
-```
+**SaaS:** el tenant_key se captura en el constructor y se restaura automáticamente en queue.
 
 ---
 
 ## Gates (Domain Permissions)
 
-One gate class per domain. All abilities defined as methods. Registered explicitly from the domain's service provider — no filesystem scanning.
+Gates de Laravel reescritos como clases en `app/Domains/{Domain}/Gates/`. Extienden
+`\Innertia\Platform\Contracts\DomainGate`.
 
 ```php
-// app/Domains/Orders/OrdersGate.php
+namespace App\Domains\Orders\Gates;
+
+use App\Domains\Orders\Models\Order;
+use App\Domains\Users\Models\User;
 use Innertia\Platform\Contracts\DomainGate;
 
-class OrdersGate extends DomainGate
+class ViewOrder extends DomainGate
 {
-    public function manage(User $user, Order $order): bool
-    {
-        return $user->hasPermission('orders.manage');
-    }
-
-    public function view(User $user): bool
-    {
-        return true;
+    public function check(User $user, Order $order): bool {
+        return $user->hasPermission('orders.view')
+            && $user->id === $order->customer_id;
     }
 }
 ```
+
+Uso:
 
 ```php
-// app/Domains/Orders/OrdersServiceProvider.php
-use Innertia\Platform\Support\DomainServiceProvider;
-
-class OrdersServiceProvider extends DomainServiceProvider
-{
-    public function boot(): void
-    {
-        $this->registerGate(OrdersGate::class);
-        // registers: 'orders.manage', 'orders.view'
-    }
-}
+Gate::authorize('view-order', $order);
 ```
 
-Convention: `OrdersGate::manage` → `'orders.manage'`, `OrdersGate::view` → `'orders.view'`.
-
-Superadmins bypass all gates automatically (requires `isSuperAdmin()` on the User model).
+Gates se autodescubren via convención de namespace.
 
 ---
 
 ## Settings
 
-Global (app mode) or per-tenant with platform fallback (saas mode). Same API in both modes.
+Configuración por tenant, persistida en DB. Cast automático (`string`, `boolean`, `integer`, `json`,
+`encrypted`).
 
 ```php
 use Innertia\Facades\Settings;
 
-Settings::set('invoice.prefix', 'INV-');
-Settings::get('invoice.prefix');              // 'INV-'
-Settings::get('invoice.prefix', 'DEFAULT');   // with fallback
-Settings::getGroup('invoice');                // all keys under 'invoice'
-Settings::forget('invoice.prefix');
+Settings::set('auth.otp_enabled', true, 'boolean');
+Settings::get('auth.otp_enabled');                 // bool
+Settings::get('auth.otp_enabled', false);          // con default
+Settings::scope('auth.*')->toArray();              // todas las claves del scope
 ```
 
-In saas mode, `Settings` resolves to the active tenant automatically and falls back to platform-level settings when the tenant has no value set.
+Settings públicas (visibles al frontend) usan `Settings::setPublic(...)`.
 
 ---
 
-## Realtime Events
+## Eventos realtime
 
-Extend `RealtimeEvent` to auto-broadcast on dispatch. Implements `ShouldBroadcast`.
+`DomainEvent` extensible para events que se broadcast a usuarios.
 
 ```php
-use Innertia\Platform\Events\RealtimeEvent;
-use Illuminate\Broadcasting\PrivateChannel;
+use Innertia\Platform\Events\DomainEvent;
 
-class OrderShipped extends RealtimeEvent
+class OrderCreated extends DomainEvent
 {
-    public function __construct(public readonly Order $order) {}
-
-    public function channel(): Channel
-    {
-        return new PrivateChannel('tenant.' . tenant('id'));
+    public function key(): string {
+        return 'orders.created';
     }
 
-    public function broadcastWith(): array
-    {
-        return ['order_id' => $this->order->id, 'status' => $this->order->status];
+    public function audience(): array {
+        return ['user:'.$this->order->customer_id];
     }
 }
-
-// Dispatches and broadcasts automatically:
-OrderShipped::dispatch($order);
 ```
 
-Default channel: private channel named after the class in kebab-case. Default payload: all public properties via reflection. Override `channel()`, `broadcastAs()`, or `broadcastWith()` as needed.
+El sistema:
+- Dispara via `event(new OrderCreated($order))`
+- Broadcast vía Pusher / Reverb / canal configurado
+- Frontend `useRealtime()` recibe y reacciona
+
+`Subscription::matchesEvent('orders.*')` soporta wildcards dot-notation.
 
 ---
 
 ## Exceptions
 
-Register in `bootstrap/app.php`:
+`InnertiaExceptionHandler::register($exceptions)` — register handler global en
+`bootstrap/app.php`. Convierte:
 
-```php
-use Innertia\Exceptions\InnertiaExceptionHandler;
-
-->withExceptions(function (Exceptions $exceptions) {
-    InnertiaExceptionHandler::register($exceptions);
-})
-```
-
-Consistent JSON responses for all API errors:
-
-```json
-{ "message": "Resource not found.", "error": "not_found", "errors": {} }
-```
-
-Throw from anywhere:
-
-```php
-use Innertia\Exceptions\NotFoundException;
-use Innertia\Exceptions\ForbiddenException;
-use Innertia\Exceptions\ConflictException;
-use Innertia\Exceptions\UnprocessableException;
-
-throw new NotFoundException('Invoice not found.');
-throw new ForbiddenException();
-throw new ConflictException('Email already in use.');
-throw new UnprocessableException('Invalid data.', ['field' => ['error']]);
-```
-
-Laravel's `ValidationException`, `AuthenticationException`, `ModelNotFoundException`, and Spatie's `UnauthorizedException` are also handled automatically. In production, unexpected 500 errors never expose internal details.
+- `ConflictException` → 409
+- `NotFoundException` → 404
+- `ValidationException` (Innertia) → 422 con shape `{ errors: { field: [msg] } }`
+- `PermissionException` → 403
+- Resto → 500 con trace en debug
 
 ---
 
 ## Mail
 
-Extend `InnertiaMailable`. Define `subject()` and `view()`. All public constructor properties are passed to the view automatically.
+`InnertiaMailable` extiende `Mailable` con:
+- Branding del tenant (logo, colors via `tenant.configs`)
+- Templates Blade con layout `mail::layouts.tenant`
+- Settings de SMTP por-tenant
 
 ```php
+namespace App\Domains\Orders\Mails;
+
 use Innertia\Mail\InnertiaMailable;
 
-class WelcomeMail extends InnertiaMailable
-{
-    public function __construct(public readonly string $name) {}
-
-    public function subject(): string { return 'Welcome to ' . config('app.name'); }
-
-    public function view(): string { return 'emails.welcome'; }
-}
-
-Mail::to($user)->send(new WelcomeMail(name: $user->name));
-```
-
-Publish and override the built-in mail views (OTP, layout):
-
-```bash
-php artisan vendor:publish --tag=innertia-mail-views
-```
-
----
-
-## SaaS / Tenancy
-
-Set `mode = 'saas'` in `config/innertia.php`. Tenancy is configured programmatically — no need to publish `config/tenancy.php`.
-
-Ensure provider order in `bootstrap/providers.php`:
-
-```php
-return [
-    Innertia\InnertiaServiceProvider::class,   // first
-    Stancl\Tenancy\TenancyServiceProvider::class,
-    App\Providers\AppServiceProvider::class,
-];
-```
-
-And in `composer.json`:
-
-```json
-"extra": {
-    "laravel": {
-        "dont-discover": ["innertia-solutions/laravel-innertia", "stancl/tenancy"]
+class OrderConfirmation extends InnertiaMailable {
+    public function build() {
+        return $this->view('mails.order-confirmation')
+            ->subject('Tu pedido fue confirmado');
     }
 }
 ```
 
 ---
 
-## Other Utilities
-
-### DataTable
+## DataTable
 
 ```php
 use Innertia\Facades\DataTable;
@@ -488,30 +608,49 @@ $result = DataTable::create('users')
     ->make();
 ```
 
-### Activity Logger
+Soporta paginación server-side, sort por columna, filtros por columna, search, export (xlsx/csv/pdf/json).
+
+---
+
+## Activity Logger
 
 ```php
 use Innertia\Facades\ActivityLogger;
 
 ActivityLogger::logUserAction('login');
-ActivityLogger::logEntityAction('updated', 'invoice', $invoice->id, 'Changed amount');
+ActivityLogger::logEntityAction('updated', 'invoice', $invoice->id, 'Cambió el monto');
 ActivityLogger::logSecurityAction('password_changed');
 ```
 
-### Traits
+Persiste en `activity_log` table. Visible vía `EntityHistory` trait.
 
-| Trait | Description |
-|-------|-------------|
-| `HasNanoId` | Nano IDs instead of auto-increment PKs |
-| `HasHistory` | Auto-record entity history on model events |
-| `Auditable` | Track `created_by` / `updated_by` |
-| `UseEnumWithValues` | Helper methods for PHP 8.1+ backed enums |
+---
+
+## Traits utilitarios
+
+| Trait | Descripción |
+|---|---|
+| `HasNanoId` | Nano IDs en vez de auto-increment PKs |
+| `HasUuid` | UUIDs |
+| `HasHistory` | Auto-record de cambios en `entity_history` |
+| `Auditable` | Track `created_by` / `updated_by` automáticamente |
+| `HasTenant` | Global scope + auto-inject por tenant (SaaS mode) |
+| `HasOrganization` | Global scope + auto-inject por organization (cuando feature activo) |
+| `HasApps` | Tabla user_apps + appKeys() + grantApp/revokeApp |
+| `HasRoles` | RBAC roles, permissions |
+| `HasTeams` | Membership a teams + permission inheritance |
+| `HasPreferences` | Preferencias del user (key/value con cast) |
+| `HasSingleFile` | Relación 1:1 con File (avatar, logo, etc.) |
+| `UseEnumWithValues` | Helpers para enums PHP 8.1+ con `values()`, `labels()`, `options()` |
 
 ---
 
 ## Releasing
 
-Use the **Release** GitHub Actions workflow (`workflow_dispatch`). Select `patch`, `minor`, or `major`. The workflow creates and pushes the git tag — Packagist auto-updates via webhook.
+Workflow `Release` de GitHub Actions (`workflow_dispatch`). Elegir `patch`, `minor` o `major`. El
+workflow crea + pushea el tag — Packagist se actualiza vía webhook.
+
+---
 
 ## License
 
