@@ -303,6 +303,76 @@ class Asset extends Model {
 - `organization.resolve` — lee `X-Organization` y popula context
 - `organization.require` — 400 si no hay org activa cuando se requiere
 
+### Rutas CRUD (opt-in)
+
+El paquete trae un controller default y un helper para montar las rutas:
+
+```php
+// routes/api.private.php
+Route::middleware(['auth:api', 'tenant.require'])->group(function () {
+    \Innertia\Platform\Organizations\Routes::register();
+    // GET/POST     /organizations
+    // GET/PUT/DELETE /organizations/{id}
+});
+```
+
+Argumentos opcionales: `Routes::register(prefix: 'admin/orgs', controller: \App\OrgsController::class)`.
+
+### Extender el modelo y agregar campos propios
+
+Patrón en 5 pasos para, por ejemplo, agregar `owner_id`:
+
+```php
+// 1. Migration de la app
+Schema::table('organizations', fn ($t) => $t->uuid('owner_id')->nullable());
+
+// 2. Modelo extendido
+class Organization extends \Innertia\Platform\Organizations\Models\Organization {
+    protected $fillable = [...parent::$fillable, 'owner_id'];
+    public function owner() { return $this->belongsTo(User::class, 'owner_id'); }
+}
+
+// 3. config('innertia.organizations.model') = App\Models\Organization::class
+
+// 4. Controller extendido — hooks `extraStoreRules`, `extraUpdateRules`, `extraFields`
+class OrganizationsController extends \Innertia\Platform\Organizations\Http\Controllers\OrganizationsController {
+    protected function extraStoreRules(): array {
+        return ['owner_id' => 'required|uuid|exists:users,id'];
+    }
+    protected function extraUpdateRules(): array {
+        return ['owner_id' => 'sometimes|uuid|exists:users,id'];
+    }
+    protected function extraFields(Request $r, $org = null): array {
+        return array_filter(['owner_id' => $r->input('owner_id')], fn ($v) => $v !== null);
+    }
+    protected function indexColumns(): array {
+        return [...parent::indexColumns(), 'owner_id'];
+    }
+}
+
+// 5. Mount con el controller de la app
+Routes::register('organizations', \App\Http\OrganizationsController::class);
+```
+
+### Niveles de extensibilidad
+
+| Necesidad | Mecanismo |
+|---|---|
+| Agregar columnas y validaciones | Hooks `extraFields` + `extraStoreRules` en controller |
+| Cambiar mapping de atributos (rename, transform, defaults) | Extender UseCase + override `attributes()` |
+| Side-effects post-create (eventos, notifs, queues) | Extender UseCase + override `execute()` |
+| Reemplazar UseCase entero | Subclase + container bind + override método del controller que lo llama |
+| Reemplazar controller entero | Forkear y montar via `Routes::register('orgs', App\Controller::class)` |
+
+### Artisan commands
+
+```bash
+php artisan innertia:organization:create {tenant} {key} {name} [--inactive]
+php artisan innertia:organization:list [--tenant=]
+php artisan innertia:organization:install [--force]   # --force genera incremental cuando cambias config.tables
+php artisan innertia:organization:check               # verifica coherencia trait ↔ config ↔ schema
+```
+
 ---
 
 ## Teams
@@ -332,6 +402,8 @@ Crea tablas:
 | ON | ON | Enterprise. Teams pueden ser tenant-wide (`organization_id=NULL`) o por org |
 
 ### Trait `HasTeams`
+
+El trait ya se aplica automáticamente en `\Innertia\Auth\Models\User` (la base) — cuando el feature está disabled es no-op y no agrega overhead. Si tenés tu propio User que NO extiende la base, agrégalo manualmente:
 
 ```php
 use Innertia\Platform\Teams\Traits\HasTeams;
@@ -369,6 +441,60 @@ EntityPermission::create([
 ```
 
 Todos los miembros del team heredan ese acceso vía resolución de gates.
+
+### Rutas CRUD (opt-in)
+
+```php
+Route::middleware(['auth:api', 'tenant.require'])->group(function () {
+    \Innertia\Platform\Teams\Routes::register();
+    // GET/POST     /teams
+    // GET/PUT/DELETE /teams/{id}
+    // PUT          /teams/{id}/members   { members: [{user_id, role_in_team}] }
+});
+```
+
+`Routes::register(prefix, controller)` para customizar prefijo o controller.
+
+### Extender Team con campos propios
+
+Mismo patrón que Organizations. Hooks disponibles en el controller:
+
+- `extraStoreRules()` / `extraUpdateRules()` — reglas de validación adicionales
+- `extraFields(Request, ?Team)` — mapping request → atributos del modelo
+- `showRelations()` — relaciones eager-load en `GET /teams/{id}`
+
+Ejemplo agregando `color` y `avatar`:
+
+```php
+class TeamsController extends \Innertia\Platform\Teams\Http\Controllers\TeamsController {
+    protected function extraStoreRules(): array {
+        return [
+            'color'  => 'nullable|string|max:32',
+            'avatar' => 'nullable|string|max:100',
+        ];
+    }
+    protected function extraUpdateRules(): array { return $this->extraStoreRules(); }
+    protected function extraFields(Request $r, $team = null): array {
+        return array_filter(
+            ['color' => $r->input('color'), 'avatar' => $r->input('avatar')],
+            fn ($v) => $v !== null,
+        );
+    }
+    protected function showRelations(): array {
+        return [...parent::showRelations(), 'members.worker:id,user_id,position'];
+    }
+}
+```
+
+El `SyncTeamMembers` UseCase preserva el `joined_at` original de los miembros existentes — solo se actualiza `role_in_team` cuando cambia.
+
+### Artisan commands
+
+```bash
+php artisan innertia:team:create {tenant} {name} [--description=] [--parent=] [--org=]
+php artisan innertia:team:list [--tenant=]
+php artisan innertia:teams:install [--force]
+```
 
 ---
 
@@ -418,12 +544,18 @@ Response:
       { "id": 2, "key": "acme-pe", "name": "Acme Perú" }
     ]
   },
+  "current_organization": { "id": 1, "key": "acme-cl", "name": "Acme Chile", "active": true },
+  "teams": [
+    { "id": "uuid-...", "name": "Comité de Calidad", "parent_team_id": null, "organization_id": 1, "role_in_team": "lead" }
+  ],
   "preferences": { "appearance": "dark", "language": "es" }
 }
 ```
 
 - `contexts` reemplaza a `availableContexts` (mantenido como alias deprecated)
-- `organizations` solo aparece cuando feature está activo
+- `organizations` solo aparece cuando OrganizationsFeature está activo
+- `current_organization` aparece solo cuando el request trajo `X-Organization` válido
+- `teams` aparece solo cuando TeamsFeature está activo
 
 ### Preferencias del usuario
 
