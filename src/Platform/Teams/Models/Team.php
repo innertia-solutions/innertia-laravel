@@ -9,7 +9,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Innertia\Auth\RBAC\Models\Role;
 use Innertia\Auth\RBAC\Traits\HasRoles;
-use Innertia\Traits\HasUuid;
+use Innertia\Platform\Traits\HasUuid;
 
 /**
  * Team — agrupación de usuarios para asignar roles y permisos colectivamente.

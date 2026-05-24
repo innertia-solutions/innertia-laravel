@@ -88,6 +88,11 @@ return new class extends Migration
             $table->softDeletes();
 
             $table->index(['tenant_id', 'organization_id'], 'teams_tenant_org_idx');
+        });
+
+        // FK self-referencial fuera del Schema::create — Postgres no ve el PK
+        // como unique constraint hasta que la tabla esté creada.
+        Schema::table('teams', function (Blueprint $table) {
             $table->foreign('parent_team_id')->references('id')->on('teams')->nullOnDelete();
         });
 

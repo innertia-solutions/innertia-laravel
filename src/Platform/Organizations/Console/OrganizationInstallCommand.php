@@ -140,14 +140,22 @@ PHP;
 
     private function renderDownBlock(string $table, string $column, bool $withIndex): string
     {
+        // No usamos try/catch para drop index: en Postgres una excepción dentro
+        // del Schema::table() envenena la transacción y todo el rollback explota.
+        // Detectamos índices existentes vía Schema::getIndexes() (Laravel 10.42+).
         return <<<PHP
-        Schema::table('{$table}', function (Blueprint \$table) {
-            if (Schema::hasColumn('{$table}', '{$column}')) {
-                try { \$table->dropIndex('{$table}_tenant_org_idx'); } catch (\\Throwable \$e) {}
-                try { \$table->dropIndex('{$table}_org_idx'); } catch (\\Throwable \$e) {}
+        if (Schema::hasColumn('{$table}', '{$column}')) {
+            \$existing = collect(Schema::getIndexes('{$table}'))->pluck('name')->all();
+            Schema::table('{$table}', function (Blueprint \$table) use (\$existing) {
+                if (in_array('{$table}_tenant_org_idx', \$existing, true)) {
+                    \$table->dropIndex('{$table}_tenant_org_idx');
+                }
+                if (in_array('{$table}_org_idx', \$existing, true)) {
+                    \$table->dropIndex('{$table}_org_idx');
+                }
                 \$table->dropColumn('{$column}');
-            }
-        });
+            });
+        }
 PHP;
     }
 }
