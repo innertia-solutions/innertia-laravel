@@ -20,7 +20,10 @@ use Innertia\Platform\Organizations\OrganizationsFeature;
  */
 class OrganizationInstallCommand extends Command
 {
-    protected $signature   = 'innertia:organization:install {--path= : Override migrations directory (default: database/migrations)}';
+    protected $signature = 'innertia:organization:install
+        {--path= : Override migrations directory (default: database/migrations)}
+        {--force : Generate a new migration even if a previous one exists. Útil cuando agregás tablas a config.tables después del install inicial. La migración usa Schema::hasColumn() para saltar columnas ya existentes — segura de aplicar.}';
+
     protected $description = 'Generate the consolidated migration that introduces organization_id across declared tables and RBAC.';
 
     public function handle(): int
@@ -41,11 +44,6 @@ class OrganizationInstallCommand extends Command
         }
 
         // RBAC + identity always scoped — non-negotiable when feature is enabled.
-        // Includes:
-        //   - roles / model_roles    → roles per-org (existing)
-        //   - model_permissions      → direct permission grants per-org
-        //   - user_apps              → app access per-org (un user puede ser técnico en
-        //                              org A pero backoffice en org B)
         $rbacTables = ['roles', 'model_roles', 'model_permissions', 'user_apps'];
         $allTables  = array_values(array_unique(array_merge($tables, $rbacTables)));
 
@@ -53,8 +51,9 @@ class OrganizationInstallCommand extends Command
         File::ensureDirectoryExists($dir);
 
         $existing = glob($dir . '/*_add_organization_id_*.php') ?: [];
-        if (count($existing) > 0) {
+        if (count($existing) > 0 && ! $this->option('force')) {
             $this->info('Migration already exists at ' . $existing[0] . ' — nothing to do.');
+            $this->line('Use --force to generate a new incremental migration (covers tables added to config since last install).');
             return self::SUCCESS;
         }
 
@@ -69,6 +68,13 @@ class OrganizationInstallCommand extends Command
         File::put($path, $body);
 
         $this->info('Created migration: ' . $path);
+        if (count($existing) > 0) {
+            $this->line('Previous migration(s) detected:');
+            foreach ($existing as $e) {
+                $this->line('  • ' . basename($e));
+            }
+            $this->line('The new migration uses Schema::hasColumn() to skip tables that already have organization_id, so re-running migrate is safe.');
+        }
         $this->line('Run `php artisan migrate` to apply it.');
 
         return self::SUCCESS;

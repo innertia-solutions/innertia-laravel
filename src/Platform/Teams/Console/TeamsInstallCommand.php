@@ -22,7 +22,10 @@ use Innertia\Platform\Teams\TeamsFeature;
  */
 class TeamsInstallCommand extends Command
 {
-    protected $signature   = 'innertia:teams:install {--path= : Override migrations directory (default: database/migrations)}';
+    protected $signature = 'innertia:teams:install
+        {--path= : Override migrations directory (default: database/migrations)}
+        {--force : Generate a new migration even if a previous one exists.}';
+
     protected $description = 'Generate migrations for the Teams feature (teams + team_members tables).';
 
     public function handle(): int
@@ -40,8 +43,9 @@ class TeamsInstallCommand extends Command
         File::ensureDirectoryExists($dir);
 
         $existing = glob($dir . '/*_create_teams_tables*.php') ?: [];
-        if (count($existing) > 0) {
+        if (count($existing) > 0 && ! $this->option('force')) {
             $this->info('Teams migration already exists at ' . $existing[0] . ' — nothing to do.');
+            $this->line('Use --force to regenerate.');
             return self::SUCCESS;
         }
 
