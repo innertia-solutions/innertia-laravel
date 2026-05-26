@@ -59,6 +59,24 @@ abstract class DomainEvent implements ShouldBroadcast
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     /**
+     * The typed event key — every event must declare its enum.
+     *
+     *   public function key(): DomainEventKey {
+     *       return DirectoryEvent::Moved;
+     *   }
+     */
+    abstract public function key(): DomainEventKey;
+
+    /**
+     * Optional variant for granularity (e.g. workflow step name).
+     * Appended to resolvedKey() if non-null: "{key}.{variant}".
+     */
+    public function variant(): ?string
+    {
+        return null;
+    }
+
+    /**
      * Runtime channel override set via dispatch($model, channels: [...]).
      * Null means "use the event's own channels() definition".
      */
@@ -126,7 +144,7 @@ abstract class DomainEvent implements ShouldBroadcast
 
     public function broadcastAs(): string
     {
-        return class_basename(static::class);
+        return $this->resolvedKey();
     }
 
     public function broadcastWith(): array
@@ -137,28 +155,14 @@ abstract class DomainEvent implements ShouldBroadcast
     // ── Webhook ───────────────────────────────────────────────────────────────
 
     /**
-     * Event key used to match registered webhook endpoints.
-     * e.g. OrderShipped → 'order.shipped'
-     * Override to use a custom key.
+     * Canonical instance key for routing/subscription matching.
+     * Derived from key() + variant() — not overrideable.
      */
-    public function webhookKey(): string
+    final public function resolvedKey(): string
     {
-        return Str::snake(class_basename(static::class), '.');
-    }
-
-    /**
-     * Clave canónica específica de esta instancia del evento.
-     * Usada por DomainEventRouter para matching de suscripciones.
-     *
-     * Por defecto igual a webhookKey(). Los eventos con variantes dinámicas
-     * (ej. WorkflowTransitioned) lo sobrescriben para añadir especificidad.
-     *
-     * Convención: define const KEY en cada evento concreto y sobrescribe
-     * resolvedKey() solo si necesitás especificidad dinámica.
-     */
-    public function resolvedKey(): string
-    {
-        return $this->webhookKey();
+        $base = $this->key()->key();
+        $v = $this->variant();
+        return $v !== null ? "{$base}.{$v}" : $base;
     }
 
     /**
