@@ -42,3 +42,20 @@ class SampleFooUpdatedWithVariant extends DomainEvent
         return $this->field;
     }
 }
+
+use Innertia\Platform\Events\Trigger;
+
+class SampleFooCreatedTrigger implements Trigger
+{
+    public static array $invocations = [];
+
+    public static function on(): DomainEventKey
+    {
+        return SampleFooEvent::Created;
+    }
+
+    public function handle(\Innertia\Platform\Events\DomainEvent $event): void
+    {
+        self::$invocations[] = $event;
+    }
+}
