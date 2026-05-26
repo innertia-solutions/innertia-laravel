@@ -43,6 +43,7 @@ src/
 Cada feature tiene un gate único:
 - `\Innertia\Platform\Organizations\OrganizationsFeature::isActive()`
 - `\Innertia\Platform\Teams\TeamsFeature::isActive()`
+- `\Innertia\Tags\TagsFeature::isActive()`
 
 `--force` regenera la migration con timestamp fresco. La migration usa `Schema::hasColumn()` para saltar tablas ya scopeadas — segura de re-aplicar cuando agregás tablas a `config('innertia.organizations.tables')`.
 
