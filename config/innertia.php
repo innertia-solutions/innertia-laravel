@@ -151,6 +151,41 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Tags — polymorphic, tenant-scoped tagging system
+    |--------------------------------------------------------------------------
+    |
+    | Opt-in feature for adding flexible tagging to any Eloquent model.
+    | When `enabled = false` all Tags code paths are no-op.
+    |
+    | enabled  — Master switch. When false, tagging is disabled.
+    | model    — FQCN of the Tag model. Defaults to the library model.
+    | taggable_types — Map of type string → model FQN. Used by /taggables/{type}/...
+    |                  routes to validate and resolve tagged entities.
+    | authorize_attach — Hook callable(User $user, Model $entity): bool.
+    |                    Determines who can attach/detach tags from an entity.
+    |                    null = default Laravel policy 'update' on the entity.
+    | slug_generator   — Hook callable(string $name): string.
+    |                    Generates slug from tag name.
+    |                    null = default Str::slug
+    |
+    */
+
+    'tags' => [
+        'enabled' => env('INNERTIA_TAGS_ENABLED', false),
+        'model'   => \Innertia\Tags\Models\Tag::class,
+
+        // type-string → FQN of Eloquent model (used by /taggables/{type}/...)
+        'taggable_types' => [],
+
+        // Hook callable(User $user, Model $entity): bool. null = default Laravel policy 'update'.
+        'authorize_attach' => null,
+
+        // Hook callable(string $name): string. null = default Str::slug
+        'slug_generator' => null,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | SaaS / Tenancy Settings
     |--------------------------------------------------------------------------
     |
