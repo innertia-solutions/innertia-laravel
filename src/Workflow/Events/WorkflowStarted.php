@@ -5,16 +5,21 @@ namespace Innertia\Workflow\Events;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Innertia\Platform\Events\DomainEvent;
+use Innertia\Platform\Events\DomainEventKey;
+use Innertia\Workflow\Enums\WorkflowEvent;
 use Innertia\Workflow\Models\WorkflowInstance;
 
 class WorkflowStarted extends DomainEvent
 {
-    const KEY = 'workflow.started';
-
     public function __construct(
         public readonly WorkflowInstance $instance,
         public readonly ?Authenticatable $startedBy,
     ) {}
+
+    public function key(): DomainEventKey
+    {
+        return WorkflowEvent::Started;
+    }
 
     public function channels(): array
     {

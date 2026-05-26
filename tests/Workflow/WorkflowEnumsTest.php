@@ -36,18 +36,14 @@ test('WorkflowEvent has correct keys', function () {
     expect(WorkflowEvent::Cancelled->value)->toBe('workflow.cancelled');
 });
 
-test('WorkflowEvent forStep returns granular key for any case', function () {
-    // Transitioned — primary use case
-    expect(WorkflowEvent::Transitioned->forStep('findings'))->toBe('workflow.transitioned.findings');
-    expect(WorkflowEvent::Transitioned->forStep('planning'))->toBe('workflow.transitioned.planning');
-
-    // forStep is intentionally valid on all cases (any event can be step-granular)
-    expect(WorkflowEvent::Started->forStep('start'))->toBe('workflow.started.start');
-    expect(WorkflowEvent::Cancelled->forStep('closure'))->toBe('workflow.cancelled.closure');
-    expect(WorkflowEvent::Finished->forStep('done'))->toBe('workflow.finished.done');
-    expect(WorkflowEvent::TransitionBlocked->forStep('execution'))->toBe('workflow.transition_blocked.execution');
+test('WorkflowEvent implements DomainEventKey', function () {
+    expect(WorkflowEvent::Started)->toBeInstanceOf(\Innertia\Platform\Events\DomainEventKey::class);
 });
 
-test('WorkflowEvent forStep throws on empty step key', function () {
-    WorkflowEvent::Transitioned->forStep('');
-})->throws(\InvalidArgumentException::class, 'Step key must not be empty.');
+test('WorkflowEvent key() returns the enum value', function () {
+    expect(WorkflowEvent::Started->key())->toBe('workflow.started');
+    expect(WorkflowEvent::Transitioned->key())->toBe('workflow.transitioned');
+    expect(WorkflowEvent::TransitionBlocked->key())->toBe('workflow.transition_blocked');
+    expect(WorkflowEvent::Finished->key())->toBe('workflow.finished');
+    expect(WorkflowEvent::Cancelled->key())->toBe('workflow.cancelled');
+});

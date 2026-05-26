@@ -5,13 +5,12 @@ namespace Innertia\Workflow\Events;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Model;
 use Innertia\Platform\Events\DomainEvent;
+use Innertia\Platform\Events\DomainEventKey;
 use Innertia\Workflow\Enums\WorkflowEvent;
 use Innertia\Workflow\Models\WorkflowInstance;
 
 class WorkflowTransitioned extends DomainEvent
 {
-    const KEY = 'workflow.transitioned';
-
     public function __construct(
         public readonly WorkflowInstance $instance,
         public readonly string           $fromStep,
@@ -21,13 +20,18 @@ class WorkflowTransitioned extends DomainEvent
         public readonly Authenticatable  $performedBy,
     ) {}
 
-    /**
-     * Clave específica al step: permite suscripciones granulares.
-     * Ej: 'workflow.transitioned.findings'
-     */
-    public function resolvedKey(): string
+    public function key(): DomainEventKey
     {
-        return WorkflowEvent::Transitioned->forStep($this->toStep);
+        return WorkflowEvent::Transitioned;
+    }
+
+    /**
+     * Variant allows granular subscriptions by destination step.
+     * e.g. resolvedKey() => 'workflow.transitioned.findings'
+     */
+    public function variant(): ?string
+    {
+        return $this->toStep;
     }
 
     public function channels(): array
