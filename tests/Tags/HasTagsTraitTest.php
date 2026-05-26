@@ -77,6 +77,15 @@ it('retag replaces the full set', function () {
     expect($quote->fresh()->tags->pluck('slug')->sort()->values()->all())->toEqual(['x', 'y']);
 });
 
+it('retag accepts variadic strings like tag()', function () {
+    $quote = TaggableQuote::create(['title' => 'Cotización A']);
+    $quote->tag('a', 'b');
+
+    $quote->retag('x', 'y');
+
+    expect($quote->fresh()->tags->pluck('slug')->sort()->values()->all())->toEqual(['x', 'y']);
+});
+
 it('clearTags removes all', function () {
     $quote = TaggableQuote::create(['title' => 'Cotización A']);
     $quote->tag('a', 'b');

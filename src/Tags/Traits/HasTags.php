@@ -93,14 +93,14 @@ trait HasTags
         return $this;
     }
 
-    public function retag(array $tags): static
+    public function retag(string|array ...$tags): static
     {
         if (! TagsFeature::isActive()) {
             throw \Innertia\Tags\Exceptions\FeatureDisabledException::tags();
         }
 
         $this->clearTags();
-        $this->tag($tags);
+        $this->tag(...$tags);
         return $this;
     }
 
