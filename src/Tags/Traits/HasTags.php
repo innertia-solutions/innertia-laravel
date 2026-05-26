@@ -40,6 +40,10 @@ trait HasTags
      */
     public function tag(string|array ...$tags): static
     {
+        if (! TagsFeature::isActive()) {
+            throw \Innertia\Tags\Exceptions\FeatureDisabledException::tags();
+        }
+
         $names = $this->flattenTagArgs($tags);
         if (empty($names)) {
             return $this;
@@ -69,6 +73,10 @@ trait HasTags
      */
     public function untag(string|array ...$tags): static
     {
+        if (! TagsFeature::isActive()) {
+            throw \Innertia\Tags\Exceptions\FeatureDisabledException::tags();
+        }
+
         $names = $this->flattenTagArgs($tags);
         if (empty($names)) {
             return $this;
@@ -87,6 +95,10 @@ trait HasTags
 
     public function retag(array $tags): static
     {
+        if (! TagsFeature::isActive()) {
+            throw \Innertia\Tags\Exceptions\FeatureDisabledException::tags();
+        }
+
         $this->clearTags();
         $this->tag($tags);
         return $this;
@@ -94,6 +106,10 @@ trait HasTags
 
     public function clearTags(): static
     {
+        if (! TagsFeature::isActive()) {
+            throw \Innertia\Tags\Exceptions\FeatureDisabledException::tags();
+        }
+
         $this->tags()->detach();
         $this->unsetRelation('tags');
         return $this;

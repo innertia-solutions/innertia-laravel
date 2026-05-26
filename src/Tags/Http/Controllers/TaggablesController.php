@@ -83,11 +83,13 @@ class TaggablesController extends Controller
             return;
         }
 
-        // Default: Laravel policy "update"
-        if ($user && method_exists($user, 'can')) {
-            if (! $user->can('update', $entity)) {
-                abort(403, 'Not authorized to tag this entity.');
-            }
+        // No callback configured — default to "must be authenticated and pass Laravel policy 'update'".
+        if (! $user) {
+            abort(403, 'Authentication required to modify tags.');
+        }
+
+        if (method_exists($user, 'can') && ! $user->can('update', $entity)) {
+            abort(403, 'Not authorized to tag this entity.');
         }
     }
 }

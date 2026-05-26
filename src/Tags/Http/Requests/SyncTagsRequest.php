@@ -11,7 +11,7 @@ class SyncTagsRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'tags'   => ['required', 'array'],
+            'tags'   => ['required', 'array', 'min:1'],
             'tags.*' => ['string', 'max:255'],
         ];
     }

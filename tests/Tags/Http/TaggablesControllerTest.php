@@ -97,3 +97,19 @@ it('returns 403 when authorize_attach callback rejects', function () {
     $this->postJson("/taggables/quotes/{$quote->id}/tags", ['tags' => ['vip']])
         ->assertForbidden();
 });
+
+it('rejects empty tags array on attach', function () {
+    $quote = HttpQuote::create(['title' => 'X']);
+
+    $this->postJson("/taggables/quotes/{$quote->id}/tags", ['tags' => []])
+        ->assertStatus(422)
+        ->assertJsonValidationErrors(['tags']);
+});
+
+it('returns 403 when no user and no callback configured', function () {
+    config()->set('innertia.tags.authorize_attach', null);
+    $quote = HttpQuote::create(['title' => 'X']);
+
+    $this->postJson("/taggables/quotes/{$quote->id}/tags", ['tags' => ['vip']])
+        ->assertForbidden();
+});

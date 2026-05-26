@@ -31,10 +31,11 @@ class TagsController extends Controller
         }
 
         if ($ids = $request->query('ids')) {
-            $query->whereIn('id', explode(',', $ids));
+            $idList = array_slice(explode(',', $ids), 0, 100);
+            $query->whereIn('id', $idList);
         }
 
-        $perPage = (int) $request->query('per_page', 25);
+        $perPage = min(max((int) $request->query('per_page', 25), 1), 100);
 
         return TagResource::collection($query->paginate($perPage));
     }

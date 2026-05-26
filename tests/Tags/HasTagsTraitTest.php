@@ -86,6 +86,14 @@ it('clearTags removes all', function () {
     expect($quote->fresh()->tags)->toHaveCount(0);
 });
 
+it('throws FeatureDisabledException when feature is disabled', function () {
+    config()->set('innertia.tags.enabled', false);
+    $quote = TaggableQuote::create(['title' => 'X']);
+
+    expect(fn () => $quote->tag('vip'))
+        ->toThrow(\Innertia\Tags\Exceptions\FeatureDisabledException::class);
+});
+
 it('hasTag, hasAnyTag, hasAllTags work correctly', function () {
     $quote = TaggableQuote::create(['title' => 'Cotización A']);
     $quote->tag('vip', 'urgente');
