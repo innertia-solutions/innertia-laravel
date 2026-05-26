@@ -38,6 +38,7 @@ src/
 |---|---|---|---|
 | Organizations | `INNERTIA_ORGANIZATIONS_ENABLED=true` | `php artisan innertia:organization:install [--force]` | Crea `organizations`, agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_apps`, y tablas declaradas |
 | Teams | `INNERTIA_TEAMS_ENABLED=true` | `php artisan innertia:teams:install [--force]` | Crea `teams`, `team_members` |
+| Tags | `INNERTIA_TAGS_ENABLED=true` | `php artisan innertia:tags:install [--force]` | Crea `tags`, `taggables` (polimórfica). Tenant-scoped. Trait `HasTags` para cualquier modelo. |
 
 Cada feature tiene un gate único:
 - `\Innertia\Platform\Organizations\OrganizationsFeature::isActive()`
@@ -101,6 +102,7 @@ El paquete trae skills versionados en `src/Skills/*.md`. Cada proyecto consumido
 - `innertia-framework` — overview, modes, estructura DDD
 - `innertia-organizations` — multi-org scoping + cómo crear/extender
 - `innertia-teams` — RBAC por grupo + cómo crear/extender
+- `innertia-tags` — sistema de tags polimórfico, trait HasTags, endpoints CRUD, extensión
 - `innertia-permissions` — las 8 fuentes de permisos, DomainGates, EntityPermission, HasApps
 - `innertia-events` — DomainEvents multi-channel (realtime/webhook/mail/web), Subscribable
 - `innertia-webhooks` — outbound webhooks con HMAC signing
