@@ -11,7 +11,7 @@ class WebhookService
     public function dispatchForEvent(DomainEvent $event): void
     {
         $tenantId = $this->resolveTenantId();
-        $eventKey = $event->webhookKey();
+        $eventKey = $event->resolvedKey();
         $payload  = array_merge($event->payload(), [
             '_event'     => $eventKey,
             '_timestamp' => now()->toIso8601String(),
