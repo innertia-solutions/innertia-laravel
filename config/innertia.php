@@ -188,6 +188,17 @@ return [
         'verbose_catalog'   => env('APP_DEBUG', false),
     ],
 
+    'directories' => [
+        'enabled'              => env('INNERTIA_DIRECTORIES_ENABLED', false),
+        'model'                => \Innertia\Files\Directories\Models\Directory::class,
+        'max_depth'            => (int) env('INNERTIA_DIRECTORIES_MAX_DEPTH', 20),
+        'trash_retention_days' => env('INNERTIA_DIRECTORIES_TRASH_RETENTION_DAYS') !== null
+            ? (int) env('INNERTIA_DIRECTORIES_TRASH_RETENTION_DAYS')
+            : null,
+        'owner_types'          => [],
+        'bulk_async_threshold' => 1000,
+    ],
+
     'tags' => [
         'enabled' => env('INNERTIA_TAGS_ENABLED', false),
         'model'   => \Innertia\Tags\Models\Tag::class,

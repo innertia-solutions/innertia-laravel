@@ -235,6 +235,9 @@ class InnertiaServiceProvider extends ServiceProvider
             // Tags install command — same pattern: registered always, guard runs at execution.
             $commands[] = \Innertia\Tags\Console\TagsInstallCommand::class;
 
+            // Directories install command — same pattern: registered always, guard runs at execution.
+            $commands[] = \Innertia\Files\Directories\Console\DirectoriesInstallCommand::class;
+
             // Claude Code skills installer — instala skills del paquete en .claude/skills/innertia/
             $commands[] = \Innertia\Console\SkillsInstallCommand::class;
 
