@@ -105,7 +105,7 @@ El paquete trae skills versionados en `src/Skills/*.md`. Cada proyecto consumido
 - `innertia-teams` — RBAC por grupo + cómo crear/extender
 - `innertia-tags` — sistema de tags polimórfico, trait HasTags, endpoints CRUD, extensión
 - `innertia-permissions` — las 8 fuentes de permisos, DomainGates, EntityPermission, HasApps
-- `innertia-events` — DomainEvents multi-channel (realtime/webhook/mail/web), Subscribable
+- `innertia-events` — Event Bus tipado, DomainEventKey enums, Triggers, EventBusFake, catálogo introspectable
 - `innertia-webhooks` — outbound webhooks con HMAC signing
 - `innertia-mail` — InnertiaMailable, branding por tenant, NotificationMail fluent builder
 - `innertia-config` — referencia de config/innertia.php

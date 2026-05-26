@@ -1,181 +1,263 @@
 ---
 name: innertia-events
-description: Use when working with DomainEvents, realtime broadcasting, subscriptions, multi-channel notifications (realtime / webhook / mail / web). Trigger for "emitir evento", "DomainEvent", "broadcast", "subscriptores", "Subscribable", "channels", "DomainEventRouter".
+description: Use when working with DomainEvents, EventBus, Triggers, multi-channel notifications (realtime/webhook/mail/web). Trigger for "emitir evento", "DomainEvent", "EventBus", "DomainEventKey", "Trigger", "Innertia::events()", "broadcast", "suscribir a eventos".
 ---
 
-# Innertia — DomainEvents + Realtime + Notificaciones
+# Innertia — Event Bus + DomainEvents
 
-Sistema de eventos multi-canal. Un `DomainEvent` se dispara una vez y el `DomainEventRouter` lo distribuye automáticamente a los canales que el evento declara: **realtime**, **webhook**, **mail**, **web** (notificaciones en-app).
+Sistema tipado de eventos sobre Laravel. Eventos declaran su key via **enum** (DomainEventKey), suscribirse usa `Innertia::events()->listen(...)` con autocompletado, y el bus tiene catálogo introspectable + test fakes.
 
-## DomainEvent base
+Por debajo usa Laravel Event Dispatcher (queue, broadcast, model events siguen funcionando), pero la API del consumer es 100% Innertia.
 
-```php
-// src/Platform/Events/DomainEvent.php
-abstract class DomainEvent implements ShouldBroadcast { /* ... */ }
-```
+## Conceptos
 
-Métodos a override en subclases:
-
-| Método | Cuándo | Default |
-|---|---|---|
-| `channels(): array` | Qué canales activar para este evento | `[]` (ninguno) |
-| `payload(): array` | Datos públicos del evento | props públicas del constructor |
-| `webhookKey(): string` | Clave para matching de webhooks | `Str::kebab(class_basename($this))` |
-| `subscribable(): ?Model` | Modelo "dueño" de subscriptores | `null` |
-| `toMail(): ?InnertiaMailable` | Mailable a enviar a subscriptores | `null` |
-| `toWeb(): ?array` | Shape de la notificación in-app | `null` |
-| `ancestors(): array` | Modelos padre que también reciben el evento | `[]` |
-| `broadcastOn(): Channel` | Canal de broadcast (realtime) | `PrivateChannel("tenant.{tenantId}")` |
-| `broadcastAs(): string` | Nombre del evento para el cliente | `webhookKey()` |
+| Pieza | Qué hace |
+|---|---|
+| `DomainEventKey` (interfaz) | La implementan enums que catalogan eventos. Una case = un evento. |
+| `DomainEvent` (abstract) | Base class de cada evento. Cada concreto declara `key()` retornando un case del enum. |
+| `EventBus` (singleton) | Listener registry tipado, dispatch con aislamiento de excepciones. |
+| `Trigger` (interfaz) | Patrón de clase con `on(): DomainEventKey` + `handle($event)`. |
+| `EventBusFake` | Test helper con assertions tipo `assertDispatched(...)`. |
 
 ## Definir un evento
+
+1. Crear el enum del catálogo:
 
 ```php
 namespace App\Domains\Orders\Events;
 
-use App\Domains\Orders\Models\Order;
-use Innertia\Platform\Events\DomainEvent;
+use Innertia\Platform\Events\DomainEventKey;
 
-class OrderShipped extends DomainEvent {
+enum OrderEvent: string implements DomainEventKey
+{
+    case Placed   = 'order.placed';
+    case Shipped  = 'order.shipped';
+    case Cancelled = 'order.cancelled';
+
+    public function key(): string
+    {
+        return $this->value;
+    }
+}
+```
+
+Convención de valores: `<feature>.<verb>` en snake.case.
+
+2. Crear el evento extendiendo `DomainEvent`:
+
+```php
+namespace App\Domains\Orders\Events;
+
+use Innertia\Platform\Events\DomainEvent;
+use Innertia\Platform\Events\DomainEventKey;
+use App\Domains\Orders\Models\Order;
+
+class OrderShipped extends DomainEvent
+{
     public function __construct(public readonly Order $order) {}
 
-    public function channels(): array {
+    public function key(): DomainEventKey
+    {
+        return OrderEvent::Shipped;
+    }
+
+    // Optional: per-instance variant for granular subscriptions
+    public function variant(): ?string
+    {
+        return null;  // or e.g. $this->order->region
+    }
+
+    // Optional: multi-channel routing (realtime/webhook/mail/web)
+    public function channels(): array
+    {
         return ['realtime', 'webhook', 'mail'];
     }
 
-    public function webhookKey(): string {
-        return 'order.shipped';
-    }
-
-    public function payload(): array {
-        return [
-            'order_id'  => $this->order->id,
-            'number'    => $this->order->number,
-            'shipped_at' => $this->order->shipped_at?->toIso8601String(),
-        ];
-    }
-
-    public function subscribable(): ?Model {
-        return $this->order;
-    }
-
-    public function toMail(): ?InnertiaMailable {
-        return new OrderShippedMail($this->order);
+    public function payload(): array
+    {
+        return ['order_id' => $this->order->id];
     }
 }
 ```
 
-## Disparar el evento
+3. Disparar (igual que cualquier Laravel event):
 
 ```php
-// Estándar Laravel
 event(new OrderShipped($order));
-
-// Fluent helper (heredado de Dispatchable)
-OrderShipped::dispatch($order);
-
-// Override de canales runtime (útil en jobs/tests)
-OrderShipped::dispatch($order, channels: ['webhook']);
 ```
 
-El `DomainEventRouter` lo recibe y, según `channels()`:
+## Suscribirse — listeners y triggers
 
-- **`realtime`** → broadcast via Laravel Broadcasting (Pusher / Reverb / Soketi)
-- **`webhook`** → `WebhookService::dispatchForEvent($event)` notifica a webhooks registrados con matching key
-- **`mail`** → envía `toMail()` a los `subscribable()->subscribersByChannel('order.shipped')['mail']`
-- **`web`** → crea registros en `user_notifications` para `subscribable()->subscribersByChannel(...)['web']`
-
-## Realtime / Broadcasting
-
-Usa Laravel Broadcasting estándar. El paquete NO bundlea ningún driver — configurá tu `BROADCAST_DRIVER` en `.env` (`pusher`, `reverb`, `ably`).
-
-```env
-BROADCAST_DRIVER=reverb
-REVERB_APP_ID=...
-REVERB_APP_KEY=...
-REVERB_APP_SECRET=...
-```
-
-En el frontend (no parte del paquete), suscribite al canal:
-
-```js
-Echo.private(`tenant.${tenantId}`)
-    .listen('.order.shipped', (payload) => { /* ... */ });
-```
-
-(El `.` inicial del event name es porque `broadcastAs()` se serializa como custom event name.)
-
-## Subscriptores
-
-Cuando un evento tiene `subscribable()` y `channels` incluye `mail` o `web`, el router consulta los suscriptores del modelo via el trait `Subscribable`.
-
-### Trait Subscribable en modelos
+### Listener closure (anonimo, registrado en boot)
 
 ```php
-use Innertia\Platform\Traits\Subscribable;
+// AppServiceProvider::boot()
+Innertia::events()->listen(OrderEvent::Shipped, function ($event) {
+    Log::info("Order shipped: {$event->order->id}");
+});
+```
 
-class Order extends Model {
-    use Subscribable;
+### Listener clase con `handle()`
+
+```php
+class SendShipmentEmail
+{
+    public function handle(OrderShipped $event): void
+    {
+        Mail::to($event->order->customer)->send(new ShipmentMail($event->order));
+    }
 }
 
-// Suscribir un user a todos los eventos del modelo
-$order->subscribe($user, events: ['*'], channels: ['mail', 'web']);
-
-// Suscribir solo a eventos específicos
-$order->subscribe($user, events: ['order.shipped', 'order.delivered'], channels: ['mail']);
-
-// Wildcards
-$order->subscribe($user, events: ['order.*'], channels: ['web']);
-
-// Quitar suscripción
-$order->unsubscribe($user);
-
-// Listar suscriptores (por evento o todos)
-$order->subscribers();
-$order->subscribers('order.shipped');
-$order->subscribersByChannel('order.shipped');  // ['mail' => Collection, 'web' => Collection]
+// Boot:
+Innertia::events()->listen(OrderEvent::Shipped, SendShipmentEmail::class);
 ```
 
-### Modelo Subscription
-
-```
-subscriptions (id, tenant_id, subscribable_type, subscribable_id, user_id, events jsonb, channels jsonb, created_at)
-```
-
-Método `Subscription::matchesEvent($eventKey)` evalúa wildcards:
-
-- `*` → match all
-- `orders.*` → match cualquier evento que empiece con `orders.`
-- `orders.shipped` → match exacto
-
-## Notificaciones in-app (canal `web`)
-
-Cuando `channels()` incluye `web` y el evento define `toWeb()`:
+### Trigger (clase con contrato `Trigger`)
 
 ```php
-public function toWeb(): ?array {
-    return [
-        'title'     => 'Tu pedido fue enviado',
-        'body'      => "Pedido #{$this->order->number}",
-        'url'       => "/orders/{$this->order->id}",
-        'icon'      => 'truck',
-        'severity'  => 'info',
-    ];
+namespace App\Triggers;
+
+use Innertia\Platform\Events\Trigger;
+use Innertia\Platform\Events\DomainEvent;
+use Innertia\Platform\Events\DomainEventKey;
+use App\Domains\Orders\Events\OrderEvent;
+
+class AuditOrderShipped implements Trigger
+{
+    public static function on(): DomainEventKey
+    {
+        return OrderEvent::Shipped;
+    }
+
+    public function handle(DomainEvent $event): void
+    {
+        AuditLog::record('order.shipped', $event->payload());
+    }
+}
+
+// Boot:
+Innertia::events()->trigger(AuditOrderShipped::class);
+```
+
+### Listener condicional (`when`)
+
+```php
+Innertia::events()->when(
+    OrderEvent::Shipped,
+    fn ($event) => $event->order->amount > 1000,
+    NotifyVipCustomer::class,
+);
+```
+
+### Bulk registration
+
+```php
+Innertia::events()->listenMany([
+    OrderEvent::Placed->key()    => RecordSale::class,
+    OrderEvent::Shipped->key()   => UpdateInventory::class,
+    OrderEvent::Cancelled->key() => ReleaseInventory::class,
+]);
+```
+
+## Async (encolar listener)
+
+Listener corre **sync por default**. Para encolar, implementar `Illuminate\Contracts\Queue\ShouldQueue`:
+
+```php
+use Illuminate\Contracts\Queue\ShouldQueue;
+
+class SendShipmentEmail implements ShouldQueue
+{
+    public function handle(OrderShipped $event): void { /* ... */ }
 }
 ```
 
-El router crea un registro por cada suscriptor en `user_notifications`. El usuario las consulta en `/notifications` (endpoint del paquete).
+El bus detecta `ShouldQueue` y dispatchea via Laravel queue automáticamente. Closures NO se encolan (no son serializables).
 
-## Patrones recomendados
+## Aislamiento de excepciones
 
-- **Un evento por hito de negocio**, no por cambio técnico. `OrderShipped`, no `OrderUpdated`.
-- **`channels()` declarativo**, no condicional con if. Si necesitás condicionalidad runtime, pasá `channels:` al `dispatch()`.
-- **`payload()` solo con campos públicos**. Para datos sensibles, los suscriptores pueden re-consultar via API.
-- **`subscribable()` apunta al modelo que define el grupo de listeners** (la Order, no el User).
-- **Cuando el evento debe sobrevivir compaction/queue restart**, recordá que los DomainEvents son serializables (`SerializesModels`).
+Si un listener tira excepción:
+- Se captura
+- Se loguea via `Log::error` con contexto: event class, key, listener, message, trace
+- **El dispatch continúa con los listeners restantes**
 
-## Skills relacionados
+Esto evita que un listener defectuoso reviente toda la cadena de side-effects.
 
-- `innertia-webhooks` — qué pasa cuando `channels` incluye `webhook`
-- `innertia-mail` — qué pasa cuando `channels` incluye `mail`
-- `innertia-framework` — DomainEvent vs UseCase, cuándo cada uno
+## Catalog — introspección
+
+Registrar enums permite descubrirlos vía `Innertia::events()->catalog()`:
+
+```php
+// Boot (típicamente desde un feature service provider)
+Innertia::events()->registerCatalog(OrderEvent::class);
+
+// Cualquier momento:
+$catalog = Innertia::events()->catalog();
+// [
+//   'OrderEvent' => [
+//     'enum'      => 'App\Domains\Orders\Events\OrderEvent',
+//     'cases'     => ['Placed', 'Shipped', 'Cancelled'],
+//     'listeners' => [
+//       'order.placed'    => 1,
+//       'order.shipped'   => 3,
+//       'order.cancelled' => 0,
+//     ],
+//   ],
+// ]
+```
+
+Útil para devtools, frontend de suscripciones, o auditoría de qué está activo.
+
+## Test helpers
+
+```php
+use Innertia\Platform\Events\EventBusFake;
+
+it('fires OrderShipped when shipment is recorded', function () {
+    $fake = EventBusFake::fake();  // reemplaza el bus en el container
+
+    // ... ejercitar código ...
+
+    $fake->assertDispatched(OrderEvent::Shipped);
+    $fake->assertDispatchedTimes(OrderEvent::Shipped, 1);
+    $fake->assertDispatched(OrderEvent::Shipped, fn ($e) => $e->order->id === '...');
+    $fake->assertNotDispatched(OrderEvent::Cancelled);
+    $fake->assertNothingDispatched();
+});
+```
+
+Mientras esté activo el fake, listeners reales **no corren** — solo se registra el dispatch.
+
+## Channels multi-delivery (mantenido del sistema anterior)
+
+`channels()` controla cómo se entrega el evento más allá de los listeners Innertia:
+
+| Channel | Qué hace |
+|---|---|
+| `'realtime'` | Broadcast via Pusher/Reverb. Frontend recibe vía `useRealtime()`. |
+| `'webhook'` | Dispatch a endpoints registrados en tabla `webhooks` con HMAC signing. |
+| `'mail'` | Envia `toMail()` mailable a suscriptores del `subscribable()`. |
+| `'web'` | Crea notificación in-app con shape de `toWeb()`. |
+
+`DomainEventRouter` (listener interno) procesa los channels — vos no lo tocás.
+
+## Migración desde la API anterior
+
+Si tu proyecto tenía `class MyEvent extends DomainEvent { const KEY = 'my.event'; }` o `webhookKey()` override:
+
+| Antes | Ahora |
+|---|---|
+| `const KEY = 'my.event';` | Crear enum `MyEvent` con case `MyEvent` + `public function key()` |
+| `public function webhookKey(): string { return 'my.event'; }` | `public function key(): DomainEventKey { return MyFeatureEvent::My; }` |
+| `public function resolvedKey()` override custom | `public function variant(): ?string { return $this->dynamicPart; }` — el bus combina key + variant |
+| `Event::listen('my.event', ...)` | `Innertia::events()->listen(MyFeatureEvent::My, ...)` |
+
+El listener Laravel-style sigue funcionando (back-compat), pero la API tipada es la recomendada.
+
+## Performance
+
+- Listener registration es O(1) por entrada.
+- Dispatch es O(N) donde N = número de listeners para esa key.
+- `catalog()` solo recorre los enums registrados — costo despreciable.
+- Closures sync no tocan queue/storage.
+- ShouldQueue listeners encolan via Laravel queue normal.

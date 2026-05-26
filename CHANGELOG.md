@@ -7,8 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BREAKING CHANGES
+- **DomainEvent contract unified.** Removed `DomainEvent::webhookKey()` method and `const KEY` convention.
+  Every event must now implement `public function key(): DomainEventKey` returning an enum case.
+  `resolvedKey()` is now final, derived from `key()` + optional `variant()`.
+  Subscribers using `Event::listen('event.string.key', ...)` continue working — new typed API is recommended.
+
 ### Added
+- `Innertia\Platform\Events\DomainEventKey` — interface implemented by event-key enums.
+- `Innertia\Platform\Events\Trigger` — explicit contract for event handlers.
+- `Innertia\Platform\Events\EventBus` — typed listener registry over Laravel events.
+- `Innertia\Platform\Events\EventBusFake` — test helper with assertion methods (assertDispatched, assertNotDispatched, etc.).
+- `Innertia\Platform\Events\IsDomainEvent` — marker interface enabling Laravel listener subscription to all DomainEvent subclasses.
+- `Innertia\Facades\Events` facade and `Innertia::events()` static helper.
+- Event catalog introspection via `Innertia::events()->catalog()`.
 - **Tags feature** (opt-in): polymorphic, tenant-scoped tagging system. Enable with `INNERTIA_TAGS_ENABLED=true` + `php artisan innertia:tags:install`. Apply `HasTags` trait on any model. See `docs/superpowers/specs/2026-05-26-innertia-tags-design.md`.
+
+### Changed
+- 5 Workflow events refactored to new `key()` / `variant()` contract.
+- `WorkflowEvent` enum implements `DomainEventKey`; `WorkflowEvent::forStep()` removed (replaced by `DomainEvent::variant()`).
+- `WebhookService::dispatchForEvent` uses `$event->resolvedKey()` instead of `webhookKey()`.
+
+### Upgrade guide
+See `docs/superpowers/specs/2026-05-26-innertia-event-bus-design.md` for the full migration guide.
+
+Quick path:
+1. Define an enum implementing `DomainEventKey` listing your event cases.
+2. In each event class, replace `const KEY = '...'` with `public function key(): DomainEventKey { return MyEnum::Case; }`.
+3. If you had a custom `resolvedKey()` returning `Enum::Case->forStep($x)` or similar, implement `variant(): ?string { return $x; }`.
+4. Replace `Event::listen('event.key', ...)` with `Innertia::events()->listen(MyEnum::Case, ...)` (optional but recommended).
 
 ## [0.3.0] — 2026-05-23
 
