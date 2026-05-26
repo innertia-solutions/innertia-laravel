@@ -87,6 +87,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->register(AuthServiceProvider::class);
         $this->app->singleton(WebhookService::class);
         $this->app->singleton(\Innertia\Workflow\WorkflowEngine::class);
+        $this->app->singleton(\Innertia\Platform\Events\EventBus::class);
     }
 
     public function boot(): void
@@ -241,7 +242,19 @@ class InnertiaServiceProvider extends ServiceProvider
         }
 
         // ── Events ────────────────────────────────────────────────────────────
-        Event::listen(DomainEvent::class, DomainEventRouter::class);
+        // IsDomainEvent is a marker interface on DomainEvent. Laravel's dispatcher
+        // fires interface listeners for all implementing subclasses — this ensures
+        // both the router and the EventBus bridge receive every concrete DomainEvent
+        // regardless of which subclass is dispatched.
+        Event::listen(\Innertia\Platform\Events\IsDomainEvent::class, DomainEventRouter::class);
+
+        // EventBus bridge — all DomainEvents emitted via Laravel event() flow through the bus.
+        Event::listen(
+            \Innertia\Platform\Events\IsDomainEvent::class,
+            function (\Innertia\Platform\Events\DomainEvent $event) {
+                app(\Innertia\Platform\Events\EventBus::class)->dispatch($event);
+            }
+        );
 
         // ── Publishables ──────────────────────────────────────────────────────
         $this->publishes([

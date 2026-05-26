@@ -20,4 +20,9 @@ class Innertia extends Facade
     {
         return InnertiaManager::class;
     }
+
+    public static function events(): \Innertia\Platform\Events\EventBus
+    {
+        return app(\Innertia\Platform\Events\EventBus::class);
+    }
 }

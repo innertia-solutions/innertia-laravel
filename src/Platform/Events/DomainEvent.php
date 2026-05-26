@@ -54,7 +54,7 @@ use Innertia\Mail\NotificationMail;
  *
  *   OrderShipped::dispatch($order);
  */
-abstract class DomainEvent implements ShouldBroadcast
+abstract class DomainEvent implements ShouldBroadcast, IsDomainEvent
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 

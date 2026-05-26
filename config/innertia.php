@@ -170,6 +170,24 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Event Bus
+    |--------------------------------------------------------------------------
+    |
+    | Configuration for the internal DomainEvent bus.
+    |
+    | error_log_channel — Log channel for dispatch errors (null = default channel).
+    | verbose_catalog   — When true, logs the full event catalog on boot.
+    |                     Defaults to APP_DEBUG value.
+    |
+    */
+
+    'events' => [
+        'error_log_channel' => null,
+        'verbose_catalog'   => env('APP_DEBUG', false),
+    ],
+
     'tags' => [
         'enabled' => env('INNERTIA_TAGS_ENABLED', false),
         'model'   => \Innertia\Tags\Models\Tag::class,
