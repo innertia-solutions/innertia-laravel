@@ -115,7 +115,13 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'innertia');
 
         // Files: rutas de acceso/descarga de archivos (plataforma interna).
-        $this->loadRoutesFrom(__DIR__ . '/Files/routes.php');
+        // Use booted() to ensure these load after all providers, matching how
+        // loadRoutesFrom() works but without requiring a procedural include file.
+        $this->booted(function () {
+            if (! $this->app->routesAreCached()) {
+                \Innertia\Files\Routes::registerFileServing();
+            }
+        });
 
         // Platform: history, files upload, notifications genéricas.
         $this->loadRoutesFrom(__DIR__ . '/Platform/routes.php');

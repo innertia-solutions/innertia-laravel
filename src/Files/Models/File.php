@@ -264,6 +264,23 @@ class File extends Model
         return $this->mime_type === 'application/pdf';
     }
 
+    // ── Lifecycle shortcuts ───────────────────────────────────────────────────
+
+    public function trash(): self
+    {
+        return (new \Innertia\Files\UseCases\TrashFile($this))->execute();
+    }
+
+    public function restoreFromTrash(?string $relocateDirectoryId = null): self
+    {
+        return (new \Innertia\Files\UseCases\RestoreFile($this, $relocateDirectoryId))->execute();
+    }
+
+    public function rename(string $newName): self
+    {
+        return (new \Innertia\Files\UseCases\RenameFile($this, $newName))->execute();
+    }
+
     /**
      * Hard delete — removes storage and the DB row.
      *
