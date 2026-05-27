@@ -6,10 +6,12 @@ use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
 use Innertia\Platform\Traits\HasEntityPermissions;
+use Innertia\Tags\Traits\HasTags;
 
 /**
  * Central file registry for all uploaded/generated files.
@@ -50,6 +52,8 @@ use Innertia\Platform\Traits\HasEntityPermissions;
 class File extends Model
 {
     use HasUuids;
+    use SoftDeletes;
+    use HasTags;
     use HasEntityPermissions {
         // Rename trait method to avoid collision with File's own isAccessibleBy
         // (which adds the visibility layer on top of the entity-level check).
@@ -67,6 +71,8 @@ class File extends Model
         'owner_type',
         'owner_id',
         'created_by',
+        'directory_id',
+        'trash_group_id',
     ];
 
     // ── Static factories ──────────────────────────────────────────────────────
@@ -258,13 +264,31 @@ class File extends Model
         return $this->mime_type === 'application/pdf';
     }
 
-    public function delete(): ?bool
+    /**
+     * Hard delete — removes storage and the DB row.
+     *
+     * Use this for permanent removal. Default delete() is now soft (preserves
+     * storage for restore from trash).
+     */
+    public function forceDelete(): bool
     {
         $this->revokeAllEntityAccess();
-
         Storage::disk($this->disk)->delete($this->path);
+        // TODO(Files-T3): event(new FileHardDeleted($this->id, $this->original_name));
 
-        return parent::delete();
+        // Call SoftDeletes::forceDelete() via the trait. We cannot use parent::forceDelete()
+        // here because that resolves to Model::forceDelete() (which just calls $this->delete()
+        // without setting forceDeleting = true). The trait method is inlined below to ensure
+        // the hard-delete path through SoftDeletes::performDeleteOnModel() is taken.
+        $this->forceDeleting = true;
+
+        try {
+            $deleted = $this->delete();
+        } finally {
+            $this->forceDeleting = false;
+        }
+
+        return (bool) $deleted;
     }
 
     // ── Relationships ─────────────────────────────────────────────────────────
