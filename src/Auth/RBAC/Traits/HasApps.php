@@ -30,12 +30,11 @@ trait HasApps
     /**
      * App keys the user has access to.
      *
-     * Comportamiento:
-     *   - Orgs OFF → todos los user_apps del user en el tenant actual
-     *   - Orgs ON  → user_apps en el OrganizationContext::scope() actual
-     *                (NULL = global al tenant; valor = específico de esa org)
+     * App access is orthogonal to organization context — a grant is valid across
+     * all orgs. Use appKeysInOrganization() for the org-specific context map
+     * returned by /auth/me.
      *
-     * Result is cached per (user, tenant, org-scope-fingerprint).
+     * Result is cached per (user, tenant).
      */
     public function appKeys(): array
     {
@@ -44,22 +43,12 @@ trait HasApps
         $loader = function () {
             $configured = array_keys(config('innertia.apps', []));
 
-            $query = UserApp::where('user_id', $this->getKey())
+            return UserApp::where('user_id', $this->getKey())
                 ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentAppTenantId()))
-                ->whereIn('app', $configured);
-
-            // Filtro por org scope cuando feature activo
-            if (\Innertia\Platform\Organizations\OrganizationsFeature::isActive()) {
-                $scope = \Innertia\Facades\Innertia::organization()?->scope() ?? [];
-                if (! empty($scope)) {
-                    $query->where(function ($q) use ($scope) {
-                        $q->whereIn('organization_id', $scope)
-                          ->orWhereNull('organization_id'); // NULL = global al tenant
-                    });
-                }
-            }
-
-            return $query->distinct()->pluck('app')->all();
+                ->whereIn('app', $configured)
+                ->distinct()
+                ->pluck('app')
+                ->all();
         };
 
         return $ttl === null
@@ -186,17 +175,9 @@ trait HasApps
         $userId   = (string) $this->getKey();
         $tenantId = $this->currentAppTenantId();
 
-        // Incluye fingerprint del scope de orgs en el cache key para no servir
-        // resultados stale al cambiar de org context.
-        $orgFingerprint = '';
-        if (\Innertia\Platform\Organizations\OrganizationsFeature::isActive()) {
-            $scope = \Innertia\Facades\Innertia::organization()?->scope() ?? [];
-            $orgFingerprint = $scope ? '.orgs.' . implode(',', $scope) : '.orgs.all';
-        }
-
         return $tenantId
-            ? "innertia.apps.{$tenantId}.{$userId}{$orgFingerprint}"
-            : "innertia.apps.{$userId}{$orgFingerprint}";
+            ? "innertia.apps.{$tenantId}.{$userId}"
+            : "innertia.apps.{$userId}";
     }
 
     private function flushAppCache(): void
