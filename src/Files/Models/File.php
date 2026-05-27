@@ -274,7 +274,7 @@ class File extends Model
     {
         $this->revokeAllEntityAccess();
         Storage::disk($this->disk)->delete($this->path);
-        // TODO(Files-T3): event(new FileHardDeleted($this->id, $this->original_name));
+        event(new \Innertia\Files\Events\FileHardDeleted($this->id, $this->original_name));
 
         // Call SoftDeletes::forceDelete() via the trait. We cannot use parent::forceDelete()
         // here because that resolves to Model::forceDelete() (which just calls $this->delete()
