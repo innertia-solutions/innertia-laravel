@@ -130,4 +130,23 @@ class Directory extends Model
         return $q->where('path', 'like', $dir->path . '%')
                  ->where('id', '!=', $dir->id);
     }
+
+    // ── Static factories ─────────────────────────────────────────────────────
+
+    /**
+     * Factory method: creates a directory via CreateDirectory use case.
+     *
+     * @param  self|null  $parent   Parent directory (null for root)
+     * @param  string     $name     Directory name
+     * @param  \Illuminate\Database\Eloquent\Model|null  $owner  Optional owner model
+     * @return self
+     */
+    public static function createIn(?self $parent, string $name, ?\Illuminate\Database\Eloquent\Model $owner = null): self
+    {
+        return (new \Innertia\Files\Directories\UseCases\CreateDirectory(
+            parent: $parent,
+            name:   $name,
+            owner:  $owner,
+        ))->execute();
+    }
 }
