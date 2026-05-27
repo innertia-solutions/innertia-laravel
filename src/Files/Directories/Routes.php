@@ -29,6 +29,7 @@ class Routes
             Route::patch ('{id}',         [$controller, 'update'])->name('directories.update');
             Route::delete('{id}',         [$controller, 'destroy'])->name('directories.destroy');
             Route::get   ('{id}/tree',    [$controller, 'tree'])->name('directories.tree');
+            Route::get   ('{id}/files',   [$controller, 'files'])->name('directories.files');
             Route::post  ('{id}/restore', [$controller, 'restore'])->name('directories.restore');
         });
     }

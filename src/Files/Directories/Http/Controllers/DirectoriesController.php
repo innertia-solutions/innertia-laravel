@@ -277,6 +277,30 @@ class DirectoriesController extends Controller
         return DirectoryResource::collection($query->paginate($perPage));
     }
 
+    public function files(Request $request, string $id): AnonymousResourceCollection
+    {
+        $directoryClass = DirectoriesFeature::modelClass();
+        $dir = $directoryClass::find($id);
+
+        if (! $dir) {
+            abort(404, 'Directory not found.');
+        }
+
+        $query = \Innertia\Files\Models\File::query()
+            ->where('directory_id', $dir->id)
+            ->whereNull('deleted_at');
+
+        if ($search = $request->query('search')) {
+            $query->where('original_name', 'like', "%{$search}%");
+        }
+
+        $perPage = min(max((int) $request->query('per_page', 25), 1), 100);
+
+        return \Innertia\Files\Http\Resources\FileResource::collection(
+            $query->orderBy('original_name')->paginate($perPage)
+        );
+    }
+
     public function emptyTrash(Request $request): JsonResponse
     {
         $count = (new EmptyTrash())->execute();
