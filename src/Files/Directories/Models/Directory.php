@@ -166,4 +166,18 @@ class Directory extends Model
     {
         return (new \Innertia\Files\Directories\UseCases\MoveDirectory($this, null))->execute();
     }
+
+    public function trash(): self
+    {
+        return (new \Innertia\Files\Directories\UseCases\TrashDirectory($this))->execute();
+    }
+
+    /**
+     * Wrapper to disambiguate from Laravel's SoftDeletes::restore() which we keep available.
+     * Restores the entire trash group this directory belongs to.
+     */
+    public function restoreFromTrash(?self $relocateParent = null): self
+    {
+        return (new \Innertia\Files\Directories\UseCases\RestoreDirectory($this, $relocateParent))->execute();
+    }
 }
