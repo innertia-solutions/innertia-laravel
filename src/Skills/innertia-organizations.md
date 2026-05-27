@@ -194,6 +194,18 @@ Si `php artisan list innertia` no muestra `innertia:organization:*`, es porque e
 docker exec ... composer update innertia-solutions/laravel-innertia --with-dependencies
 ```
 
+## Eventos emitidos
+
+Organizations emite 3 eventos típados:
+
+| Evento | Cuándo dispara | Payload |
+|---|---|---|
+| `OrganizationEvent::Created` | `CreateOrganization::execute()` | organization_id, key, name, active |
+| `OrganizationEvent::Updated` | `UpdateOrganization::execute()` | organization_id, changes (old/new — incluye active flag para detectar activate/deactivate) |
+| `OrganizationEvent::Deleted` | `DeleteOrganization::execute()` | organization_id, key, name |
+
+Note: activate/deactivate se detecta vía changes payload de `Updated` — no hay eventos separados.
+
 ## Skills relacionados
 
 - `innertia-teams` — los Teams también pueden ser org-scoped (cada team pertenece a una org)

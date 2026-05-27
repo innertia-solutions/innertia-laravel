@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Events sweep — Tags, Teams, Organizations
+- **Tags now emit events**: `TagCreated`, `TagUpdated`, `TagDeleted`, `TagsAttached`, `TagsDetached`, `TagsSynced` via `\Innertia\Tags\Events\TagEvent` enum.
+- **Teams now emit events**: `TeamCreated`, `TeamUpdated`, `TeamDeleted`, `TeamMembersSynced` via `\Innertia\Platform\Teams\Events\TeamEvent` enum.
+- **Organizations now emit events**: `OrganizationCreated`, `OrganizationUpdated`, `OrganizationDeleted` via `\Innertia\Platform\Organizations\Events\OrganizationEvent` enum.
+- All 13 events extend `DomainEvent` and integrate with the EventBus — listen via `Innertia::events()->listen(...)`.
+- Test with `EventBusFake::fake()` + `assertDispatched(EnumCase, ?callback)`.
+
 ### BREAKING CHANGES
 - **DomainEvent contract unified.** Removed `DomainEvent::webhookKey()` method and `const KEY` convention.
   Every event must now implement `public function key(): DomainEventKey` returning an enum case.

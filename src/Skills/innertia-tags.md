@@ -142,6 +142,30 @@ Tablas indexadas:
 
 `withAllTags` usa `whereHas` con `count` — escala bien hasta ~100k registros. Si pasa eso, considerá denormalizar a una columna `tags_cache JSONB`.
 
+## Eventos emitidos
+
+Tags emite 6 eventos típados que cualquier producto puede escuchar:
+
+| Evento | Cuándo dispara | Payload |
+|---|---|---|
+| `TagEvent::Created` | `CreateTag::execute()` | tag_id, name, slug, color |
+| `TagEvent::Updated` | `UpdateTag::execute()` | tag_id, changes (old/new diff) |
+| `TagEvent::Deleted` | `DeleteTag::execute()` | tag_id, slug |
+| `TagEvent::Attached` | `AttachTags::execute()` | entity_type, entity_id, slugs |
+| `TagEvent::Detached` | `DetachTags::execute()` | entity_type, entity_id, slugs |
+| `TagEvent::Synced` | `SyncTags::execute()` | entity_type, entity_id, added, removed |
+
+Escuchar:
+
+```php
+use Innertia\Facades\Innertia;
+use Innertia\Tags\Events\TagEvent;
+
+Innertia::events()->listen(TagEvent::Created, function ($event) {
+    Log::info("Tag created: {$event->tag->slug}");
+});
+```
+
 ## Skills relacionados
 
 - `innertia-extending` — patrón template method para customización

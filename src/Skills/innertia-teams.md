@@ -187,6 +187,27 @@ Cuando TeamsFeature está activo, `/auth/me` devuelve:
 
 El frontend puede usar esto para renderizar el árbol de pertenencia sin extra requests.
 
+## Eventos emitidos
+
+Teams emite 4 eventos típados:
+
+| Evento | Cuándo dispara | Payload |
+|---|---|---|
+| `TeamEvent::Created` | `CreateTeam::execute()` | team_id, name, organization_id, parent_team_id |
+| `TeamEvent::Updated` | `UpdateTeam::execute()` | team_id, changes (old/new) |
+| `TeamEvent::Deleted` | `DeleteTeam::execute()` | team_id, name |
+| `TeamEvent::MembersSynced` | `SyncTeamMembers::execute()` | team_id, added (user IDs), removed |
+
+Ejemplo:
+
+```php
+Innertia::events()->listen(TeamEvent::MembersSynced, function ($event) {
+    foreach ($event->added as $userId) {
+        // welcome notification
+    }
+});
+```
+
 ## Skills relacionados
 
 - `innertia-organizations` — Teams pueden ser org-scoped
