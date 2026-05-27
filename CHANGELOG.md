@@ -23,6 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Event catalog introspection via `Innertia::events()->catalog()`.
 - **Tags feature** (opt-in): polymorphic, tenant-scoped tagging system. Enable with `INNERTIA_TAGS_ENABLED=true` + `php artisan innertia:tags:install`. Apply `HasTags` trait on any model. See `docs/superpowers/specs/2026-05-26-innertia-tags-design.md`.
 
+### Added (Directories feature)
+- **Directories feature** (opt-in): polymorphic owner-scoped tree with materialized path, soft delete with trash_group_id for Drive-style grouped restore, 6 dispatched events (DirectoryEvent enum). Enable with `INNERTIA_DIRECTORIES_ENABLED=true` + `php artisan innertia:directories:install`. Apply via `Directory::createIn($parent, $name, $owner)`. See `docs/superpowers/specs/2026-05-26-innertia-directories-design.md`.
+- `Innertia\Files\Directories\DirectoriesFeature` gate, install command, purge-trash artisan command.
+- `Innertia\Files\Directories\Models\Directory` model with tree navigation (descendants, ancestors, breadcrumbs).
+- 7 use cases (Create/Rename/Move/Trash/Restore/HardDelete/EmptyTrash).
+- `Routes::register()` opt-in HTTP layer with CRUD, restore, trash, /tree (via DataTree).
+- 6 typed events: `directories.created`, `.renamed`, `.moved`, `.trashed`, `.restored`, `.hard_deleted`.
+
 ### Changed
 - 5 Workflow events refactored to new `key()` / `variant()` contract.
 - `WorkflowEvent` enum implements `DomainEventKey`; `WorkflowEvent::forStep()` removed (replaced by `DomainEvent::variant()`).

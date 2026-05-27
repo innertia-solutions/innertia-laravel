@@ -39,11 +39,13 @@ src/
 | Organizations | `INNERTIA_ORGANIZATIONS_ENABLED=true` | `php artisan innertia:organization:install [--force]` | Crea `organizations`, agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_apps`, y tablas declaradas |
 | Teams | `INNERTIA_TEAMS_ENABLED=true` | `php artisan innertia:teams:install [--force]` | Crea `teams`, `team_members` |
 | Tags | `INNERTIA_TAGS_ENABLED=true` | `php artisan innertia:tags:install [--force]` | Crea `tags`, `taggables` (polimórfica). Tenant-scoped. Trait `HasTags` para cualquier modelo. |
+| Directories | `INNERTIA_DIRECTORIES_ENABLED=true` | `php artisan innertia:directories:install [--force]` | Crea `directories` (jerarquía con materialized path, trash con trash_group_id). Trait HasTags aplicable. Eventos vía DirectoryEvent enum. |
 
 Cada feature tiene un gate único:
 - `\Innertia\Platform\Organizations\OrganizationsFeature::isActive()`
 - `\Innertia\Platform\Teams\TeamsFeature::isActive()`
 - `\Innertia\Tags\TagsFeature::isActive()`
+- `\Innertia\Files\Directories\DirectoriesFeature::isActive()`
 
 `--force` regenera la migration con timestamp fresco. La migration usa `Schema::hasColumn()` para saltar tablas ya scopeadas — segura de re-aplicar cuando agregás tablas a `config('innertia.organizations.tables')`.
 
@@ -111,6 +113,7 @@ El paquete trae skills versionados en `src/Skills/*.md`. Cada proyecto consumido
 - `innertia-config` — referencia de config/innertia.php
 - `innertia-storage` — HasSingleFile, HasFiles, disks
 - `innertia-extending` — patrón template method para extender el paquete
+- `innertia-directories` — árbol de carpetas con materialized path, trash agrupado, eventos tipados (DirectoryEvent)
 
 Mantenerlos sincronizados con la realidad del código es responsabilidad del paquete — cualquier feature/refactor que cambia uso público debería actualizar el skill correspondiente.
 
