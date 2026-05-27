@@ -4,6 +4,7 @@ namespace Innertia\Files\Directories\UseCases;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Innertia\Files\Directories\Events\DirectoryHardDeleted;
 use Innertia\Files\Directories\Models\Directory;
 
@@ -25,6 +26,23 @@ class HardDeleteDirectory
         $name = $this->directory->name;
 
         DB::transaction(function () {
+            // Clean entity-level grants for all affected directories
+            if ($this->cascade) {
+                $affectedIds = Directory::withTrashed()
+                    ->where('path', 'like', $this->directory->path . '%')
+                    ->pluck('id')
+                    ->map(fn ($id) => (string) $id)
+                    ->all();
+            } else {
+                $affectedIds = [(string) $this->directory->id];
+            }
+
+            if (Schema::hasTable('entity_permissions')) {
+                \Innertia\Auth\RBAC\Models\EntityPermission::where('entity_type', Directory::class)
+                    ->whereIn('entity_id', $affectedIds)
+                    ->delete();
+            }
+
             if ($this->cascade) {
                 Directory::withTrashed()
                     ->where('path', 'like', $this->directory->path . '%')
