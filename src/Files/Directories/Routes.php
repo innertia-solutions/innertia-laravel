@@ -17,8 +17,9 @@ class Routes
     public static function register(
         string $prefix = 'directories',
         string $controller = Http\Controllers\DirectoriesController::class,
+        string $grantsController = Http\Controllers\DirectoryGrantsController::class,
     ): void {
-        Route::prefix($prefix)->group(function () use ($controller) {
+        Route::prefix($prefix)->group(function () use ($controller, $grantsController) {
             // Specific paths first to avoid {id} capturing 'trash'
             Route::get   ('trash',        [$controller, 'trash'])->name('directories.trash');
             Route::post  ('trash/empty',  [$controller, 'emptyTrash'])->name('directories.trash.empty');
@@ -31,6 +32,11 @@ class Routes
             Route::get   ('{id}/tree',    [$controller, 'tree'])->name('directories.tree');
             Route::get   ('{id}/files',   [$controller, 'files'])->name('directories.files');
             Route::post  ('{id}/restore', [$controller, 'restore'])->name('directories.restore');
+
+            // Grants (sharing)
+            Route::get   ('{id}/grants',  [$grantsController, 'index'])->name('directories.grants.index');
+            Route::post  ('{id}/grants',  [$grantsController, 'store'])->name('directories.grants.store');
+            Route::delete('{id}/grants',  [$grantsController, 'destroy'])->name('directories.grants.destroy');
         });
     }
 }
