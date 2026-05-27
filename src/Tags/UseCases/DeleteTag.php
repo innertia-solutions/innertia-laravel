@@ -19,6 +19,11 @@ class DeleteTag
             throw TagNotFoundException::forId($this->tagId);
         }
 
+        $id   = $tag->id;
+        $slug = $tag->slug;
+
         $tag->delete(); // taggables cascadean por FK
+
+        event(new \Innertia\Tags\Events\TagDeleted($id, $slug));
     }
 }

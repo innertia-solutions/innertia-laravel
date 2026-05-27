@@ -14,5 +14,7 @@ class DetachTags
     public function execute(): void
     {
         $this->entity->untag($this->names);
+
+        event(new \Innertia\Tags\Events\TagsDetached($this->entity, $this->names));
     }
 }

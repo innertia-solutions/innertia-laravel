@@ -14,5 +14,7 @@ class AttachTags
     public function execute(): void
     {
         $this->entity->tag($this->names);
+
+        event(new \Innertia\Tags\Events\TagsAttached($this->entity, $this->names));
     }
 }

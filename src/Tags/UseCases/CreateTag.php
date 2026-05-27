@@ -20,10 +20,14 @@ class CreateTag
             throw DuplicateTagException::forSlug($slug);
         }
 
-        return Tag::create([
+        $tag = Tag::create([
             'name'  => $this->name,
             'slug'  => $slug,
             'color' => $this->color,
         ]);
+
+        event(new \Innertia\Tags\Events\TagCreated($tag));
+
+        return $tag;
     }
 }

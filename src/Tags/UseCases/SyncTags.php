@@ -13,6 +13,14 @@ class SyncTags
 
     public function execute(): void
     {
+        $existingSlugs = $this->entity->tags()->pluck('slug')->all();
+
         $this->entity->retag($this->names);
+
+        $newSlugs = $this->entity->fresh()->tags()->pluck('slug')->all();
+        $added    = array_values(array_diff($newSlugs, $existingSlugs));
+        $removed  = array_values(array_diff($existingSlugs, $newSlugs));
+
+        event(new \Innertia\Tags\Events\TagsSynced($this->entity, $added, $removed));
     }
 }

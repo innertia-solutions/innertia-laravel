@@ -22,6 +22,9 @@ class UpdateTag
             throw TagNotFoundException::forId($this->tagId);
         }
 
+        $oldName  = $tag->name;
+        $oldColor = $tag->color;
+
         if ($this->name !== null) {
             $newSlug = Tag::slugify($this->name);
 
@@ -39,6 +42,13 @@ class UpdateTag
         }
 
         $tag->save();
+
+        $changes = [
+            'old' => ['name' => $oldName, 'color' => $oldColor],
+            'new' => ['name' => $tag->name, 'color' => $tag->color],
+        ];
+
+        event(new \Innertia\Tags\Events\TagUpdated($tag, $changes));
 
         return $tag;
     }
