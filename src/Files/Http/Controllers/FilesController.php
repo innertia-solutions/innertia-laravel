@@ -144,12 +144,18 @@ class FilesController extends Controller
                 $file = $file->rename($request->input('original_name'));
             }
 
-            // TODO (T10): Add move logic (moveTo / moveToRoot) once MoveFile use case is implemented.
-            // When directory_id is present:
-            //   - Check DirectoriesFeature::isActive() → abort 422 if false
-            //   - null  → $file->moveToRoot()
-            //   - uuid  → load Directory, call $file->moveTo($dir)
-            // Catch DirectoriesFeatureDisabledException → 422
+            if ($request->has('directory_id')) {
+                if ($request->input('directory_id') === null) {
+                    $file->moveToRoot();
+                } else {
+                    $directoryClass = \Innertia\Files\Directories\DirectoriesFeature::modelClass();
+                    $dir = $directoryClass::find($request->input('directory_id'));
+                    if (! $dir) {
+                        abort(422, 'Directory not found.');
+                    }
+                    $file->moveTo($dir);
+                }
+            }
 
         } catch (InvalidFileNameException $e) {
             return response()->json(['message' => $e->getMessage()], 422);

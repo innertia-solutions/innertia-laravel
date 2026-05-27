@@ -281,6 +281,16 @@ class File extends Model
         return (new \Innertia\Files\UseCases\RenameFile($this, $newName))->execute();
     }
 
+    public function moveTo(\Innertia\Files\Directories\Models\Directory $dir): self
+    {
+        return (new \Innertia\Files\UseCases\MoveFile($this, $dir))->execute();
+    }
+
+    public function moveToRoot(): self
+    {
+        return (new \Innertia\Files\UseCases\MoveFile($this, null))->execute();
+    }
+
     /**
      * Hard delete — removes storage and the DB row.
      *
@@ -313,6 +323,14 @@ class File extends Model
     public function owner(): MorphTo
     {
         return $this->morphTo();
+    }
+
+    public function directory(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(
+            \Innertia\Files\Directories\Models\Directory::class,
+            'directory_id'
+        );
     }
 
     // ── Private ───────────────────────────────────────────────────────────────

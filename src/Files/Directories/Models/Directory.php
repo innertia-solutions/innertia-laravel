@@ -48,6 +48,11 @@ class Directory extends Model
         return $this->hasMany(static::class, 'parent_id');
     }
 
+    public function files(): HasMany
+    {
+        return $this->hasMany(\Innertia\Files\Models\File::class, 'directory_id');
+    }
+
     // ── Tree navigation ──────────────────────────────────────────────────────
 
     /** Returns a query of all descendants (not the model itself). */
