@@ -23,6 +23,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Event catalog introspection via `Innertia::events()->catalog()`.
 - **Tags feature** (opt-in): polymorphic, tenant-scoped tagging system. Enable with `INNERTIA_TAGS_ENABLED=true` + `php artisan innertia:tags:install`. Apply `HasTags` trait on any model. See `docs/superpowers/specs/2026-05-26-innertia-tags-design.md`.
 
+### Files lifecycle (core)
+- File model now uses `SoftDeletes` — `delete()` is soft (preserves storage). Use `forceDelete()` for permanent removal.
+- **BREAKING:** `File::delete()` no longer removes the physical file. Use `forceDelete()` or `trash()` + `purge-trash` command for explicit lifecycle.
+- **BREAKING:** Inline view URL moved from `/files/{id}` to `/files/{id}/view`. Named route `innertia.files.view` is stable. Use `route('innertia.files.view', $id)` or `$file->viewUrl()` instead of hardcoded paths.
+- File model uses `HasTags` trait — files can be tagged out-of-the-box when Tags feature is active.
+- 6 typed events: `files.uploaded`, `.renamed`, `.moved`, `.trashed`, `.restored`, `.hard_deleted`.
+- New use cases: `UploadFile`, `RenameFile`, `MoveFile`, `TrashFile`, `RestoreFile`, `HardDeleteFile`, `EmptyFilesTrash`.
+- `innertia:files:purge-trash` artisan command with `INNERTIA_FILES_TRASH_RETENTION_DAYS` config.
+- HTTP endpoints via `\Innertia\Files\Routes::register()`: list/upload/rename/move/delete/restore/trash.
+
+### Files ↔ Directories integration
+- `directory_id` column added to files via `innertia:directories:install` (idempotent).
+- `$file->moveTo($directory)`, `$file->moveToRoot()`, `$file->directory()` relation.
+- `$directory->files()` relation.
+- Directory trash cascades to files (shared `trash_group_id` for grouped restore).
+- New endpoints: `GET /directories/{id}/files`, `POST /files` accepts `directory_id`, `PATCH /files/{id}` accepts `directory_id` for move.
+- Files trashed independently keep their own group — restoring the directory doesn't restore them.
+
 ### Added (Directories feature)
 - **Directories feature** (opt-in): polymorphic owner-scoped tree with materialized path, soft delete with trash_group_id for Drive-style grouped restore, 6 dispatched events (DirectoryEvent enum). Enable with `INNERTIA_DIRECTORIES_ENABLED=true` + `php artisan innertia:directories:install`. Apply via `Directory::createIn($parent, $name, $owner)`. See `docs/superpowers/specs/2026-05-26-innertia-directories-design.md`.
 - `Innertia\Files\Directories\DirectoriesFeature` gate, install command, purge-trash artisan command.

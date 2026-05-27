@@ -32,14 +32,20 @@ src/
 | `saas` | ✅ | ✅ | Multi-tenant via `X-Tenant` header. |
 | `api` | ❌ | ✅ JWT | API mode. Consumers manejan su propio scope. |
 
+## Features core (siempre activos)
+
+| Feature | Descripción |
+|---|---|
+| **Files** | Upload, storage, papelera (soft delete / restore / hard delete), HasTags en archivos, 6 eventos tipados (FileEvent), endpoints CRUD via `\Innertia\Files\Routes::register()`. **No tiene feature flag** — activo desde que el paquete está instalado. `File::delete()` es soft (storage preservado); usar `forceDelete()` para borrado físico. Inline view en `/files/{id}/view` (named route `innertia.files.view`). |
+
 ## Features opt-in (config flags)
 
 | Feature | Flag | Install | Schema |
 |---|---|---|---|
 | Organizations | `INNERTIA_ORGANIZATIONS_ENABLED=true` | `php artisan innertia:organization:install [--force]` | Crea `organizations`, agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_apps`, y tablas declaradas |
 | Teams | `INNERTIA_TEAMS_ENABLED=true` | `php artisan innertia:teams:install [--force]` | Crea `teams`, `team_members` |
-| Tags | `INNERTIA_TAGS_ENABLED=true` | `php artisan innertia:tags:install [--force]` | Crea `tags`, `taggables` (polimórfica). Tenant-scoped. Trait `HasTags` para cualquier modelo. |
-| Directories | `INNERTIA_DIRECTORIES_ENABLED=true` | `php artisan innertia:directories:install [--force]` | Crea `directories` (jerarquía con materialized path, trash con trash_group_id). Trait HasTags aplicable. Eventos vía DirectoryEvent enum. |
+| Tags | `INNERTIA_TAGS_ENABLED=true` | `php artisan innertia:tags:install [--force]` | Crea `tags`, `taggables` (polimórfica). Tenant-scoped. Trait `HasTags` para cualquier modelo. Cuando activo, `File` tiene `HasTags` disponible. |
+| Directories | `INNERTIA_DIRECTORIES_ENABLED=true` | `php artisan innertia:directories:install [--force]` | Crea `directories` (jerarquía con materialized path, trash con trash_group_id). Agrega `directory_id` a `files` (idempotente). Trait HasTags aplicable. Eventos vía DirectoryEvent enum. |
 
 Cada feature tiene un gate único:
 - `\Innertia\Platform\Organizations\OrganizationsFeature::isActive()`
@@ -111,7 +117,7 @@ El paquete trae skills versionados en `src/Skills/*.md`. Cada proyecto consumido
 - `innertia-webhooks` — outbound webhooks con HMAC signing
 - `innertia-mail` — InnertiaMailable, branding por tenant, NotificationMail fluent builder
 - `innertia-config` — referencia de config/innertia.php
-- `innertia-storage` — HasSingleFile, HasFiles, disks
+- `innertia-storage` — File model con soft delete, HasTags, HasEntityPermissions, eventos, papelera, integración con Directorios
 - `innertia-extending` — patrón template method para extender el paquete
 - `innertia-directories` — árbol de carpetas con materialized path, trash agrupado, eventos tipados (DirectoryEvent)
 

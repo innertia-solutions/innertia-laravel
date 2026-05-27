@@ -1,165 +1,311 @@
 ---
 name: innertia-storage
-description: Use when working with files, attachments, storage disks, avatars, or the HasSingleFile / HasFiles traits del paquete innertia-laravel. Trigger for "subir archivo", "avatar", "attachment", "storage disk", "File model", or "HasSingleFile".
+description: Use when working with files, storage, trash/restore lifecycle, file tagging, visibility/permissions, directory integration, or the HasSingleFile / HasFiles traits. Trigger for "subir archivo", "papelera", "File model", "HasSingleFile", "HasFiles", "storage disk", "attachment", "avatar", "file lifecycle", or "file events".
 ---
 
-# Innertia Storage — Files, HasSingleFile, HasFiles
+# Innertia Storage — Files Lifecycle
 
-El paquete provee una capa sobre `Illuminate\Filesystem` para manejar archivos asociados a modelos: un modelo `File`, dos traits (`HasSingleFile`, `HasFiles`), y una integración con los disks de Laravel.
+El paquete provee un sistema completo de gestión de archivos: upload, storage, papelera, tags,
+eventos tipados e integración con Directorios. Files es **core** — siempre activo, sin feature flag.
+
+## Cuándo usar
+
+| Necesidad | Solución |
+|---|---|
+| Subir y guardar un archivo | `File::fromRequest()` / `UploadFile` use case |
+| Papelera (soft delete) | `$file->trash()` / `$file->restoreFromTrash()` |
+| Borrado permanente | `$file->forceDelete()` |
+| Taggear archivos | `$file->tag('factura')` — requiere `INNERTIA_TAGS_ENABLED=true` |
+| Árbol de carpetas | `$file->moveTo($dir)` — requiere DirectoriesFeature activa |
+| Endpoints CRUD HTTP | `\Innertia\Files\Routes::register()` en las rutas privadas |
+
+## Habilitar
+
+**Files es core** — no tiene feature flag. Está activo desde que se aplica el paquete.
+
+Para funcionalidades adicionales:
+- **Tags en archivos**: `INNERTIA_TAGS_ENABLED=true` + `php artisan innertia:tags:install`
+- **Directorios**: `INNERTIA_DIRECTORIES_ENABLED=true` + `php artisan innertia:directories:install`
+  (este comando también agrega `directory_id` a la tabla `files`)
 
 ## Modelo File
 
-`\Innertia\Files\Models\File` — la entidad central. Schema típico:
+`\Innertia\Files\Models\File` — entidad central. Traits aplicados:
 
+- `SoftDeletes` — `delete()` es soft (preserva storage). Usar `forceDelete()` para borrar storage.
+- `HasTags` — tagging cuando TagsFeature activa.
+- `HasEntityPermissions` — grants por usuario/rol cuando visibility es `restricted`.
+
+Schema:
 ```
-files (id uuid PK, tenant_id, disk, path, original_name, mime, size, meta jsonb, created_by, timestamps)
+files (
+  id uuid PK,
+  disk, path, original_name, mime_type, extension,
+  size int, visibility string,
+  owner_type, owner_id (morph),
+  directory_id uuid nullable FK → directories,
+  trash_group_id uuid nullable,
+  created_by uuid,
+  deleted_at timestamp,   ← soft delete
+  timestamps
+)
 ```
 
-- `disk` — nombre del disk de Laravel (`local`, `s3`, etc.)
-- `path` — ruta relativa dentro del disk
-- `meta` — bag JSON para datos custom (dimensiones, hash, tags)
-
-Accesores útiles:
+### API del modelo
 
 ```php
-$file->url        // URL absoluta resolvida via Storage::disk($disk)->url($path)
-$file->stream()   // Stream para download
-$file->contents() // Bytes en memoria (cuidado con archivos grandes)
-$file->exists()   // Verifica en el disk
+// Lifecycle
+$file->trash()                          // soft delete → FileEvent::Trashed
+$file->restoreFromTrash($dirId?)        // restore → FileEvent::Restored
+$file->forceDelete()                    // borra storage + DB row → FileEvent::HardDeleted
+$file->rename('nuevo-nombre.pdf')       // → FileEvent::Renamed
+$file->moveTo($directory)               // → FileEvent::Moved
+$file->moveToRoot()                     // → FileEvent::Moved (directory_id = null)
+
+// Relaciones
+$file->directory()                      // BelongsTo Directory
+$file->owner()                          // MorphTo (owner model)
+
+// Helpers
+$file->sizeMb()
+$file->sizeKb()
+$file->isImage()
+$file->isPdf()
 ```
 
-## Trait HasSingleFile (relación 1:1)
-
-Cuando un modelo tiene UN archivo principal (avatar, isologo):
+## Factories estáticas
 
 ```php
-use Innertia\Platform\Traits\HasSingleFile;
+// Desde un request HTTP (field 'attachment')
+$file = File::fromRequest($request, 'attachment', disk: 's3');
 
+// Desde UploadedFile ya validado
+$file = File::fromUploadedFile($uploadedFile, disk: 'tenant-files');
+
+// Desde una ruta absoluta del filesystem local
+$file = File::fromPath('/tmp/report.csv', visibility: 'auth');
+
+// Desde URL remota (hace GET + persiste en el disk)
+$file = File::fromUrl('https://example.com/data.xlsx', disk: 's3');
+```
+
+Todos crean el registro en DB + mueven el archivo al disk indicado.
+Si no se especifica disk, usa `config('filesystems.default')`.
+
+## Visibility model
+
+| Valor | Quién accede |
+|---|---|
+| `public` | Cualquiera, sin autenticación |
+| `auth` | Cualquier usuario autenticado (default) |
+| `restricted` | Solo usuarios/roles con grants explícitos |
+
+```php
+// Restricción explícita
+$file->allowUsers($user1, $user2);          // visibility → 'restricted'
+$file->allowRoles('admin', 'manager');      // visibility → 'restricted'
+$file->restrict(users: [$user1], roles: ['admin']);
+
+// Check
+$file->isAccessibleBy($user);  // true/false
+```
+
+`isAccessibleBy` para `restricted`: creator siempre tiene acceso, luego entity-level permissions,
+luego cascade vía `$file->owner->canAccess($user)` si el owner implementa ese método.
+
+## URLs
+
+```php
+$file->url()             // /files/{id}/download — siempre forzado como descarga
+$file->viewUrl()         // /files/{id}/view — inline (PDF/imagen en browser)
+$file->temporaryUrl(60)  // URL firmada del driver (S3/etc.) — bypasses permission check
+```
+
+Las rutas de serving (`/view` y `/download`) se registran automáticamente por el ServiceProvider.
+No requieren `Routes::register()`.
+
+> **BREAKING (migración):** El endpoint inline view cambió de `/files/{id}` → `/files/{id}/view`.
+> Usar `route('innertia.files.view', $id)` o `$file->viewUrl()` — ambos son estables.
+
+## HasSingleFile / HasFiles traits (legado — siguen funcionando)
+
+Para modelos que necesitan asociar archivos directamente:
+
+```php
+// 1:1 (avatar, logo)
 class Worker extends Model {
-    use HasSingleFile;
+    use \Innertia\Platform\Traits\HasSingleFile;
 }
 
-// Accesor automático
-$worker->file       // ?File
-$worker->file?->url // URL para el frontend
-```
-
-Cómo asociar:
-
-```php
+$worker->file           // ?File
 $worker->setFile($uploadedFile, disk: 's3');
 $worker->clearFile();   // soft-detach
-$worker->deleteFile();  // hard-delete del archivo en el disk + del registro File
-```
+$worker->deleteFile();  // hard-delete storage + registro
 
-## Trait HasFiles (relación 1:N)
-
-Cuando un modelo tiene MUCHOS archivos (documento con múltiples revisiones, project con anexos):
-
-```php
-use Innertia\Platform\Traits\HasFiles;
-
+// 1:N (documento con múltiples revisiones)
 class Document extends Model {
-    use HasFiles;
+    use \Innertia\Platform\Traits\HasFiles;
 }
 
-$document->files                              // Collection<File>
-$document->addFile($uploadedFile, ['tag' => 'evidence']);
+$document->files                               // Collection<File>
+$document->addFile($uploadedFile);
 $document->removeFile($fileId);
-$document->files()->where('meta->tag', 'evidence')->get();
 ```
 
-## Storage disks
+## HasTags integración
 
-Los archivos viven en disks definidos en `config/filesystems.php`. El paquete no impone disks particulares — usá los de Laravel:
+Cuando `INNERTIA_TAGS_ENABLED=true`, el modelo `File` tiene `HasTags` activo:
 
 ```php
-// config/filesystems.php
-'disks' => [
-    'local' => [...],
-    's3' => [
-        'driver' => 's3',
-        'key'    => env('AWS_ACCESS_KEY_ID'),
-        ...
-    ],
-    'tenant-files' => [
-        'driver' => 's3',
-        'bucket' => env('TENANT_FILES_BUCKET'),
-    ],
+$file->tag('factura', 'urgente');
+$file->untag('urgente');
+$file->tags;                        // Collection<Tag>
+
+// Scopes en queries
+File::withAnyTags(['factura', 'urgente'])->get();
+File::withAllTags(['factura', 'urgente'])->get();
+File::withoutTags(['borrador'])->get();
+```
+
+## Eventos
+
+```php
+use Innertia\Files\Events\FileEvent;
+
+// 6 casos tipados
+FileEvent::Uploaded    // 'files.uploaded'
+FileEvent::Renamed     // 'files.renamed'
+FileEvent::Moved       // 'files.moved'
+FileEvent::Trashed     // 'files.trashed'
+FileEvent::Restored    // 'files.restored'
+FileEvent::HardDeleted // 'files.hard_deleted'
+
+// Suscribir
+Innertia::events()->listen(FileEvent::Uploaded, function (FileUploaded $event) {
+    // $event->fileId, $event->originalName, $event->disk, $event->path
+});
+
+// Wildcard (todos los eventos de files)
+Innertia::events()->listen(FileEvent::class, MyFileListener::class);
+```
+
+## HTTP endpoints CRUD
+
+Registrar en las rutas privadas:
+
+```php
+// routes/api.private.php
+Route::middleware(['auth:api', 'tenant.require'])->group(function () {
+    \Innertia\Files\Routes::register();   // monta en /files
+    // o con prefijo custom:
+    \Innertia\Files\Routes::register('documentos', App\Http\DocumentosController::class);
+});
+```
+
+| Método | Ruta | Acción |
+|---|---|---|
+| `GET` | `/files` | Lista paginada. Query: `trashed=only\|with`, `search`, `owner_type`, `owner_id`, `include=tags`, `per_page` |
+| `POST` | `/files` | Upload. Body: `file` (multipart), `visibility?`, `owner_type?`, `owner_id?`, `directory_id?` |
+| `GET` | `/files/{id}` | Detalle. Query: `include=tags` |
+| `PATCH` | `/files/{id}` | Rename (`original_name`) + Move (`directory_id`, null = root) |
+| `DELETE` | `/files/{id}` | Soft-delete (trash). Query: `?force=true` para hard-delete permanente |
+| `POST` | `/files/{id}/restore` | Restaurar desde papelera. Body: `directory_id?` |
+| `GET` | `/files/trash` | Lista sólo trashed, ordenado por `deleted_at` desc |
+| `POST` | `/files/trash/empty` | Purge completo de papelera (hard-delete todos) |
+
+## Endpoints de serving (siempre activos)
+
+Registrados automáticamente por `InnertiaServiceProvider`, sin necesidad de `Routes::register()`:
+
+| Ruta | Named route | Comportamiento |
+|---|---|---|
+| `GET /files/{id}/view` | `innertia.files.view` | Inline — `Content-Disposition: inline` |
+| `GET /files/{id}/download` | `innertia.files.download` | Descarga forzada — `Content-Disposition: attachment` |
+
+Ambos respetan `visibility` + `isAccessibleBy()`. Archivos trashed devuelven 404.
+
+## Directorios integración
+
+Cuando `DirectoriesFeature` está activa (`INNERTIA_DIRECTORIES_ENABLED=true`):
+
+```php
+// Mover archivo a carpeta
+$file->moveTo($directory);     // actualiza directory_id → FileEvent::Moved
+$file->moveToRoot();           // directory_id = null   → FileEvent::Moved
+
+// Relación inversa
+$directory->files();           // HasMany<File>
+
+// Endpoint adicional
+GET /directories/{id}/files    // lista archivos de esa carpeta
+```
+
+**Cascade trash desde Directory:** Cuando una carpeta se envía a la papelera, sus archivos activos
+(no trashados independientemente) se trashean con el mismo `trash_group_id`. Al restaurar el
+directorio, todos los archivos del mismo grupo se restauran juntos.
+
+```php
+// Archivos trashados antes que su directorio mantienen su propio grupo
+// → restaurar el directorio NO los restaura
+```
+
+## Papelera lifecycle
+
+```
+upload
+  └─► File (activo, storage presente)
+        └─► trash()          → SoftDeletes, storage PRESERVADO, FileEvent::Trashed
+              └─► restoreFromTrash()  → activo de nuevo, FileEvent::Restored
+              └─► forceDelete()       → borra storage + DB row, FileEvent::HardDeleted
+              └─► innertia:files:purge-trash (comando artisan)
+                    → forceDelete() en todos los trashed que superan retention days
+```
+
+> **BREAKING:** `File::delete()` ahora es soft — el storage físico NO se borra.
+> Usar `$file->forceDelete()` o el comando purge para borrado permanente.
+
+## Retention / purge automático
+
+```env
+INNERTIA_FILES_TRASH_RETENTION_DAYS=30   # null = no auto-purge
+```
+
+```bash
+php artisan innertia:files:purge-trash           # purga archivos en papelera > retention days
+php artisan innertia:files:purge-trash --dry-run # preview sin borrar
+```
+
+Programar en `app/Console/Kernel.php`:
+```php
+$schedule->command('innertia:files:purge-trash')->daily();
+```
+
+## Performance / config
+
+```php
+// config/innertia.php
+'files' => [
+    'max_upload_mb' => env('INNERTIA_FILES_MAX_UPLOAD_MB', 20),
+    'disk'          => env('INNERTIA_FILES_DISK', 'local'),
+    'trash_retention_days' => env('INNERTIA_FILES_TRASH_RETENTION_DAYS', null),
 ],
 ```
 
-Y elegís cuál usar al asociar el archivo:
+Validation rule de upload aplicada automáticamente en `FilesController::store()`:
+`'file' => ['required', 'file', 'max:' . (config('innertia.files.max_upload_mb') * 1024)]`
 
-```php
-$worker->setFile($upload, disk: 'tenant-files');
-```
+## Migration breaking change — resumen
 
-## Pattern: file upload en un controller
-
-```php
-public function uploadAvatar(Request $request, string $id): JsonResponse {
-    $data = $request->validate([
-        'avatar' => 'required|image|max:2048',   // 2MB
-    ]);
-
-    $worker = Worker::findOrFail($id);
-    $worker->setFile($data['avatar']);
-
-    return response()->json(['url' => $worker->file?->url]);
-}
-```
-
-## Pattern: download autorizado
-
-```php
-public function download(string $fileId) {
-    $file = File::findOrFail($fileId);
-
-    Gate::authorize('view', $file);   // tu propio DomainGate
-
-    return Storage::disk($file->disk)->download($file->path, $file->original_name);
-}
-```
-
-## Cleanup automático
-
-Cuando se elimina el modelo padre, los traits NO eliminan los archivos automáticamente — es decisión consciente para evitar pérdida de data. Si querés cleanup, override en el Observer:
-
-```php
-class WorkerObserver {
-    public function deleted(Worker $worker) {
-        $worker->deleteFile();   // explícito
-    }
-}
-```
-
-O usá `forceDelete()` para soft-deleted models que ya están confirmados a borrar.
-
-## Disks per-tenant
-
-Si querés disks por tenant (cada tenant tiene su bucket o subfolder), usá un disk dinámico:
-
-```php
-// app/Providers/AppServiceProvider.php
-Storage::extend('tenant', function ($app, $config) {
-    $tenant = Innertia::tenant();
-    return Storage::createS3Driver(array_merge($config, [
-        'root' => "tenants/{$tenant?->key}/files",
-    ]));
-});
-
-// config/filesystems.php
-'tenant' => ['driver' => 'tenant', /* ... */],
-```
-
-Luego: `$worker->setFile($upload, disk: 'tenant');`.
-
-## Exports
-
-Los exports usan su propio disk via `config('innertia.exports.disk')`. El paquete persiste ZIPs ahí. Ver skill `innertia-config`.
+| Comportamiento | Antes | Ahora |
+|---|---|---|
+| `File::delete()` | Borraba storage + DB | Soft delete (storage preservado) |
+| Inline view URL | `/files/{id}` | `/files/{id}/view` — named route `innertia.files.view` |
+| Hard-delete explícito | N/A | `$file->forceDelete()` |
 
 ## Skills relacionados
 
-- `innertia-config` — bloque `exports`, mail logo url
-- `innertia-framework` — convención de modelos en Domains/
+- `innertia-directories` — árbol de carpetas, materialized path, cascade trash
+- `innertia-tags` — sistema de tags polimórfico, HasTags, scopes de query
+- `innertia-events` — Event Bus tipado, DomainEventKey, listen/fake
+- `innertia-permissions` — entity-level permissions, HasEntityPermissions
+- `innertia-config` — referencia de `config/innertia.php`
