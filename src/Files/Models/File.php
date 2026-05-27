@@ -10,6 +10,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Innertia\Auth\RBAC\Models\EntityPermission;
+use Innertia\Files\Directories\Models\Directory;
 use Innertia\Platform\Traits\HasEntityPermissions;
 use Innertia\Tags\Traits\HasTags;
 
@@ -347,11 +349,49 @@ class File extends Model
             return true;
         }
 
+        // Inherited access via ancestor directory grant
+        if ($this->directory_id && $this->inheritedDirectoryAccess($user)) {
+            return true;
+        }
+
         // Cascade via owner — if the owning model implements canAccess()
         if ($this->owner && method_exists($this->owner, 'canAccess')) {
             return $this->owner->canAccess($user);
         }
 
         return false;
+    }
+
+    /**
+     * Check if any ancestor directory of this file's directory has granted access to $user.
+     *
+     * Parses the directory's materialized path to extract ancestor IDs (including the
+     * directory itself), then checks entity_permissions for any grant on those directories
+     * for the given user. Any grant on any ancestor = file is accessible (OR logic).
+     */
+    private function inheritedDirectoryAccess(Authenticatable $user): bool
+    {
+        // Load directory (use eager-loaded relation if available to avoid N+1)
+        $directory = $this->relationLoaded('directory')
+            ? $this->getRelation('directory')
+            : $this->directory()->first();
+
+        if (! $directory) {
+            return false;
+        }
+
+        // Parse materialized path: "/uuid1/uuid2/uuid3/" → [uuid1, uuid2, uuid3]
+        // This includes the directory itself AND all its ancestors.
+        $pathIds = array_values(array_filter(explode('/', $directory->path)));
+
+        if (empty($pathIds)) {
+            return false;
+        }
+
+        return EntityPermission::where('entity_type', Directory::class)
+            ->whereIn('entity_id', $pathIds)
+            ->where('grantable_type', get_class($user))
+            ->where('grantable_id', (string) $user->getAuthIdentifier())
+            ->exists();
     }
 }
