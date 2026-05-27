@@ -188,6 +188,11 @@ return [
         'verbose_catalog'   => env('APP_DEBUG', false),
     ],
 
+    'files' => [
+        'trash_retention_days' => env('INNERTIA_FILES_TRASH_RETENTION_DAYS', null),
+        'max_upload_mb'        => (int) env('INNERTIA_FILES_MAX_UPLOAD_MB', 100),
+    ],
+
     'directories' => [
         'enabled'              => env('INNERTIA_DIRECTORIES_ENABLED', false),
         'model'                => \Innertia\Files\Directories\Models\Directory::class,
