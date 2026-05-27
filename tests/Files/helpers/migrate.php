@@ -26,6 +26,7 @@ function innertiaFilesMigrateUp(): void
         $table->enum('visibility', ['public', 'auth', 'restricted'])->default('auth');
         $table->nullableUuidMorphs('owner');
         $table->string('created_by')->nullable();
+        $table->uuid('directory_id')->nullable()->index();
         $table->timestamps();
         $table->uuid('trash_group_id')->nullable()->index();
         $table->softDeletes();
