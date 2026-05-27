@@ -38,8 +38,22 @@ class UpdateOrganization extends UseCase
         $model = config('innertia.organizations.model', Organization::class);
         $org   = $model::findOrFail($this->id);
 
+        $old = [
+            'name'   => $org->name,
+            'key'    => $org->key,
+            'active' => $org->active,
+        ];
+
         $org->fill($this->attributes());
         $org->save();
+
+        $new = [
+            'name'   => $org->name,
+            'key'    => $org->key,
+            'active' => $org->active,
+        ];
+
+        event(new \Innertia\Platform\Organizations\Events\OrganizationUpdated($org, ['old' => $old, 'new' => $new]));
 
         return $org;
     }

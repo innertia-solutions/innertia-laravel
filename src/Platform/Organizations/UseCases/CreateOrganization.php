@@ -44,6 +44,10 @@ class CreateOrganization extends UseCase
     {
         $model = config('innertia.organizations.model', Organization::class);
 
-        return $model::create($this->attributes());
+        $organization = $model::create($this->attributes());
+
+        event(new \Innertia\Platform\Organizations\Events\OrganizationCreated($organization));
+
+        return $organization;
     }
 }

@@ -12,6 +12,14 @@ class DeleteOrganization extends UseCase
     public function execute(): void
     {
         $model = config('innertia.organizations.model', Organization::class);
-        $model::findOrFail($this->id)->delete();
+        $org   = $model::findOrFail($this->id);
+
+        $id   = $org->id;
+        $key  = $org->key;
+        $name = $org->name;
+
+        $org->delete();
+
+        event(new \Innertia\Platform\Organizations\Events\OrganizationDeleted($id, $key, $name));
     }
 }
