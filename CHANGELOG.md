@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Sharing & inherited permissions (Sub-C)
+- **Directory grants**: `Directory` now uses `HasEntityPermissions` — `grantAccessTo()`, `revokeAccessFrom()`, `isAccessibleBy()`.
+- **`Directory::scopeAccessibleBy($user)`**: Eloquent scope that returns directories where the user has a direct grant or a grant on any ancestor (materialized path inheritance via `LIKE` query).
+- **File inherits directory access**: `File::isAccessibleBy($user)` now checks ancestor directory grants via `inheritedDirectoryAccess()` — parsing the materialized path to find all ancestor IDs in one query.
+- **`ShareDirectory` / `RevokeDirectoryShare`**: Use cases to grant/revoke access to a directory.
+- **`ShareFile` / `RevokeFileShare`**: Use cases to grant/revoke access to a file.
+- **`DirectoryGrantsController`**: `GET/POST/DELETE /directories/{id}/grants`.
+- **`FileGrantsController`**: `GET/POST/DELETE /files/{id}/grants`.
+- **`SharedFilesController`**: `GET /files/shared-with-me` — paginated files accessible via grant (excludes own files).
+- **`EntityPermissionResource`**: JSON resource for entity_permissions rows.
+- **`AccessDeniedException`**: Exception class for access control failures.
+- **HardDeleteDirectory cleanup**: `revokeAllEntityAccess()` on target + descendants runs inside the DB transaction before `forceDelete()`.
+- **Routes**: `Files\Routes::register()` and `Directories\Routes::register()` now include grants + shared-with-me endpoints.
+
 ### Events sweep — Tags, Teams, Organizations
 - **Tags now emit events**: `TagCreated`, `TagUpdated`, `TagDeleted`, `TagsAttached`, `TagsDetached`, `TagsSynced` via `\Innertia\Tags\Events\TagEvent` enum.
 - **Teams now emit events**: `TeamCreated`, `TeamUpdated`, `TeamDeleted`, `TeamMembersSynced` via `\Innertia\Platform\Teams\Events\TeamEvent` enum.

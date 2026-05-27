@@ -36,7 +36,7 @@ src/
 
 | Feature | Descripción |
 |---|---|
-| **Files** | Upload, storage, papelera (soft delete / restore / hard delete), HasTags en archivos, 6 eventos tipados (FileEvent), endpoints CRUD via `\Innertia\Files\Routes::register()`. **No tiene feature flag** — activo desde que el paquete está instalado. `File::delete()` es soft (storage preservado); usar `forceDelete()` para borrado físico. Inline view en `/files/{id}/view` (named route `innertia.files.view`). |
+| **Files** | Upload, storage, papelera (soft delete / restore / hard delete), HasTags en archivos, 6 eventos tipados (FileEvent), endpoints CRUD via `\Innertia\Files\Routes::register()`. **No tiene feature flag** — activo desde que el paquete está instalado. `File::delete()` es soft (storage preservado); usar `forceDelete()` para borrado físico. Inline view en `/files/{id}/view` (named route `innertia.files.view`). Sharing: grantAccessTo($user)/revokeAccessFrom($user) en files y directories; acceso heredado desde ancestros; endpoints /files/{id}/grants, /directories/{id}/grants, /files/shared-with-me via Routes::register(). |
 
 ## Features opt-in (config flags)
 

@@ -309,3 +309,73 @@ Validation rule de upload aplicada automáticamente en `FilesController::store()
 - `innertia-events` — Event Bus tipado, DomainEventKey, listen/fake
 - `innertia-permissions` — entity-level permissions, HasEntityPermissions
 - `innertia-config` — referencia de `config/innertia.php`
+
+## Sharing & Inherited Permissions (Sub-C)
+
+### Directory access control
+
+`Directory` uses `HasEntityPermissions` (same trait as `File`). Fluent API:
+
+```php
+$directory->grantAccessTo($user, 'access');  // or 'view', 'edit', 'manage'
+$directory->revokeAccessFrom($user, 'access');
+$directory->isAccessibleBy($user);           // true if any grant exists (action ignored — Drive-style OR logic)
+```
+
+`scopeAccessibleBy($user)` filters directories by direct grant OR grant on any ancestor directory (materialized path inheritance):
+
+```php
+Directory::accessibleBy($user)->get();
+```
+
+### File access sources
+
+`File::isAccessibleBy($user)` returns `true` if any of the following:
+
+1. File visibility is `public` or `auth` (existing behavior)
+2. `created_by = user` — owner always has access (existing behavior)
+3. Direct grant on the file via `entity_permissions` (existing behavior)
+4. **NEW:** Grant on any ancestor directory of the file (materialized path inheritance)
+
+OR logic — the most permissive grant wins. No restriction inheritance.
+
+### Use cases
+
+```php
+// Share a directory with a user
+(new ShareDirectory($directory, $user, 'access'))->execute();   // returns EntityPermission
+(new RevokeDirectoryShare($directory, $user, 'access'))->execute();
+
+// Share a file with a user
+(new ShareFile($file, $user, 'access'))->execute();             // returns EntityPermission
+(new RevokeFileShare($file, $user, 'access'))->execute();
+```
+
+Default action: `'access'`. Supported actions: `access | view | edit | manage`.
+
+### HTTP endpoints
+
+```
+GET    /directories/{id}/grants        — list grants on a directory
+POST   /directories/{id}/grants        — grant access: {grantable_type, grantable_id, action}
+DELETE /directories/{id}/grants        — revoke access: {grantable_type, grantable_id, action}
+
+GET    /files/{id}/grants              — list grants on a file
+POST   /files/{id}/grants              — grant access: {grantable_type, grantable_id, action}
+DELETE /files/{id}/grants              — revoke access: {grantable_type, grantable_id, action}
+
+GET    /files/shared-with-me           — paginated list of files shared with the authenticated user
+                                         (excludes files the user created themselves)
+```
+
+Body for POST/DELETE: `{ "grantable_type": "user", "grantable_id": "<uuid>", "action": "access" }`
+
+Response for grant endpoints: `EntityPermissionResource` — `{id, entity_type, entity_id, grantable_type, grantable_id, action, created_at}`.
+
+### Cleanup on HardDelete
+
+`HardDeleteDirectory` calls `revokeAllEntityAccess()` on all affected directories (the target + all descendants) inside the DB transaction before `forceDelete()`. The `entity_permissions` table stays clean.
+
+### Exception
+
+`Innertia\Files\Exceptions\AccessDeniedException` — thrown when access is denied. Extend HTTP layer to catch and return 403 as needed.
