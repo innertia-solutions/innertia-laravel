@@ -101,10 +101,25 @@ return new class extends Migration
                 );
             });
         }
+
+        // Wire files table integration — adds directory_id if files exists and column missing
+        if (Schema::hasTable('files') && ! Schema::hasColumn('files', 'directory_id')) {
+            Schema::table('files', function (Blueprint $table) {
+                $table->uuid('directory_id')->nullable()->index()->after('owner_id');
+            });
+        }
     }
 
     public function down(): void
     {
+        // Remove directory_id from files if we added it
+        if (Schema::hasColumn('files', 'directory_id')) {
+            Schema::table('files', function (Blueprint $table) {
+                $table->dropIndex(['directory_id']);
+                $table->dropColumn('directory_id');
+            });
+        }
+
         Schema::dropIfExists('directories');
     }
 };

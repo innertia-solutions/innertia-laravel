@@ -41,6 +41,19 @@ it('generates migration with directories table when enabled', function () {
     expect($contents)->toContain('directories_name_unique');  // partial unique index
 });
 
+it('migration adds directory_id to files when files table exists', function () {
+    config()->set('innertia.directories.enabled', true);
+
+    $this->artisan('innertia:directories:install', ['--path' => $this->migrationsDir])
+        ->assertSuccessful();
+
+    $files = glob($this->migrationsDir . '/*_create_directories_table*.php');
+    $contents = file_get_contents($files[0]);
+
+    expect($contents)->toContain("Schema::hasColumn('files', 'directory_id')");
+    expect($contents)->toContain("\$table->uuid('directory_id')->nullable()");
+});
+
 it('does not overwrite without --force', function () {
     config()->set('innertia.directories.enabled', true);
 
