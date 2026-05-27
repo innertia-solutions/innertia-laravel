@@ -237,6 +237,7 @@ class InnertiaServiceProvider extends ServiceProvider
 
             // Directories install command — same pattern: registered always, guard runs at execution.
             $commands[] = \Innertia\Files\Directories\Console\DirectoriesInstallCommand::class;
+            $commands[] = \Innertia\Files\Directories\Console\PurgeTrashCommand::class;
 
             // Claude Code skills installer — instala skills del paquete en .claude/skills/innertia/
             $commands[] = \Innertia\Console\SkillsInstallCommand::class;
