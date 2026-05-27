@@ -12,7 +12,7 @@ class RevokeDirectoryShare extends UseCase
     public function __construct(
         public readonly Directory $directory,
         public readonly Model    $grantable,
-        public readonly string   $action = 'view',
+        public readonly string   $action = 'access',
     ) {}
 
     public function execute(): void

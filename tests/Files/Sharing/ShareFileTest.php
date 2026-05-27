@@ -50,7 +50,7 @@ function makeFakeFileUser(): FakeFileUser
     return $u;
 }
 
-it('ShareFile creates a view grant by default', function () {
+it('ShareFile creates an access grant by default', function () {
     $file = makeShareFile();
     $user = makeFakeFileUser();
 
@@ -60,7 +60,7 @@ it('ShareFile creates a view grant by default', function () {
         ->where('entity_id', $file->id)
         ->where('grantable_type', FakeFileUser::class)
         ->where('grantable_id', $user->id)
-        ->where('action', 'view')
+        ->where('action', 'access')
         ->exists()
     )->toBeTrue();
 });
@@ -122,7 +122,7 @@ it('file becomes accessible after ShareFile is called', function () {
 
     expect($file->isAccessibleBy($user))->toBeFalse();
 
-    (new ShareFile($file, $user, 'access'))->execute();
+    (new ShareFile($file, $user))->execute(); // default 'access' now works
 
     expect($file->fresh()->isAccessibleBy($user))->toBeTrue();
 });

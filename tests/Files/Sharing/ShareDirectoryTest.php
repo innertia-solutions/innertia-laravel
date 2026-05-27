@@ -43,7 +43,7 @@ function makeFakeDirUser(): FakeDirUser
     return $u;
 }
 
-it('ShareDirectory creates an entity grant with default view action', function () {
+it('ShareDirectory creates an entity grant with default access action', function () {
     $dir  = makeShareDir(name: 'docs');
     $user = makeFakeDirUser();
 
@@ -53,7 +53,7 @@ it('ShareDirectory creates an entity grant with default view action', function (
         ->where('entity_id', $dir->id)
         ->where('grantable_type', FakeDirUser::class)
         ->where('grantable_id', $user->id)
-        ->where('action', 'view')
+        ->where('action', 'access')
         ->exists()
     )->toBeTrue();
 });

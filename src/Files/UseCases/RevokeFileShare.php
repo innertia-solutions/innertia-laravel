@@ -12,7 +12,7 @@ class RevokeFileShare extends UseCase
     public function __construct(
         public readonly File   $file,
         public readonly Model  $grantable,
-        public readonly string $action = 'view',
+        public readonly string $action = 'access',
     ) {}
 
     public function execute(): void
