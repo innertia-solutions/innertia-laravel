@@ -149,4 +149,21 @@ class Directory extends Model
             owner:  $owner,
         ))->execute();
     }
+
+    // ── Instance method delegates ─────────────────────────────────────────────
+
+    public function rename(string $newName): self
+    {
+        return (new \Innertia\Files\Directories\UseCases\RenameDirectory($this, $newName))->execute();
+    }
+
+    public function moveTo(self $newParent): self
+    {
+        return (new \Innertia\Files\Directories\UseCases\MoveDirectory($this, $newParent))->execute();
+    }
+
+    public function moveToRoot(): self
+    {
+        return (new \Innertia\Files\Directories\UseCases\MoveDirectory($this, null))->execute();
+    }
 }
