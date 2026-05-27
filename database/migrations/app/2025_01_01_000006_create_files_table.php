@@ -34,6 +34,9 @@ return new class extends Migration
             $table->string('created_by')->nullable();
             $table->timestamps();
 
+            $table->uuid('trash_group_id')->nullable()->index();
+            $table->softDeletes();
+
             $table->index('visibility');
             $table->index('created_by');
             $table->index('mime_type');
