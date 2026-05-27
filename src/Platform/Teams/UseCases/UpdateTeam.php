@@ -33,6 +33,12 @@ class UpdateTeam extends UseCase
         $model = config('innertia.teams.model', Team::class);
         $team  = $model::findOrFail($this->teamId);
 
+        $old = [
+            'name'           => $team->name,
+            'description'    => $team->description,
+            'parent_team_id' => $team->parent_team_id,
+        ];
+
         $team->fill($this->attributes());
 
         if ($this->parentTeamId !== null) {
@@ -42,6 +48,14 @@ class UpdateTeam extends UseCase
         }
 
         $team->save();
+
+        $new = [
+            'name'           => $team->name,
+            'description'    => $team->description,
+            'parent_team_id' => $team->parent_team_id,
+        ];
+
+        event(new \Innertia\Platform\Teams\Events\TeamUpdated($team, ['old' => $old, 'new' => $new]));
 
         return $team;
     }

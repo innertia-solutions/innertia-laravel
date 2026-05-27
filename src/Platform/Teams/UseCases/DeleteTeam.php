@@ -12,6 +12,13 @@ class DeleteTeam extends UseCase
     public function execute(): void
     {
         $model = config('innertia.teams.model', Team::class);
-        $model::findOrFail($this->teamId)->delete();
+        $team  = $model::findOrFail($this->teamId);
+
+        $id   = $team->id;
+        $name = $team->name;
+
+        $team->delete();
+
+        event(new \Innertia\Platform\Teams\Events\TeamDeleted($id, $name));
     }
 }

@@ -20,15 +20,18 @@ class SyncTeamMembers extends UseCase
         $model = config('innertia.teams.model', Team::class);
         $team  = $model::findOrFail($this->teamId);
 
+        $beforeIds = array_map('strval', $team->members()->pluck('team_members.user_id')->all());
+
         // Capturar joined_at de miembros existentes para preservarlo cuando solo
         // cambia el role (sync() normal haría detach+attach, perdiendo el original).
-        $existing = $team->members()
+        $existing = collect($team->members()
             ->pluck('team_members.joined_at', 'team_members.user_id')
-            ->all();
+            ->all()
+        )->mapWithKeys(fn ($v, $k) => [(string) $k => $v])->all();
 
         $payload = [];
         foreach ($this->members as $member) {
-            $userId   = $member['user_id'];
+            $userId   = (string) $member['user_id'];
             $role     = $member['role_in_team'] ?? 'member';
             $joinedAt = $existing[$userId] ?? now();
 
@@ -40,6 +43,13 @@ class SyncTeamMembers extends UseCase
 
         $team->members()->sync($payload);
 
-        return $team->fresh(['members', 'parent', 'children']);
+        $fresh     = $team->fresh(['members', 'parent', 'children']);
+        $afterIds  = array_map('strval', $fresh->members()->pluck('team_members.user_id')->all());
+        $added     = array_values(array_diff($afterIds, $beforeIds));
+        $removed   = array_values(array_diff($beforeIds, $afterIds));
+
+        event(new \Innertia\Platform\Teams\Events\TeamMembersSynced($fresh, $added, $removed));
+
+        return $fresh;
     }
 }

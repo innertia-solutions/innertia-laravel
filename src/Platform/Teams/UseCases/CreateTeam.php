@@ -32,6 +32,10 @@ class CreateTeam extends UseCase
     {
         $model = config('innertia.teams.model', Team::class);
 
-        return $model::create($this->attributes());
+        $team = $model::create($this->attributes());
+
+        event(new \Innertia\Platform\Teams\Events\TeamCreated($team));
+
+        return $team;
     }
 }
