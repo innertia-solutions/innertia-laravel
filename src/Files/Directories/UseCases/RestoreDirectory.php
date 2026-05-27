@@ -4,10 +4,12 @@ namespace Innertia\Files\Directories\UseCases;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Innertia\Files\Directories\Events\DirectoryRestored;
 use Innertia\Files\Directories\Exceptions\OrphanedRestoreException;
 use Innertia\Files\Directories\Exceptions\RestoreCollisionException;
 use Innertia\Files\Directories\Models\Directory;
+use Innertia\Files\Models\File;
 
 class RestoreDirectory
 {
@@ -53,6 +55,17 @@ class RestoreDirectory
                     'trash_group_id' => null,
                     'updated_at'     => now(),
                 ]);
+
+            // Restore files in the same trash group
+            if (Schema::hasColumn('files', 'directory_id')) {
+                File::withTrashed()
+                    ->where('trash_group_id', $groupId)
+                    ->update([
+                        'deleted_at'     => null,
+                        'trash_group_id' => null,
+                        'updated_at'     => now(),
+                    ]);
+            }
 
             if ($relocated) {
                 $dir       = Directory::find($this->directory->id);

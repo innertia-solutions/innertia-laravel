@@ -4,9 +4,11 @@ namespace Innertia\Files\Directories\UseCases;
 
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Innertia\Files\Directories\Events\DirectoryTrashed;
 use Innertia\Files\Directories\Models\Directory;
+use Innertia\Files\Models\File;
 
 class TrashDirectory
 {
@@ -36,6 +38,22 @@ class TrashDirectory
                     'trash_group_id' => $groupId,
                     'updated_at'     => $now,
                 ]);
+
+            // Cascade to files in any of the trashed directories
+            if (Schema::hasColumn('files', 'directory_id')) {
+                $descendantIds = Directory::withTrashed()
+                    ->where('path', 'like', $prefix . '%')
+                    ->pluck('id');
+
+                File::query()
+                    ->whereIn('directory_id', $descendantIds)
+                    ->whereNull('deleted_at')
+                    ->update([
+                        'deleted_at'     => $now,
+                        'trash_group_id' => $groupId,
+                        'updated_at'     => $now,
+                    ]);
+            }
         });
 
         event(new DirectoryTrashed($this->directory, $groupId, $this->performedBy));
