@@ -18,9 +18,9 @@ class ChangePassword extends UseCase
         public readonly string $userId,
         public readonly string $password,
         public readonly string $passwordConfirmation,
-        public readonly string $app,
+        public readonly string $context,
     ) {
-       
+
     }
 
     public function execute(): array
@@ -39,7 +39,7 @@ class ChangePassword extends UseCase
 
         Mail::to($user->email)->queue(new PasswordChangedMail($user));
 
-        $token = app(JwtService::class)->generateToken($user, ['app' => $this->app]);
+        $token = app(JwtService::class)->generateToken($user, ['context' => $this->context]);
 
         return ['token' => $token, 'user' => $user];
     }

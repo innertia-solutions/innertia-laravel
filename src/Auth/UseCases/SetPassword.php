@@ -17,9 +17,9 @@ class SetPassword extends UseCase
         public readonly string $userId,
         public readonly string $password,
         public readonly string $passwordConfirmation,
-        public readonly string $app,
+        public readonly string $context,
     ) {
-       
+
     }
 
     public function execute(): array
@@ -36,7 +36,7 @@ class SetPassword extends UseCase
             'email_verified_at' => $user->email_verified_at ?? now(),
         ]);
 
-        $token = app(JwtService::class)->generateToken($user, ['app' => $this->app]);
+        $token = app(JwtService::class)->generateToken($user, ['context' => $this->context]);
 
         return ['token' => $token, 'user' => $user];
     }

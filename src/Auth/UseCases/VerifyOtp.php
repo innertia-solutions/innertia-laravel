@@ -13,9 +13,9 @@ class VerifyOtp extends UseCase
         public readonly string $userId,
         public readonly string $code,
         public readonly string $action,
-        public readonly string $app,
+        public readonly string $context,
     ) {
-       
+
     }
 
     public function execute(): array
@@ -42,7 +42,7 @@ class VerifyOtp extends UseCase
             return ['requires_2fa' => true, 'user_id' => $user->getAuthIdentifier()];
         }
 
-        $token = app(JwtService::class)->generateToken($user, ['app' => $this->app]);
+        $token = app(JwtService::class)->generateToken($user, ['context' => $this->context]);
 
         return ['token' => $token, 'user' => $user];
     }
