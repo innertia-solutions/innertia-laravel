@@ -7,7 +7,7 @@ backends single-app y SaaS. **No depende de stancl/tenancy** — manager de tena
 
 ```
 src/
-├── Auth/                 # JWT, OTP, 2FA, OAuth, RBAC (roles, permissions, apps)
+├── Auth/                 # JWT, OTP, 2FA, OAuth, RBAC (roles, permissions, contexts)
 ├── Saas/                 # Multitenancy propio (Innertia::tenant(), HasTenant trait)
 ├── Platform/             # Core: UseCase, DomainEvent, DomainGate, Organizations, Teams
 │   ├── Organizations/
@@ -42,7 +42,7 @@ src/
 
 | Feature | Flag | Install | Schema |
 |---|---|---|---|
-| Organizations | `INNERTIA_ORGANIZATIONS_ENABLED=true` | `php artisan innertia:organization:install [--force]` | Crea `organizations`, agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_apps`, y tablas declaradas |
+| Organizations | `INNERTIA_ORGANIZATIONS_ENABLED=true` | `php artisan innertia:organization:install [--force]` | Crea `organizations`, agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_contexts`, y tablas declaradas |
 | Teams | `INNERTIA_TEAMS_ENABLED=true` | `php artisan innertia:teams:install [--force]` | Crea `teams`, `team_members` |
 | Tags | `INNERTIA_TAGS_ENABLED=true` | `php artisan innertia:tags:install [--force]` | Crea `tags`, `taggables` (polimórfica). Tenant-scoped. Trait `HasTags` para cualquier modelo. Cuando activo, `File` tiene `HasTags` disponible. |
 | Directories | `INNERTIA_DIRECTORIES_ENABLED=true` | `php artisan innertia:directories:install [--force]` | Crea `directories` (jerarquía con materialized path, trash con trash_group_id). Agrega `directory_id` a `files` (idempotente). Trait HasTags aplicable. Eventos vía DirectoryEvent enum. |
@@ -112,7 +112,7 @@ El paquete trae skills versionados en `src/Skills/*.md`. Cada proyecto consumido
 - `innertia-organizations` — multi-org scoping + cómo crear/extender
 - `innertia-teams` — RBAC por grupo + cómo crear/extender
 - `innertia-tags` — sistema de tags polimórfico, trait HasTags, endpoints CRUD, extensión
-- `innertia-permissions` — las 8 fuentes de permisos, DomainGates, EntityPermission, HasApps
+- `innertia-permissions` — las 8 fuentes de permisos, DomainGates, EntityPermission, HasContexts
 - `innertia-events` — Event Bus tipado, DomainEventKey enums, Triggers, EventBusFake, catálogo introspectable
 - `innertia-webhooks` — outbound webhooks con HMAC signing
 - `innertia-mail` — InnertiaMailable, branding por tenant, NotificationMail fluent builder
@@ -125,7 +125,7 @@ Mantenerlos sincronizados con la realidad del código es responsabilidad del paq
 
 ### Auto-traits en User base
 
-`\Innertia\Auth\Models\User` aplica `HasTeams` automáticamente. Si TeamsFeature está disabled el trait es no-op (cero overhead). `HasOrganization` NO se aplica al User — los users son tenant-level y el contexto multi-org se mediza vía `HasApps` (la tabla `user_apps` tiene `organization_id`).
+`\Innertia\Auth\Models\User` aplica `HasTeams` automáticamente. Si TeamsFeature está disabled el trait es no-op (cero overhead). `HasOrganization` NO se aplica al User — los users son tenant-level y el contexto multi-org se mediza vía `HasContexts` (la tabla `user_contexts` tiene `organization_id`).
 
 ## Sistema de permisos — combinaciones posibles
 
@@ -152,15 +152,15 @@ filtered by OrganizationContext::scope() cuando organizations activo
 
 `entity_permissions` se evalúan **por recurso** desde Gates, no entran en el array plano.
 
-### Apps (contexts)
+### Contexts
 
 Capa independiente del RBAC: define qué áreas del sistema puede entrar el user.
 
 ```
-user_apps (user_id, app, tenant_id, organization_id?)
+user_contexts (user_id, context, tenant_id, organization_id?)
 ```
 
-Con orgs activo, un user puede tener acceso a apps distintas según la org:
+Con orgs activo, un user puede tener acceso a contextos distintos según la org:
 - `(pepe, technician, tenant_1, org_a)` — técnico en org A
 - `(pepe, backoffice, tenant_1, org_b)` — backoffice en org B
 
@@ -173,7 +173,7 @@ role_permissions   (role_id, permission_id)
 model_roles        (model_type, model_id, role_id, organization_id?) ← polimórfico User|Team
 model_permissions  (model_type, model_id, permission_id, organization_id?) ← polimórfico
 entity_permissions (entity_type, entity_id, grantable_type, grantable_id, action) ← polimórfico
-user_apps          (user_id, app, tenant_id, organization_id?)
+user_contexts      (user_id, context, tenant_id, organization_id?)
 teams              (id, tenant_id, organization_id?, name, parent_team_id?)
 team_members       (team_id, user_id, role_in_team [member|lead])
 ```
@@ -184,13 +184,13 @@ Aplicables al User model:
 
 ```php
 use Innertia\Auth\RBAC\Traits\HasRoles;
-use Innertia\Auth\RBAC\Traits\HasApps;
+use Innertia\Auth\RBAC\Traits\HasContexts;
 use Innertia\Platform\Traits\HasOrganization;    // si orgs ON
 use Innertia\Platform\Teams\Traits\HasTeams;     // si teams ON
 use Innertia\Platform\Traits\HasPreferences;
 
 class User extends Authenticatable {
-    use HasRoles, HasApps, HasOrganization, HasTeams, HasPreferences;
+    use HasRoles, HasContexts, HasOrganization, HasTeams, HasPreferences;
 }
 ```
 

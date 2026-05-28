@@ -21,12 +21,12 @@ Archivo central de configuración del paquete. Publicado via `php artisan vendor
 | `saas` | ✅ X-Tenant | ✅ JWT | ✅ |
 | `api` | ❌ | ✅ JWT | ❌ (forzosamente off) |
 
-### `apps`
+### `contexts`
 
-Contextos del Login UseCase. El JWT valida que el user tenga acceso al app antes de emitir token.
+Contextos del Login UseCase. El JWT valida que el user tenga acceso al contexto antes de emitir token.
 
 ```php
-'apps' => [
+'contexts' => [
     'backoffice' => 'Administración',
     'technician' => 'Técnicos',
 ],

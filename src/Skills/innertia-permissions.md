@@ -1,6 +1,6 @@
 ---
 name: innertia-permissions
-description: Use when working with permissions, roles, RBAC, DomainGates, EntityPermission, HasRoles, HasApps, HasEntityPermissions, super_admin role, or `innertia:permissions` artisan command. Trigger for "asignar rol", "permiso por entidad", "rol por organization", "permission enum", "DomainGate", "user_apps", "Permissions::sync".
+description: Use when working with permissions, roles, RBAC, DomainGates, EntityPermission, HasRoles, HasContexts, HasEntityPermissions, super_admin role, or `innertia:permissions` artisan command. Trigger for "asignar rol", "permiso por entidad", "rol por organization", "permission enum", "DomainGate", "user_contexts", "Permissions::sync".
 ---
 
 # Innertia — Permissions / RBAC
@@ -16,7 +16,7 @@ role_permissions   (role_id, permission_id)
 model_roles        (model_type, model_id, role_id, organization_id?)        ← polimórfico
 model_permissions  (model_type, model_id, permission_id, organization_id?)  ← polimórfico
 entity_permissions (id, tenant_id?, entity_type, entity_id, grantable_type, grantable_id, action)
-user_apps          (user_id, app, tenant_id, organization_id?)
+user_contexts      (user_id, context, tenant_id, organization_id?)
 ```
 
 `model_roles` es polimórfico: el `model_type` puede ser `User` o `Team` (cuando Teams está activo).
@@ -142,22 +142,22 @@ $user->hasPermission('users.view');               // cache-aware, considera toda
 $user->hasPermission(UserPermissions::View);      // enum también funciona
 ```
 
-## HasApps trait — contextos de acceso
+## HasContexts trait — contextos de acceso
 
-`user_apps` define a qué áreas (backoffice, technician, pos, etc.) el user tiene acceso. El JWT lo valida en el Login.
+`user_contexts` define a qué áreas (backoffice, technician, pos, etc.) el user tiene acceso. El JWT lo valida en el Login.
 
 ```php
-$user->appKeys();                                  // ['backoffice', 'technician']
-$user->appKeysInOrganization($orgId);              // apps específicas a esa org
-$user->accessibleOrganizationsByApp();             // ['backoffice' => [orgA, orgB], 'technician' => [orgC]]
-$user->accessibleOrganizationIds();                // unique union de todas las orgs accesibles
-$user->hasApp('backoffice');
+$user->contextKeys();                                  // ['backoffice', 'technician']
+$user->contextKeysInOrganization($orgId);              // contextos específicos a esa org
+$user->accessibleOrganizationsByContext();             // ['backoffice' => [orgA, orgB], 'technician' => [orgC]]
+$user->accessibleOrganizationIds();                    // unique union de todas las orgs accesibles
+$user->hasContext('backoffice');
 
-$user->grantApp('backoffice');
-$user->grantApp(['backoffice', 'pos'], $orgId);
-$user->revokeApp('backoffice');
-$user->revokeApp('backoffice', $orgId);
-$user->syncApps(['backoffice', 'pos'], $orgId);
+$user->grantContext('backoffice');
+$user->grantContext(['backoffice', 'pos'], $orgId);
+$user->revokeContext('backoffice');
+$user->revokeContext('backoffice', $orgId);
+$user->syncContexts(['backoffice', 'pos'], $orgId);
 ```
 
 Combinación con orgs: un user puede ser técnico en org A y backoffice en org B.

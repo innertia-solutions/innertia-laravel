@@ -158,31 +158,31 @@ porque dependen del recurso específico que se accede.
 Capa independiente de los permisos: define **a qué áreas del sistema puede entrar un usuario**.
 
 ```
-user_apps              (user_id, app, tenant_id, organization_id?)
+user_contexts          (user_id, context, tenant_id, organization_id?)
 ```
 
-Tabla con un row por (user, app, [organization]). El user "puede entrar a la app backoffice" — los
+Tabla con un row por (user, context, [organization]). El user "puede entrar al contexto backoffice" — los
 permisos finos los resuelve el RBAC anterior. Con organizations activo, un user puede tener acceso
-a apps distintas según la org.
+a contextos distintos según la org.
 
 ```php
-$user->grantApp('backoffice')                  // sin org
-$user->grantApp('technician', organizationId: 5)
-$user->appKeys()                                // ['backoffice', 'technician'] (en scope actual)
-$user->appKeysInOrganization(5)                // apps que tiene en org 5
-$user->accessibleOrganizationsByApp()          // { backoffice: [1,2], technician: [5] }
+$user->grantContext('backoffice')                  // sin org
+$user->grantContext('technician', organizationId: 5)
+$user->contextKeys()                               // ['backoffice', 'technician'] (en scope actual)
+$user->contextKeysInOrganization(5)               // contextos que tiene en org 5
+$user->accessibleOrganizationsByContext()          // { backoffice: [1,2], technician: [5] }
 ```
 
 ### Helpers en User model
 
 ```php
 use Innertia\Auth\RBAC\Traits\HasRoles;
-use Innertia\Auth\RBAC\Traits\HasApps;
+use Innertia\Auth\RBAC\Traits\HasContexts;
 use Innertia\Platform\Traits\HasOrganization;       // si orgs activo
 use Innertia\Platform\Teams\Traits\HasTeams;        // si teams activo
 
 class User extends Authenticatable {
-    use HasRoles, HasApps, HasOrganization, HasTeams;
+    use HasRoles, HasContexts, HasOrganization, HasTeams;
 }
 ```
 
@@ -264,7 +264,7 @@ php artisan migrate
 El install crea:
 - Tabla `organizations`
 - Agrega `organization_id` (nullable) a las tablas declaradas en `innertia.organizations.tables`
-- Agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_apps` (RBAC + identity scoping)
+- Agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_contexts` (RBAC + identity scoping)
 
 ### Headers
 
@@ -768,7 +768,7 @@ Persiste en `activity_log` table. Visible vía `EntityHistory` trait.
 | `Auditable` | Track `created_by` / `updated_by` automáticamente |
 | `HasTenant` | Global scope + auto-inject por tenant (SaaS mode) |
 | `HasOrganization` | Global scope + auto-inject por organization (cuando feature activo) |
-| `HasApps` | Tabla user_apps + appKeys() + grantApp/revokeApp |
+| `HasContexts` | Tabla user_contexts + contextKeys() + grantContext/revokeContext |
 | `HasRoles` | RBAC roles, permissions |
 | `HasTeams` | Membership a teams + permission inheritance |
 | `HasPreferences` | Preferencias del user (key/value con cast) |
@@ -793,7 +793,7 @@ Skills incluidos:
 | `innertia-framework` | overview general, modes, estructura DDD |
 | `innertia-organizations` | trabajo con Organizations, multi-org scoping |
 | `innertia-teams` | trabajo con Teams, members, RBAC por grupo |
-| `innertia-permissions` | RBAC, las 8 fuentes de permisos, DomainGates, EntityPermission, HasApps |
+| `innertia-permissions` | RBAC, las 8 fuentes de permisos, DomainGates, EntityPermission, HasContexts |
 | `innertia-events` | DomainEvents, channels (realtime/webhook/mail/web), Subscribable |
 | `innertia-webhooks` | outbound webhooks, HMAC signing, retry, WebhookLog |
 | `innertia-mail` | InnertiaMailable, branding por tenant, NotificationMail fluent builder |

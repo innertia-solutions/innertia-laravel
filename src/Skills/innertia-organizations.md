@@ -35,7 +35,7 @@ php artisan migrate
 
 El install agrega `organization_id` (nullable bigint) a:
 - Las tablas declaradas en `config.tables`
-- Las RBAC: `roles`, `model_roles`, `model_permissions`, `user_apps`
+- Las RBAC: `roles`, `model_roles`, `model_permissions`, `user_contexts`
 
 NULL = "global al tenant" (visible desde cualquier org scope).
 

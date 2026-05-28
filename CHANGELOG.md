@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BREAKING CHANGES — Apps → Contexts rename
+- **`HasApps` trait renamed to `HasContexts`** — update `use HasApps` → `use HasContexts` in User + Tenant models.
+- **Methods renamed**: `hasApp()→hasContext()`, `grantApp()→grantContext()`, `revokeApp()→revokeContext()`, `syncApps()→syncContexts()`, `appKeys()→contextKeys()`, `appKeysInOrganization()→contextKeysInOrganization()`, `accessibleOrganizationsByApp()→accessibleOrganizationsByContext()`.
+- **`UserApp` model renamed to `UserContext`** (`Innertia\Auth\Models\UserContext`).
+- **Table renamed**: `user_apps` → `user_contexts`. Column `app` → `context`.
+- **Config key renamed**: `innertia.apps` → `innertia.contexts`.
+- **Middleware alias renamed**: `app:backoffice` → `context:backoffice` (`AppMiddleware` → `ContextMiddleware`).
+- **Login + auth request field**: `{ app: 'backoffice' }` → `{ context: 'backoffice' }`.
+- **JWT claim**: `app` → `context`.
+- **Backoffice routes**: `GET/POST/DELETE /users/{id}/apps` → `/users/{id}/contexts`.
+- **`/auth/me` response**: removed legacy `availableContexts` alias.
+
 ### Sharing & inherited permissions (Sub-C)
 - **Directory grants**: `Directory` now uses `HasEntityPermissions` — `grantAccessTo()`, `revokeAccessFrom()`, `isAccessibleBy()`.
 - **`Directory::scopeAccessibleBy($user)`**: Eloquent scope that returns directories where the user has a direct grant or a grant on any ancestor (materialized path inheritance via `LIKE` query).
@@ -123,7 +135,7 @@ Quick path:
 ### Notes
 - Apps that have already published `config/innertia.php` must add the
   `organizations` block manually OR re-publish with `--force`.
-- `user_apps` table is unchanged — app-access is orthogonal to organizations.
+- `user_contexts` table is unchanged — context-access is orthogonal to organizations.
 - Organizations feature is forcibly inactive in `api` mode regardless of
   `organizations.enabled` — API consumers manage their own isolation.
   Centralised via `Innertia\Platform\Organizations\OrganizationsFeature::isActive()`.
