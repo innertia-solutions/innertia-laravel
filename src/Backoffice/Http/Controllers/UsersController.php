@@ -146,53 +146,45 @@ class UsersController extends Controller
         return response()->json(['removed' => true]);
     }
 
-    // ── Apps ──────────────────────────────────────────────────────────────────
+    // ── Contexts ──────────────────────────────────────────────────────────────
 
-    public function apps(string $id): JsonResponse
+    public function contexts(string $id): JsonResponse
     {
-        $model = config('innertia.auth.user_model');
-        $user  = $model::findOrFail($id);
+        $user = $this->findUser($id);
+        abort_unless(method_exists($user, 'contextKeys'), 501, 'User model does not use HasContexts.');
 
-        abort_unless(method_exists($user, 'appKeys'), 501, 'User model does not use HasApps.');
-
-        return response()->json($user->appKeys());
+        return response()->json($user->contextKeys());
     }
 
-    public function grantApp(Request $request, string $id): JsonResponse
+    public function grantContext(Request $request, string $id): JsonResponse
     {
-        $request->validate(['app' => 'required|string']);
+        $user = $this->findUser($id);
+        $request->validate(['context' => 'required|string']);
 
-        $model = config('innertia.auth.user_model');
-        $user  = $model::findOrFail($id);
+        $user->grantContext($request->context);
 
-        $user->grantApp($request->app);
-
-        return response()->json(['granted' => true]);
+        return response()->json(['message' => 'Context granted.']);
     }
 
-    public function revokeApp(string $id, string $app): JsonResponse
+    public function revokeContext(string $id, string $context): JsonResponse
     {
-        $model = config('innertia.auth.user_model');
-        $user  = $model::findOrFail($id);
+        $user = $this->findUser($id);
+        $user->revokeContext($context);
 
-        $user->revokeApp($app);
-
-        return response()->json(['revoked' => true]);
+        return response()->json(['message' => 'Context revoked.']);
     }
 
-    public function syncApps(Request $request, string $id): JsonResponse
+    public function syncContexts(Request $request, string $id): JsonResponse
     {
+        $user = $this->findUser($id);
         $request->validate([
-            'apps'   => 'required|array',
-            'apps.*' => 'string',
+            'contexts'   => 'required|array',
+            'contexts.*' => 'string',
         ]);
 
-        $model = config('innertia.auth.user_model');
-        $user  = $model::findOrFail($id);
+        $user->syncContexts($request->contexts);
 
-        $user->syncApps($request->apps);
-
-        return response()->json(['apps' => $user->appKeys()]);
+        return response()->json(['contexts' => $user->contextKeys()]);
     }
 
     // ── Sessions ──────────────────────────────────────────────────────────────
@@ -293,6 +285,12 @@ class UsersController extends Controller
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private function findUser(string $id): mixed
+    {
+        $model = config('innertia.auth.user_model');
+        return $model::findOrFail($id);
+    }
 
     private function modelHasRoles(string $model): bool
     {

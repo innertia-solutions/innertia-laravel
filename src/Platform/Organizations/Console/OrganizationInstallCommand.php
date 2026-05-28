@@ -44,7 +44,7 @@ class OrganizationInstallCommand extends Command
         }
 
         // RBAC + identity always scoped — non-negotiable when feature is enabled.
-        $rbacTables = ['roles', 'model_roles', 'model_permissions', 'user_apps'];
+        $rbacTables = ['roles', 'model_roles', 'model_permissions', 'user_contexts'];
         $allTables  = array_values(array_unique(array_merge($tables, $rbacTables)));
 
         $dir = $this->option('path') ?: database_path('migrations');

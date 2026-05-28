@@ -24,10 +24,10 @@ Route::prefix($prefix)
         Route::get    ('users/{id}/roles',             [UsersController::class, 'roles']);
         Route::post   ('users/{id}/roles',             [UsersController::class, 'assignRole']);
         Route::delete ('users/{id}/roles/{role}',      [UsersController::class, 'removeRole']);
-        Route::get    ('users/{id}/apps',              [UsersController::class, 'apps']);
-        Route::post   ('users/{id}/apps',              [UsersController::class, 'grantApp']);
-        Route::post   ('users/{id}/apps/sync',         [UsersController::class, 'syncApps']);
-        Route::delete ('users/{id}/apps/{app}',        [UsersController::class, 'revokeApp']);
+        Route::get    ('users/{id}/contexts',               [UsersController::class, 'contexts']);
+        Route::post   ('users/{id}/contexts',               [UsersController::class, 'grantContext']);
+        Route::post   ('users/{id}/contexts/sync',          [UsersController::class, 'syncContexts']);
+        Route::delete ('users/{id}/contexts/{context}',     [UsersController::class, 'revokeContext']);
 
         // ── Sessions ──────────────────────────────────────────────────────────
         Route::get    ('users/{id}/sessions',              [UsersController::class, 'sessions']);

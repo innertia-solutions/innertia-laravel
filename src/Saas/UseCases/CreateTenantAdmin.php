@@ -8,7 +8,7 @@ use Innertia\Facades\Innertia;
 use Innertia\Platform\Contracts\UseCase;
 
 /**
- * Creates the initial admin user for a tenant and grants access to all configured apps.
+ * Creates the initial admin user for a tenant and grants access to all configured contexts.
  *
  * Usage:
  *   Innertia::activate($tenantKey);
@@ -35,10 +35,10 @@ class CreateTenantAdmin extends UseCase
             'email_verified_at' => now(),
         ]);
 
-        // Grant access to every app defined in config
-        $apps = array_keys(config('innertia.apps', []));
-        if ($apps && method_exists($user, 'grantApp')) {
-            $user->grantApp($apps);
+        // Grant access to every context defined in config
+        $contexts = array_keys(config('innertia.contexts', []));
+        if ($contexts && method_exists($user, 'grantContext')) {
+            $user->grantContext($contexts);
         }
 
         // Assign admin role — create it scoped to the current tenant if it doesn't exist yet
