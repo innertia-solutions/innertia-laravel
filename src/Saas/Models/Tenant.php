@@ -3,7 +3,7 @@
 namespace Innertia\Saas\Models;
 
 use Illuminate\Database\Eloquent\Model;
-use Innertia\Auth\RBAC\Traits\HasApps;
+use Innertia\Auth\RBAC\Traits\HasContexts;
 
 /**
  * Tenant model — single-DB multitenancy.
@@ -18,7 +18,7 @@ use Innertia\Auth\RBAC\Traits\HasApps;
  */
 class Tenant extends Model
 {
-    use HasApps;
+    use HasContexts;
 
     protected $fillable = [
         'key',

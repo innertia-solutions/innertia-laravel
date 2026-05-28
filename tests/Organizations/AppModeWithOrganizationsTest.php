@@ -4,7 +4,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Schema;
 use Innertia\Auth\RBAC\Models\Role;
 use Innertia\Auth\RBAC\Services\PermissionsService;
-use Innertia\Auth\RBAC\Traits\HasApps;
+use Innertia\Auth\RBAC\Traits\HasContexts;
 use Innertia\Auth\RBAC\Traits\HasRoles;
 use Innertia\Facades\Innertia;
 use Innertia\Platform\Organizations\OrganizationContext;
@@ -23,7 +23,7 @@ class AppModeOrgModel extends Model
 class AppModeUserModel extends Model
 {
     use HasRoles;
-    use HasApps;
+    use HasContexts;
     protected $table      = 'app_mode_users';
     protected $guarded    = [];
     public    $timestamps = false;
@@ -32,7 +32,7 @@ class AppModeUserModel extends Model
 beforeEach(function () {
     config()->set('innertia.mode', 'app');
     config()->set('innertia.organizations.enabled', true);
-    config()->set('innertia.apps', [
+    config()->set('innertia.contexts', [
         'backoffice'  => 'Administración',
         'technicians' => 'Portal Técnicos',
     ]);
@@ -87,13 +87,13 @@ beforeEach(function () {
         $t->primary(['model_type', 'model_id', 'role_id', 'organization_id']);
     });
 
-    // Mirror the app-mode user_apps schema (no tenant_id column)
-    Schema::create('user_apps', function ($t) {
+    // Mirror the app-mode user_contexts schema (no tenant_id column)
+    Schema::create('user_contexts', function ($t) {
         $t->bigIncrements('id');
         $t->string('user_id');
-        $t->string('app');
+        $t->string('context');
         $t->timestamps();
-        $t->unique(['user_id', 'app']);
+        $t->unique(['user_id', 'context']);
     });
 });
 
@@ -184,20 +184,20 @@ it('PermissionsService::cacheKey format in app mode is innertia.perms.{orgId}.{u
     expect($key)->toBe('innertia.perms.42.user-1');
 });
 
-it('user_apps is orthogonal to organization context (HasApps smoke check)', function () {
+it('user_contexts is orthogonal to organization context (HasContexts smoke check)', function () {
     $u = AppModeUserModel::create();
-    $u->grantApp('backoffice');
+    $u->grantContext('backoffice');
 
-    // App access holds regardless of current org context.
+    // Context access holds regardless of current org context.
     Innertia::organization()->clear();
-    expect($u->hasApp('backoffice'))->toBeTrue();
+    expect($u->hasContext('backoffice'))->toBeTrue();
 
     Innertia::organization()->set(1);
-    expect($u->hasApp('backoffice'))->toBeTrue();
+    expect($u->hasContext('backoffice'))->toBeTrue();
 
     Innertia::organization()->set(2);
-    expect($u->hasApp('backoffice'))->toBeTrue();
+    expect($u->hasContext('backoffice'))->toBeTrue();
 
-    // Unknown app stays false.
-    expect($u->hasApp('technicians'))->toBeFalse();
+    // Unknown context stays false.
+    expect($u->hasContext('technicians'))->toBeFalse();
 });

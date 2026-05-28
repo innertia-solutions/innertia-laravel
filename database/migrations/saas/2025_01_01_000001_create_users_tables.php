@@ -12,7 +12,7 @@ use Illuminate\Support\Facades\Schema;
  *   user_sessions        — Sesiones JWT activas por dispositivo (tenant_id)
  *   user_otps            — Códigos OTP de un solo uso (login, verificación)
  *   user_tokens          — Tokens de acción (reset password, email verify, etc.)
- *   user_apps            — Acceso del usuario a cada app del sistema (tenant_id)
+ *   user_contexts        — Acceso del usuario a cada context del sistema (tenant_id)
  */
 return new class extends Migration
 {
@@ -85,22 +85,22 @@ return new class extends Migration
             $table->index(['user_id', 'action', 'active']);
         });
 
-        Schema::create('user_apps', function (Blueprint $table) {
+        Schema::create('user_contexts', function (Blueprint $table) {
             $table->id();
             $table->string('user_id');
-            $table->string('app');
+            $table->string('context');
             $table->string('tenant_id')->index();
             $table->timestamps();
 
-            $table->unique(['user_id', 'app', 'tenant_id']);
+            $table->unique(['user_id', 'context', 'tenant_id']);
             $table->index('user_id');
-            $table->index('app');
+            $table->index('context');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('user_apps');
+        Schema::dropIfExists('user_contexts');
         Schema::dropIfExists('user_tokens');
         Schema::dropIfExists('user_otps');
         Schema::dropIfExists('user_sessions');
