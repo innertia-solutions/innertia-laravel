@@ -31,14 +31,14 @@ class OtpController extends Controller
             'user_id' => 'required',
             'code'    => 'required|string|size:6',
             'action'  => 'required|string',
-            'app'     => 'required|string',
+            'context' => 'required|string',
         ]);
 
         $result = (new VerifyOtp(
             userId: $data['user_id'],
             code:   $data['code'],
             action: $data['action'],
-            app:    $data['app'],
+            context: $data['context'],
         ))->execute();
 
         return response()->json($result);

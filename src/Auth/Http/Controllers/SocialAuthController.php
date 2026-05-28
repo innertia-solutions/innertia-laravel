@@ -16,21 +16,21 @@ class SocialAuthController extends Controller
     /**
      * Redirect the user to the provider's OAuth page.
      *
-     * GET /auth/{provider}/redirect?app=backoffice
+     * GET /auth/{provider}/redirect?context=backoffice
      *
-     * The `app` value is encoded in the OAuth state so it survives
+     * The `context` value is encoded in the OAuth state so it survives
      * the round-trip back to the callback endpoint.
      */
     public function redirect(string $provider, Request $request): JsonResponse|RedirectResponse
     {
-        $request->validate(['app' => 'required|string']);
+        $request->validate(['context' => 'required|string']);
 
         $p = SocialProvider::from($provider);
 
         app(ConfigureSocialite::class)->configure($p);
 
         $redirect = Socialite::driver($p->driver())
-            ->with(['state' => $request->input('app')])
+            ->with(['state' => $request->input('context')])
             ->redirect();
 
         // SPA flow: return the URL as JSON so the frontend can redirect
@@ -48,11 +48,11 @@ class SocialAuthController extends Controller
      */
     public function callback(string $provider, Request $request): JsonResponse
     {
-        $p   = SocialProvider::from($provider);
-        $app = $request->input('state');
+        $p       = SocialProvider::from($provider);
+        $context = $request->input('state');
 
-        if (! $app) {
-            return response()->json(['message' => 'Missing app context.'], 422);
+        if (! $context) {
+            return response()->json(['message' => 'Missing context.'], 422);
         }
 
         app(ConfigureSocialite::class)->configure($p);
@@ -62,7 +62,7 @@ class SocialAuthController extends Controller
         $result = (new SocialLogin(
             provider:   $p,
             socialUser: $socialUser,
-            app:        $app,
+            context:    $context,
         ))->execute();
 
         return response()->json($result);

@@ -16,14 +16,14 @@ class PasswordController extends Controller
             'user_id'               => 'required',
             'password'              => 'required|string|min:8',
             'password_confirmation' => 'required|string',
-            'app'                   => 'required|string',
+            'context'               => 'required|string',
         ]);
 
         $result = (new ChangePassword(
             userId:               $data['user_id'],
             password:             $data['password'],
             passwordConfirmation: $data['password_confirmation'],
-            app:                  $data['app'],
+            context:              $data['context'],
         ))->execute();
 
         return response()->json($result);
@@ -35,14 +35,14 @@ class PasswordController extends Controller
             'user_id'               => 'required',
             'password'              => 'required|string|min:8',
             'password_confirmation' => 'required|string',
-            'app'                   => 'required|string',
+            'context'               => 'required|string',
         ]);
 
         $result = (new SetPassword(
             userId:               $data['user_id'],
             password:             $data['password'],
             passwordConfirmation: $data['password_confirmation'],
-            app:                  $data['app'],
+            context:              $data['context'],
         ))->execute();
 
         return response()->json($result);

@@ -25,7 +25,7 @@ class EmailVerificationController extends Controller
     {
         $data = $request->validate([
             'user_id' => 'required',
-            'app'     => 'required|string',
+            'context' => 'required|string',
         ]);
 
         if (! $request->hasValidSignature()) {
@@ -34,7 +34,7 @@ class EmailVerificationController extends Controller
 
         $result = (new VerifyEmail(
             userId: $data['user_id'],
-            app:    $data['app'],
+            context: $data['context'],
         ))->execute();
 
         return response()->json($result);

@@ -16,13 +16,13 @@ class AuthController extends Controller
         $data = $request->validate([
             'email'    => 'required|email',
             'password' => 'required|string',
-            'app'      => 'required|string',
+            'context'  => 'required|string',
         ]);
 
         $result = (new Login(
             email:    $data['email'],
             password: $data['password'],
-            app:      $data['app'],
+            context:  $data['context'],
         ))->execute();
 
         return response()->json($result);
@@ -42,16 +42,11 @@ class AuthController extends Controller
      *     preferences:   { ... }                  // subset público para boot rápido
      *   }
      *
-     * Backward compat: incluye `availableContexts` (alias de `contexts`) por 1-2 versiones.
      */
     public function me(Request $request): JsonResponse
     {
         $user = $request->user();
         $userData = $user->toArray();
-
-        if (method_exists($user, 'appKeys')) {
-            $userData['apps'] = $user->appKeys();
-        }
 
         // Permissions consolidadas — direct + via roles + via teams (si feature activo)
         $permissions = [];
@@ -72,14 +67,14 @@ class AuthController extends Controller
             $permissions = $viaRoles->merge($direct)->merge($viaTeams)->unique()->values()->all();
         }
 
-        // Contexts (app keys del user)
-        $contexts = method_exists($user, 'appKeys') ? $user->appKeys() : [];
+        // Contexts (context keys del user)
+        $contexts = method_exists($user, 'contextKeys') ? $user->contextKeys() : [];
 
         // Organizations por contexto (solo si feature activo)
         $organizations = null;
         if (\Innertia\Platform\Organizations\OrganizationsFeature::isActive()
-            && method_exists($user, 'accessibleOrganizationsByApp')) {
-            $organizations = $this->buildOrganizationsByApp($user);
+            && method_exists($user, 'accessibleOrganizationsByContext')) {
+            $organizations = $this->buildOrganizationsByContext($user);
         }
 
         // Public preferences (appearance, language, etc.)
@@ -123,31 +118,24 @@ class AuthController extends Controller
                 ]);
         }
 
-        // Backward compat — alias `availableContexts`
-        $payload['availableContexts'] = $contexts;
-
         return response()->json($payload);
     }
 
     /**
-     * Transforma `accessibleOrganizationsByApp(): array<app, array<orgId|null>>` en
-     * shape para el frontend: `{ app: [{ id, key, name }, ...] }`.
-     * Los NULL en organization_id se interpretan como "todas las orgs accesibles" del user
-     * (heredado del tenant) → se expande a todas las orgs que el user tiene visibility.
+     * Transforma `accessibleOrganizationsByContext(): array<context, array<orgId|null>>` en
+     * shape para el frontend: `{ context: [{ id, key, name }, ...] }`.
      */
-    private function buildOrganizationsByApp($user): array
+    private function buildOrganizationsByContext($user): array
     {
-        $byApp = $user->accessibleOrganizationsByApp(); // ['backoffice' => [1, 2], 'technician' => [null]]
-        if (empty($byApp)) return [];
+        $byContext = $user->accessibleOrganizationsByContext();
+        if (empty($byContext)) return [];
 
-        // Resolve all org ids involved (sin NULLs)
-        $allOrgIds = collect($byApp)->flatten()->filter(fn ($v) => $v !== null)->unique()->values();
+        $allOrgIds = collect($byContext)->flatten()->filter(fn ($v) => $v !== null)->unique()->values();
 
         $orgModel = config('innertia.organizations.model', \Innertia\Platform\Organizations\Models\Organization::class);
         $orgs = $orgModel::whereIn('id', $allOrgIds)->get(['id', 'key', 'name'])->keyBy('id');
 
-        // Si hay alguna entrada con NULL (= "todas"), traer todas las orgs accesibles al user
-        $hasNullFallback = collect($byApp)->flatten()->contains(null);
+        $hasNullFallback = collect($byContext)->flatten()->contains(null);
         $allUserOrgs = collect();
         if ($hasNullFallback && method_exists($user, 'accessibleOrganizationIds')) {
             $ids = $user->accessibleOrganizationIds();
@@ -155,12 +143,12 @@ class AuthController extends Controller
         }
 
         $result = [];
-        foreach ($byApp as $app => $orgIds) {
+        foreach ($byContext as $context => $orgIds) {
             $list = collect($orgIds)->flatMap(function ($id) use ($orgs, $allUserOrgs) {
                 if ($id === null) return $allUserOrgs;
                 return $orgs->has($id) ? [$orgs->get($id)] : [];
             })->unique('id')->values()->toArray();
-            $result[$app] = $list;
+            $result[$context] = $list;
         }
 
         return $result;
