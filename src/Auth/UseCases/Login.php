@@ -15,10 +15,9 @@ class Login extends UseCase
     public function __construct(
         public readonly string $email,
         public readonly string $password,
-        public readonly string $app,
-    ) {
-       
-    }
+        public readonly string $context,
+    ) {}
+
 
     public function execute(): array
     {
@@ -33,16 +32,16 @@ class Login extends UseCase
             );
         }
 
-        // 2 — App exists in config
-        $apps = config('innertia.apps', []);
+        // 2 — Context exists in config
+        $contexts = config('innertia.contexts', []);
 
-        if (! array_key_exists($this->app, $apps)) {
-            throw new NotFoundException("App '{$this->app}' not found.");
+        if (! array_key_exists($this->context, $contexts)) {
+            throw new NotFoundException("Context '{$this->context}' not found.");
         }
 
-        // 3 — User has access to the app
-        if (method_exists($user, 'hasApp') && ! $user->hasApp($this->app)) {
-            throw new ForbiddenException("Access to '{$this->app}' is not allowed for this user.");
+        // 3 — User has access to the context
+        if (method_exists($user, 'hasContext') && ! $user->hasContext($this->context)) {
+            throw new ForbiddenException("Access to '{$this->context}' is not allowed for this user.");
         }
 
         // 4 — force_password_change
@@ -75,8 +74,8 @@ class Login extends UseCase
             return ['requires_2fa' => true, 'user_id' => $user->getAuthIdentifier()];
         }
 
-        // 8 — Issue token with app claim
-        $token = app(JwtService::class)->generateToken($user, ['app' => $this->app]);
+        // 8 — Issue token with context claim
+        $token = app(JwtService::class)->generateToken($user, ['context' => $this->context]);
 
         return ['token' => $token, 'user' => $user];
     }

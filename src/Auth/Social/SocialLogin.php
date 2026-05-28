@@ -13,10 +13,8 @@ class SocialLogin extends UseCase
     public function __construct(
         public readonly SocialProvider $provider,
         public readonly SocialUser     $socialUser,
-        public readonly string         $app,
-    ) {
-       
-    }
+        public readonly string         $context,
+    ) {}
 
     public function execute(): array
     {
@@ -28,19 +26,19 @@ class SocialLogin extends UseCase
             throw new NotFoundException('Account not registered. Please contact your administrator.');
         }
 
-        // 2 — App exists in config
-        if (! array_key_exists($this->app, config('innertia.apps', []))) {
-            throw new NotFoundException("App '{$this->app}' not found.");
+        // 2 — Context exists in config
+        if (! array_key_exists($this->context, config('innertia.contexts', []))) {
+            throw new NotFoundException("Context '{$this->context}' not found.");
         }
 
-        // 3 — User has access to the app
-        if (method_exists($user, 'hasApp') && ! $user->hasApp($this->app)) {
-            throw new ForbiddenException("Access to '{$this->app}' is not allowed for this user.");
+        // 3 — User has access to the context
+        if (method_exists($user, 'hasContext') && ! $user->hasContext($this->context)) {
+            throw new ForbiddenException("Access to '{$this->context}' is not allowed for this user.");
         }
 
-        // 4 — Generate JWT with provider + app claims
+        // 4 — Generate JWT with provider + context claims
         $token = app(JwtService::class)->generateToken($user, [
-            'app'      => $this->app,
+            'context'  => $this->context,
             'provider' => $this->provider->value,
         ]);
 
