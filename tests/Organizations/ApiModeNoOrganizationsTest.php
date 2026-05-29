@@ -1,5 +1,14 @@
 <?php
 
+/**
+ * These tests verify that the app/saas Organization feature (HasOrganization,
+ * X-Organization header, OrganizationContext, ResolveOrganizationFromHeader)
+ * is INACTIVE in api mode.
+ *
+ * API mode has its own Organization model (Innertia\Api\Models\Organization)
+ * with ApiKeys and hierarchy. That is a separate system, tested in tests/Api/.
+ */
+
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Schema;

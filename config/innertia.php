@@ -24,24 +24,16 @@ return [
     |
     | Only relevant when mode = 'api'.
     |
-    | key_prefix  — Prefix for generated client API keys (e.g. 'cog_', 'bil_').
+    | key_prefix  — Prefix for generated organization API keys (e.g. 'cog_', 'bil_').
     |               Override per-product to distinguish keys across services.
     | key_header  — HTTP header used to pass the API key in requests.
-    |
-    | available_permissions — Full list of permissions any client key can hold.
-    |   Define them here so Olimpo can display them when creating keys.
+    |               Matched by VerifyApiKey middleware (alias: verify.api.key).
     |
     */
 
     'api' => [
         'key_prefix'  => env('API_KEY_PREFIX', 'api_'),
         'key_header'  => 'X-Api-Key',
-
-        'available_permissions' => [
-            // Define your product's permissions here. Example:
-            // 'chat.create'      => 'Iniciar conversaciones',
-            // 'documents.index'  => 'Indexar documentos',
-        ],
     ],
 
     /*
