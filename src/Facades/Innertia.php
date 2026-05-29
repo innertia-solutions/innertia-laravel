@@ -7,6 +7,7 @@ use Innertia\InnertiaManager;
 use Innertia\Saas\Models\Tenant;
 
 /**
+ * @method static string|null context()
  * @method static Tenant|null tenant(?string $key = null)
  * @method static Tenant|null activate(string $key)
  * @method static void        deactivate()

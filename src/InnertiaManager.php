@@ -10,7 +10,7 @@ use Innertia\Saas\TenantContext;
 /**
  * API pública del contexto runtime de Innertia.
  *
- *   Innertia::app()             → string|null  (app/contexto del JWT activo, ej: 'backoffice')
+ *   Innertia::context()         → string|null  (contexto del JWT activo, ej: 'backoffice')
  *   Innertia::tenant()          → Tenant|null  (tenant activo en runtime)
  *   Innertia::tenant('acme')    → Tenant|null  (busca por key; null en App mode)
  *   Innertia::activate('acme')  → Tenant|null  (busca + setea; null en App mode)
@@ -28,12 +28,12 @@ class InnertiaManager
     ) {}
 
     /**
-     * Devuelve el app/contexto embebido en el JWT activo.
-     * Retorna null si no hay token válido o no tiene claim 'app'.
+     * Devuelve el contexto embebido en el JWT activo (claim 'context').
+     * Retorna null si no hay token válido o no tiene el claim.
      *
-     *   Innertia::app()  // → 'backoffice' | 'technician' | null
+     *   Innertia::context()  // → 'backoffice' | 'technician' | null
      */
-    public function app(): ?string
+    public function context(): ?string
     {
         try {
             $token = request()?->bearerToken();
@@ -43,7 +43,7 @@ class InnertiaManager
 
             $payload = app(\Innertia\Auth\Services\JwtService::class)->decode($token);
 
-            return $payload?->context ?? $payload?->app ?? null;
+            return $payload?->context ?? null;
         } catch (\Throwable) {
             return null;
         }
