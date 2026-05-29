@@ -5,6 +5,7 @@ use Innertia\Auth\Middleware\Authenticate;
 use Innertia\ApiKeys\Http\Controllers\ApiKeysController;
 use Innertia\Backoffice\Http\Controllers\PermissionsController;
 use Innertia\Backoffice\Http\Controllers\RolesController;
+use Innertia\Backoffice\Http\Controllers\SessionsController;
 use Innertia\Backoffice\Http\Controllers\UsersController;
 
 $prefix     = config('innertia.backoffice.prefix', 'backoffice');
@@ -51,6 +52,11 @@ Route::prefix($prefix)
 
         // ── Permissions ───────────────────────────────────────────────────────
         Route::get    ('permissions',                  [PermissionsController::class, 'index']);
+
+        // ── Sessions (globales — admin de sesiones JWT activas) ───────────────
+        Route::get    ('sessions',                     [SessionsController::class, 'index']);
+        Route::delete ('sessions/{id}',                [SessionsController::class, 'destroy']);
+        Route::delete ('sessions',                     [SessionsController::class, 'destroyAll']);
 
         // ── API Keys — Tenant ─────────────────────────────────────────────────
         Route::get    ('api-keys',                     [ApiKeysController::class, 'index']);
