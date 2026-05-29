@@ -33,7 +33,9 @@ class OlimpoServiceProvider extends ServiceProvider
             );
         }
 
-        $this->loadRoutesFrom(__DIR__ . '/routes.php');
+        // Auto-registra las rutas de Olimpo (admin de plataforma). Un producto
+        // también puede llamar \Innertia\Olimpo\Routes::register() explícitamente.
+        $this->loadRoutesFrom(__DIR__ . '/routes-loader.php');
 
         // Escuchar jobs fallidos si hay OLIMPO_URL configurado
         if (config('olimpo.url') && config('olimpo.key')) {

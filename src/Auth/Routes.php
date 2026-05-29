@@ -39,7 +39,7 @@ class Routes
      * login, OTP, 2FA verify, verificación de email, password (forgot/reset/change/set), OAuth.
      */
     public static function publicRoutes(
-        string $prefix              = 'backoffice/auth',
+        string $prefix              = 'auth',
         string $authController      = AuthController::class,
         string $passwordController  = PasswordController::class,
         string $otpController        = OtpController::class,
