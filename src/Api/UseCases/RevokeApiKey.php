@@ -1,16 +1,18 @@
 <?php
-
+declare(strict_types=1);
 namespace Innertia\Api\UseCases;
 
-use Innertia\Api\Models\ClientApiKey;
-use Innertia\Platform\Contracts\UseCase;
+use Innertia\Api\Events\ApiKeyRevoked;
+use Innertia\Api\Models\ApiKey;
 
-class RevokeApiKey extends UseCase
+class RevokeApiKey
 {
-    public function __construct(public readonly ClientApiKey $apiKey) {}
+    public function __construct(private readonly ApiKey $apiKey) {}
 
     public function execute(): void
     {
+        $organization = $this->apiKey->organization;
         $this->apiKey->revoke();
+        ApiKeyRevoked::dispatch($organization, $this->apiKey);
     }
 }

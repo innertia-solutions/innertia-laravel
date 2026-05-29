@@ -1,29 +1,31 @@
 <?php
-
+declare(strict_types=1);
 namespace Innertia\Api\UseCases;
 
-use Innertia\Api\Models\Client;
-use Innertia\Api\Models\ClientApiKey;
-use Innertia\Platform\Contracts\UseCase;
+use Innertia\Api\Events\ApiKeyCreated;
+use Innertia\Api\Models\ApiKey;
+use Innertia\Api\Models\Organization;
 
-class CreateApiKey extends UseCase
+class CreateApiKey
 {
     public function __construct(
-        public readonly Client          $client,
-        public readonly string          $name,
-        public readonly array           $permissions = [],
-        public readonly ?\Carbon\Carbon $expiresAt   = null,
+        private readonly Organization $organization,
+        private readonly string       $name,
     ) {}
 
+    /** @return array{raw_key: string, api_key: ApiKey} */
     public function execute(): array
     {
-        ['raw' => $raw, 'attributes' => $attributes] = ClientApiKey::generate(
-            clientId:    $this->client->id,
-            name:        $this->name,
-            permissions: $this->permissions,
-            expiresAt:   $this->expiresAt,
+        ['raw' => $raw, 'attributes' => $attrs] = ApiKey::generate(
+            organizationId: $this->organization->id,
+            name:           $this->name,
+            isDefault:      false,
         );
 
-        return ['raw_key' => $raw, 'api_key' => ClientApiKey::create($attributes)];
+        $apiKey = ApiKey::create(['organization_id' => $this->organization->id, ...$attrs]);
+
+        ApiKeyCreated::dispatch($this->organization, $apiKey);
+
+        return ['raw_key' => $raw, 'api_key' => $apiKey];
     }
 }
