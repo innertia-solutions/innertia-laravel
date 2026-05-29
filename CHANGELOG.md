@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### BREAKING CHANGES — API mode: Organizations (replaces Clients)
+
+- **`Client` model removed** — replaced by `Organization` (`src/Api/Models/Organization.php`)
+  - `organizations` table replaces `clients` table
+  - Adds `parent_id` (nullable UUID) for hierarchical orgs — root orgs have `parent_id = null`
+  - Uses `HasConfigs` trait for flexible per-org config
+  - New helpers: `isRoot()`, `isChild()`, `ancestors()`, `children()`, `isActive()`, `isSuspended()`
+  - `suspend()` / `reactivate()` replace direct status updates
+- **`ClientApiKey` model removed** — replaced by `ApiKey` (`src/Api/Models/ApiKey.php`)
+  - `api_keys` table replaces `client_api_keys` table
+  - `organization_id` replaces `client_id`
+  - No `permissions` array — keys are identity only
+  - New `is_default` flag — set on the auto-generated key at org creation
+  - `key_prefix` (12-char indexed prefix) for fast DB lookup before hash verification
+- **`VerifyClientApiKey` middleware removed** — replaced by `VerifyApiKey`
+  - Alias: `verify.api.key` (register in `InnertiaApiProvider::boot()`)
+  - Injects `$request->attributes->get('organization')` and `$request->attributes->get('api_key')` (was `client` / `client_api_key`)
+- **`RegisterClient` use case removed** — replaced by `RegisterOrganization` + `CreateChildOrganization`
+- **`ApiPermissions` class removed** — api mode no longer has route-level permissions on keys
+- **Routes changed**: `/olimpo/clients/*` → `/olimpo/organizations/*`
+- **`api.available_permissions` config removed** — api mode keys have no permissions
+
+### Added (api mode)
+
+- `OrganizationCreated`, `OrganizationSuspended`, `OrganizationReactivated`, `ApiKeyCreated`, `ApiKeyRevoked` domain events via EventBus
+- `configs` table migration added to api migrations (`database/migrations/api/`) — enables `HasConfigs` on organizations
+- `CreateApiKey` use case — creates additional keys for an existing org
+- `RevokeApiKey` use case — revokes a key and fires `ApiKeyRevoked` event
+
 ### BREAKING CHANGES — Apps → Contexts rename
 - **`HasApps` trait renamed to `HasContexts`** — update `use HasApps` → `use HasContexts` in User + Tenant models.
 - **Methods renamed**: `hasApp()→hasContext()`, `grantApp()→grantContext()`, `revokeApp()→revokeContext()`, `syncApps()→syncContexts()`, `appKeys()→contextKeys()`, `appKeysInOrganization()→contextKeysInOrganization()`, `accessibleOrganizationsByApp()→accessibleOrganizationsByContext()`.
