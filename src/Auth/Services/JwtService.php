@@ -45,14 +45,23 @@ class JwtService
 
     public function refreshToken(string $token): string
     {
+        // Capturamos el user con la sesión vieja todavía activa.
+        $user = $this->getUserFromToken($token);
+
         $this->invalidateToken($token);
 
         try {
-            $new = JWTAuth::setToken($token)->refresh();
-            return $new->get();
+            $new = JWTAuth::setToken($token)->refresh()->get();
         } catch (\Exception $e) {
             throw $e;
         }
+
+        // El token nuevo necesita su propia fila de sesión (el guard la valida).
+        if ($user) {
+            $this->registerSession($user, $new);
+        }
+
+        return $new;
     }
 
     public function getUserFromToken(string $token): ?Authenticatable
@@ -63,9 +72,27 @@ class JwtService
             return null;
         }
 
+        // La sesión debe seguir activa en DB. Revocar = borrar la fila
+        // (admin, sesión única, logout) invalida el token de inmediato,
+        // aunque el JWT siga siendo criptográficamente válido.
+        if (! $this->sessionIsActive($token)) {
+            return null;
+        }
+
         $model = config('auth.providers.users.model');
 
         return $model::find($payload->get('sub'));
+    }
+
+    /**
+     * Verifica que exista una fila de sesión activa para este token.
+     * token_hash = sha256(jwt) — el mismo hash que guarda registerSession().
+     */
+    protected function sessionIsActive(string $token): bool
+    {
+        return Session::where('token_hash', $this->hash($token))
+            ->where('expires_at', '>', now())
+            ->exists();
     }
 
     protected function registerSession(Authenticatable $user, string $token): void
