@@ -19,7 +19,10 @@ class CreateTenantCommand extends Command
         {--email=             : Admin email (default: admin@{key}.com)}
         {--admin-name=Admin   : Admin display name}
         {--password=          : Admin password (auto-generated if omitted)}
-        {--no-admin           : Skip admin user creation}';
+        {--no-admin           : Skip admin user creation}
+        {--demo               : Enable demo mode — exposes credentials on the login page}
+        {--demo-email=        : Demo login email (defaults to admin email)}
+        {--demo-password=     : Demo login password (defaults to admin password)}';
 
     protected $description = 'Create a new tenant and its initial admin user';
 
@@ -29,10 +32,18 @@ class CreateTenantCommand extends Command
         $name      = $this->argument('name');
         $status    = $this->option('status');
         $trialDays = (int) $this->option('trial-days');
+        $demo      = $this->option('demo');
 
         // 1 — Create tenant
         try {
-            $tenant = (new CreateTenant($key, $name, $status, $trialDays))->execute();
+            $tenant = (new CreateTenant(
+                key:          $key,
+                name:         $name,
+                status:       $status,
+                trialDays:    $trialDays,
+                demoEmail:    $demo ? ($this->option('demo-email') ?: null) : null,
+                demoPassword: $demo ? ($this->option('demo-password') ?: null) : null,
+            ))->execute();
         } catch (ConflictException $e) {
             $this->error($e->getMessage());
             return self::FAILURE;
@@ -72,12 +83,24 @@ class CreateTenantCommand extends Command
         }
 
         $this->newLine();
-        $this->info('Admin user created (demo mode enabled):');
+        $this->info('Admin user created:');
         $this->table(['Email', 'Password'], [[
             $result['email'],
             $result['password'],
         ]]);
         $this->warn('⚠  Save this password — it will not be shown again.');
+
+        // If --demo was passed but no explicit demo credentials, use admin credentials.
+        if ($demo && ! $this->option('demo-email') && ! $this->option('demo-password')) {
+            $tenant->configs = array_merge($tenant->configs ?? [], [
+                'demo' => [
+                    'email'    => $result['email'],
+                    'password' => $result['password'],
+                ],
+            ]);
+            $tenant->save();
+            $this->info('Demo mode enabled with admin credentials.');
+        }
 
         Innertia::deactivate();
 

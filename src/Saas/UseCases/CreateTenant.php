@@ -8,13 +8,13 @@ use Innertia\Platform\Contracts\UseCase;
 class CreateTenant extends UseCase
 {
     public function __construct(
-        public readonly string $key,
-        public readonly string $name,
-        public readonly string $status = 'trial',
-        public readonly int $trialDays = 14,
-    ) {
-       
-    }
+        public readonly string  $key,
+        public readonly string  $name,
+        public readonly string  $status = 'trial',
+        public readonly int     $trialDays = 14,
+        public readonly ?string $demoEmail = null,
+        public readonly ?string $demoPassword = null,
+    ) {}
 
     public function execute(): mixed
     {
@@ -32,6 +32,16 @@ class CreateTenant extends UseCase
 
         if ($this->status === 'trial') {
             $data['trial_ends_at'] = now()->addDays($this->trialDays);
+        }
+
+        // Demo mode — pre-populate login credentials shown on the login page.
+        if ($this->demoEmail && $this->demoPassword) {
+            $data['configs'] = [
+                'demo' => [
+                    'email'    => $this->demoEmail,
+                    'password' => $this->demoPassword,
+                ],
+            ];
         }
 
         return $model::create($data);

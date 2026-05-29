@@ -39,10 +39,22 @@ class DefaultOlimpoHandler implements OlimpoHandler
     {
         $model = $this->tenantModel();
 
+        $configs = [];
+
+        // Demo mode — pre-populate login credentials shown on the login page.
+        // Pass: { "demo": { "email": "demo@acme.com", "password": "demo1234" } }
+        if (isset($data['demo']['email'], $data['demo']['password'])) {
+            $configs['demo'] = [
+                'email'    => $data['demo']['email'],
+                'password' => $data['demo']['password'],
+            ];
+        }
+
         $tenant = $model::create([
-            'key'    => $data['key'],
-            'name'   => $data['name'],
-            'status' => $data['status'] ?? 'active',
+            'key'     => $data['key'],
+            'name'    => $data['name'],
+            'status'  => $data['status'] ?? 'active',
+            'configs' => $configs ?: null,
         ]);
 
         return $tenant->toArray();
