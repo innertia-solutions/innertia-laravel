@@ -87,6 +87,9 @@ Route::middleware(Authenticate::class)->group(function () {
         Route::get('permissions', [PermissionsController::class, 'index']);
     });
 
+    // ── Files ─────────────────────────────────────────────────────────────────
+    \Innertia\Files\Routes::register();
+
     // ── Rutas de la aplicación ────────────────────────────────────────────────
 
 });
