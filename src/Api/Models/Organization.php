@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Innertia\Api\Models;
 
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -66,7 +67,7 @@ class Organization extends Model
         $current = $this;
 
         while ($current->parent_id !== null) {
-            $current = $current->parent()->first();
+            $current = $current->parent;
             if (!$current) {
                 break;
             }
@@ -100,12 +101,12 @@ class Organization extends Model
 
     // ── Scopes ────────────────────────────────────────────────────────────────
 
-    public function scopeActive($query)
+    public function scopeActive(Builder $query): Builder
     {
         return $query->where('status', 'active');
     }
 
-    public function scopeRoots($query)
+    public function scopeRoots(Builder $query): Builder
     {
         return $query->whereNull('parent_id');
     }
