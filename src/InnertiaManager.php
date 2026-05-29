@@ -36,8 +36,14 @@ class InnertiaManager
     public function app(): ?string
     {
         try {
-            $payload = \Tymon\JWTAuth\Facades\JWTAuth::parseToken()->getPayload();
-            return $payload->get('app');
+            $token = request()?->bearerToken();
+            if (! $token) {
+                return null;
+            }
+
+            $payload = app(\Innertia\Auth\Services\JwtService::class)->decode($token);
+
+            return $payload?->context ?? $payload?->app ?? null;
         } catch (\Throwable) {
             return null;
         }

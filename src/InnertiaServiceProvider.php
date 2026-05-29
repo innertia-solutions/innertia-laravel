@@ -46,6 +46,7 @@ class InnertiaServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../config/innertia.php', 'innertia');
+        $this->mergeConfigFrom(__DIR__ . '/../config/jwt.php', 'jwt');
 
         // Make the mode authoritative. Valid values: 'app' | 'saas' | 'api'
         $mode = $this->isSaas() ? 'saas' : ($this->isApi() ? 'api' : 'app');
@@ -214,6 +215,7 @@ class InnertiaServiceProvider extends ServiceProvider
                 MakeModelCommand::class,
                 MakeUseCaseCommand::class,
                 MakeControllerCommand::class,
+                \Innertia\Auth\Console\Commands\JwtSecretCommand::class,
             ];
 
             if ($isSaas) {

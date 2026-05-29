@@ -2,42 +2,53 @@
 
 namespace Innertia\Auth\Services;
 
+use Firebase\JWT\JWT;
+use Firebase\JWT\Key;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Support\Facades\Cache;
-use Innertia\Facades\Settings;
 use Innertia\Auth\Models\Session;
-use Tymon\JWTAuth\Facades\JWTAuth;
-use Tymon\JWTAuth\Facades\JWTFactory;
+use Innertia\Facades\Settings;
 
+/**
+ * Servicio JWT propio de Innertia. Firma/verifica con firebase/php-jwt
+ * (sin tymon/jwt-auth). El guard (JwtGuard), las sesiones (user_sessions)
+ * y la revocación viven encima de este codec.
+ */
 class JwtService
 {
     public function generateToken(Authenticatable $user, array $extraClaims = []): string
     {
-        $claims = array_merge(['sub' => $user->getAuthIdentifier()], $extraClaims);
-        $payload = JWTFactory::customClaims($claims)->make();
-        $token = JWTAuth::encode($payload)->get();
+        $now    = time();
+        $ttlMin = (int) config('jwt.ttl', 60);
+
+        $claims = array_merge([
+            'sub' => (string) $user->getAuthIdentifier(),
+            'iat' => $now,
+            'nbf' => $now,
+            'exp' => $now + ($ttlMin * 60),
+            'jti' => bin2hex(random_bytes(16)),
+        ], $extraClaims);
+
+        $token = JWT::encode($claims, $this->secret(), $this->algo());
 
         $this->registerSession($user, $token);
 
         return $token;
     }
 
+    /** Decodifica + valida firma/exp. Devuelve el payload (stdClass) o null. */
     public function validateToken(string $token): ?object
     {
         if ($this->isBlacklisted($token)) {
             return null;
         }
 
-        try {
-            return JWTAuth::setToken($token)->getPayload();
-        } catch (\Exception) {
-            return null;
-        }
+        return $this->decode($token);
     }
 
     public function invalidateToken(string $token): void
     {
-        $ttl = config('jwt.ttl', 60) * 60;
+        $ttl = (int) config('jwt.ttl', 60) * 60;
         Cache::put($this->blacklistKey($token), true, $ttl);
 
         Session::where('token_hash', $this->hash($token))->delete();
@@ -45,23 +56,30 @@ class JwtService
 
     public function refreshToken(string $token): string
     {
-        // Capturamos el user con la sesión vieja todavía activa.
-        $user = $this->getUserFromToken($token);
+        $payload = $this->validateToken($token);
+
+        if (! $payload || ! $this->sessionIsActive($token)) {
+            throw new \RuntimeException('Token inválido o sesión revocada.');
+        }
+
+        $model = config('auth.providers.users.model');
+        $user  = $model::find($payload->sub ?? null);
+
+        if (! $user) {
+            throw new \RuntimeException('Usuario no encontrado para refresh.');
+        }
 
         $this->invalidateToken($token);
 
-        try {
-            $new = JWTAuth::setToken($token)->refresh()->get();
-        } catch (\Exception $e) {
-            throw $e;
+        // Preservar claims de dominio (ej. context) en el token nuevo.
+        $extra = [];
+        foreach (['context'] as $claim) {
+            if (isset($payload->{$claim})) {
+                $extra[$claim] = $payload->{$claim};
+            }
         }
 
-        // El token nuevo necesita su propia fila de sesión (el guard la valida).
-        if ($user) {
-            $this->registerSession($user, $new);
-        }
-
-        return $new;
+        return $this->generateToken($user, $extra);
     }
 
     public function getUserFromToken(string $token): ?Authenticatable
@@ -81,7 +99,17 @@ class JwtService
 
         $model = config('auth.providers.users.model');
 
-        return $model::find($payload->get('sub'));
+        return $model::find($payload->sub ?? null);
+    }
+
+    /** Decodifica el token con la clave/algoritmo configurados. Null si inválido/expirado. */
+    public function decode(string $token): ?object
+    {
+        try {
+            return JWT::decode($token, new Key($this->secret(), $this->algo()));
+        } catch (\Throwable) {
+            return null;
+        }
     }
 
     /**
@@ -147,5 +175,21 @@ class JwtService
     protected function resolveTenantId(): mixed
     {
         return \Innertia\Facades\Innertia::tenant()?->getKey();
+    }
+
+    protected function secret(): string
+    {
+        $secret = config('jwt.secret');
+
+        if (empty($secret)) {
+            throw new \RuntimeException('JWT secret no configurado. Ejecuta `php artisan jwt:secret`.');
+        }
+
+        return $secret;
+    }
+
+    protected function algo(): string
+    {
+        return config('jwt.algo', 'HS256');
     }
 }

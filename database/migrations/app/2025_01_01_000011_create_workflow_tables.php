@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('workflow_definitions', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            // Sin tenant_id — modo app es single-tenant
+            $table->string('tenant_id')->nullable();
             $table->string('entity_type');
             $table->string('name');
             $table->string('label');
@@ -24,7 +24,7 @@ return new class extends Migration
 
         Schema::create('workflow_instances', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            // Sin tenant_id
+            $table->string('tenant_id')->nullable();
             $table->uuid('definition_id');
             $table->foreign('definition_id')->references('id')->on('workflow_definitions');
             $table->string('workflowable_type');

@@ -12,7 +12,6 @@ use Innertia\Platform\Traits\Auditable;
 use Innertia\Platform\Traits\HasHistory;
 use Innertia\Platform\Traits\HasPreferences;
 use Innertia\Platform\Traits\HasUuid;
-use Tymon\JWTAuth\Contracts\JWTSubject;
 
 /**
  * Base User model.
@@ -20,7 +19,7 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
  * Extend this in your app: class User extends \Innertia\Auth\Models\User { ... }
  *
  * Includes:
- * - JWT authentication (tymon/jwt-auth)
+ * - JWT authentication (codec propio — firebase/php-jwt vía JwtService)
  * - Roles & permissions (innertia RBAC — HasRoles + HasContexts)
  * - UUID as primary key
  * - Audit trail + entity history (innertia-laravel)
@@ -29,7 +28,7 @@ use Tymon\JWTAuth\Contracts\JWTSubject;
  *   via TeamsFeature::isActive()). Users son tenant-level; el contexto de
  *   organization se mediza vía user_contexts (HasContexts), no via HasOrganization.
  */
-abstract class User extends Authenticatable implements JWTSubject
+abstract class User extends Authenticatable
 {
     use Auditable, HasContexts, HasFactory, HasHistory, HasPreferences, HasRoles, HasTeams, HasUuid, SoftDeletes;
 
@@ -62,17 +61,5 @@ abstract class User extends Authenticatable implements JWTSubject
     public function creator(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(static::class, 'created_by');
-    }
-
-    /* ── JWTSubject ── */
-
-    public function getJWTIdentifier()
-    {
-        return $this->getKey();
-    }
-
-    public function getJWTCustomClaims(): array
-    {
-        return [];
     }
 }

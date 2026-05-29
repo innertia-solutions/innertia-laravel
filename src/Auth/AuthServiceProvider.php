@@ -29,10 +29,9 @@ class AuthServiceProvider extends ServiceProvider
 
     protected function registerJwtGuard(): void
     {
-        // Diferido a booted() para correr DESPUÉS del provider de tymon/jwt-auth,
-        // que también registra un driver 'jwt'. El último Auth::extend gana; si no
-        // diferimos, el guard de tymon (sin validación de sesión) ensombrece al
-        // nuestro y la revocación de sesiones no surte efecto.
+        // Diferido a booted() para correr DESPUÉS de cualquier otro provider que
+        // pudiera registrar un driver 'jwt' (el último Auth::extend gana). Garantiza
+        // que el guard activo sea SIEMPRE el nuestro, con validación de sesión.
         $this->app->booted(function () {
             Auth::extend('jwt', function ($app, $name, array $config) {
                 return new JwtGuard(
