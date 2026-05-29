@@ -29,12 +29,18 @@ class AuthServiceProvider extends ServiceProvider
 
     protected function registerJwtGuard(): void
     {
-        Auth::extend('jwt', function ($app, $name, array $config) {
-            return new JwtGuard(
-                Auth::createUserProvider($config['provider']),
-                $app->make('request'),
-                $app->make(JwtService::class),
-            );
+        // Diferido a booted() para correr DESPUÉS del provider de tymon/jwt-auth,
+        // que también registra un driver 'jwt'. El último Auth::extend gana; si no
+        // diferimos, el guard de tymon (sin validación de sesión) ensombrece al
+        // nuestro y la revocación de sesiones no surte efecto.
+        $this->app->booted(function () {
+            Auth::extend('jwt', function ($app, $name, array $config) {
+                return new JwtGuard(
+                    Auth::createUserProvider($config['provider']),
+                    $app->make('request'),
+                    $app->make(JwtService::class),
+                );
+            });
         });
     }
 
