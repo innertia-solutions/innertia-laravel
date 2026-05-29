@@ -127,9 +127,9 @@ class InnertiaServiceProvider extends ServiceProvider
         // Platform: history, files upload, notifications genéricas.
         $this->loadRoutesFrom(__DIR__ . '/Platform/routes.php');
 
-        // Api mode: rutas Olimpo para gestión de clients.
+        // Api mode: admin de organizaciones + API keys (delega en Api\Routes::register()).
         if ($mode === 'api') {
-            $this->loadRoutesFrom(__DIR__ . '/Api/routes.php');
+            $this->loadRoutesFrom(__DIR__ . '/Api/routes-loader.php');
         }
 
         // Auth y Backoffice NO se auto-cargan aquí.
