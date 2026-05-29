@@ -41,7 +41,7 @@ class InnertiaServiceProvider extends ServiceProvider
      * InnertiaApiProvider  → isSaas: false, isApi: true
      */
     protected function isSaas(): bool { return config('innertia.mode') === 'saas'; }
-    protected function isApi(): bool  { return false; }
+    protected function isApi(): bool  { return config('innertia.mode') === 'api'; }
 
     public function register(): void
     {
@@ -300,6 +300,15 @@ class InnertiaServiceProvider extends ServiceProvider
 
     protected function configureAuth(): void
     {
+        // API mode has no users — it authenticates organizations via API keys
+        // (verify.api.key middleware). No JWT guard, no users provider, no user
+        // model. config/innertia.php is the single source of truth for the user
+        // model in app/saas; in api mode none is declared because none exists,
+        // so config/auth.php is unnecessary and the product ships without it.
+        if ($this->isApi()) {
+            return;
+        }
+
         $userModel = config('innertia.auth.user_model', \App\Models\User::class);
 
         config([

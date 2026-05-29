@@ -28,9 +28,9 @@ src/
 
 | Modo | Multitenancy | Auth | Description |
 |------|-------------|------|-------------|
-| `app` | ❌ | ✅ | Single-tenant. App interna. |
-| `saas` | ✅ | ✅ | Multi-tenant via `X-Tenant` header. |
-| `api` | ❌ | ✅ JWT | API mode. Consumers manejan su propio scope. |
+| `app` | ❌ | ✅ JWT | Single-tenant. App interna. |
+| `saas` | ✅ | ✅ JWT | Multi-tenant via `X-Tenant` header. |
+| `api` | ❌ | 🔑 API key | API mode. **Sin usuarios, sin JWT.** Autentica organizaciones vía `verify.api.key` (header `X-Api-Key`). El admin de orgs/keys va bajo `/olimpo` protegido por `olimpo.auth` (X-Olimpo-Key). No publica `config/auth.php` — `configureAuth()` no cablea auth en este modo. |
 
 ## Features core (siempre activos)
 

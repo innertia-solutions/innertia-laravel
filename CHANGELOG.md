@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — API mode no longer wires user auth
+
+- **`InnertiaServiceProvider::isApi()` is now config-driven** (`config('innertia.mode') === 'api'`),
+  mirroring `isSaas()`. Previously it was hardcoded `false` on the base provider, so the
+  auto-discovered base provider (registered alongside the product's `InnertiaApiProvider`)
+  mis-detected api products as `app` mode and wired the JWT guard + Eloquent users provider.
+- **`configureAuth()` is now skipped in api mode.** API mode has no users — it authenticates
+  organizations via API keys (`verify.api.key`). No JWT guard, no users provider, no user model.
+- **`config/auth.php` is no longer needed in api mode.** `config/innertia.php` (`auth.user_model`)
+  is the single source of truth for the user model in `app`/`saas`; in api mode none is declared
+  because none exists. The `laravel-api` template ships without `config/auth.php`.
+
 ### BREAKING CHANGES — API mode: Organizations (replaces Clients)
 
 - **`Client` model removed** — replaced by `Organization` (`src/Api/Models/Organization.php`)
