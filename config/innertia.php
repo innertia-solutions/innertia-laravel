@@ -19,6 +19,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Demo mode
+    |--------------------------------------------------------------------------
+    |
+    | Credenciales pre-cargadas en el login (app mode), expuestas por /status
+    | como branding.demo. Setting global por environment. En producción dejar
+    | enabled=false (demo => null).
+    |
+    */
+
+    'demo' => [
+        'enabled'  => env('INNERTIA_DEMO_ENABLED', false),
+        'email'    => env('INNERTIA_DEMO_EMAIL'),
+        'password' => env('INNERTIA_DEMO_PASSWORD'),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | API Product Mode
     |--------------------------------------------------------------------------
     |

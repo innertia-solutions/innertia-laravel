@@ -23,7 +23,27 @@ class StatusController extends Controller
             ],
             'branding' => [
                 'name' => config('app.name'),
+                'demo' => $this->resolveDemo(),
             ],
         ]);
+    }
+
+    /**
+     * Credenciales demo para pre-llenar el login (app mode). Setting global vía env:
+     *   INNERTIA_DEMO_ENABLED, INNERTIA_DEMO_EMAIL, INNERTIA_DEMO_PASSWORD
+     * Devuelve { email, password } solo si está habilitado y completo; si no, null.
+     */
+    private function resolveDemo(): ?array
+    {
+        $demo = (array) config('innertia.demo', []);
+
+        if (empty($demo['enabled']) || empty($demo['email']) || empty($demo['password'])) {
+            return null;
+        }
+
+        return [
+            'email'    => $demo['email'],
+            'password' => $demo['password'],
+        ];
     }
 }
