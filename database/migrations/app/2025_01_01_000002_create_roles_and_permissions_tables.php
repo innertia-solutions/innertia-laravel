@@ -23,6 +23,7 @@ return new class extends Migration
     {
         Schema::create('permissions', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->string('tenant_id')->nullable()->index();
             $table->string('name');
             $table->string('description')->nullable();
             $table->timestamps();
@@ -30,6 +31,7 @@ return new class extends Migration
 
         Schema::create('roles', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->string('tenant_id')->nullable()->index();
             $table->string('name');
             $table->string('description')->nullable();
             $table->timestamps();
@@ -69,6 +71,7 @@ return new class extends Migration
 
         Schema::create('entity_permissions', function (Blueprint $table) {
             $table->uuid('id')->primary();
+            $table->string('tenant_id')->nullable()->index();
             $table->string('entity_type');
             $table->string('entity_id');
             $table->string('grantable_type');
