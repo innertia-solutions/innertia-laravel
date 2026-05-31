@@ -12,12 +12,12 @@ class EmailVerificationMail extends InnertiaMailable
         public readonly string $url,
     ) {}
 
-    public function subject(): string
+    public function subjectLine(): string
     {
         return 'Verify your email address';
     }
 
-    public function view(): string
+    public function markdownView(): string
     {
         return 'innertia::mail.email-verification';
     }

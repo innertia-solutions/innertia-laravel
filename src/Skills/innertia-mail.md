@@ -14,8 +14,8 @@ Capa sobre `Illuminate\Mail\Mailable` con branding configurable, layout master, 
 abstract class InnertiaMailable extends Mailable {
     use Queueable, SerializesModels;
 
-    abstract public function subject(): string;
-    abstract public function view(): string;
+    abstract public function subjectLine(): string;
+    abstract public function markdownView(): string;
 
     public function build() { /* renderiza con layout master */ }
     public function payload(): array { /* props públicas serializadas */ }
@@ -80,11 +80,11 @@ use Innertia\Mail\InnertiaMailable;
 class InvoicePaidMail extends InnertiaMailable {
     public function __construct(public readonly Invoice $invoice) {}
 
-    public function subject(): string {
+    public function subjectLine(): string {
         return "Pago confirmado — Factura #{$this->invoice->number}";
     }
 
-    public function view(): string {
+    public function markdownView(): string {
         return 'emails.invoice-paid';
     }
 }

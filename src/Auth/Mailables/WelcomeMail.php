@@ -12,12 +12,12 @@ class WelcomeMail extends InnertiaMailable
         public readonly ?string $temporaryPassword = null,
     ) {}
 
-    public function subject(): string
+    public function subjectLine(): string
     {
         return '¡Bienvenido a ' . config('app.name') . '!';
     }
 
-    public function view(): string
+    public function markdownView(): string
     {
         return 'innertia::mail.welcome';
     }

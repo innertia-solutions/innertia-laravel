@@ -5,6 +5,8 @@ namespace Innertia\Mail;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Mail\Mailable;
+use Illuminate\Mail\Mailables\Content;
+use Illuminate\Mail\Mailables\Envelope;
 use Illuminate\Queue\SerializesModels;
 
 /**
@@ -19,25 +21,34 @@ use Illuminate\Queue\SerializesModels;
  *   {
  *       public function __construct(public readonly string $name) {}
  *
- *       public function subject(): string { return 'Welcome!'; }
+ *       public function subjectLine(): string { return 'Welcome!'; }
  *
- *       public function view(): string { return 'emails.welcome'; }
+ *       public function markdownView(): string { return 'emails.welcome'; }
  *   }
+ *
+ * NOTA: los métodos de contrato se llaman subjectLine() / markdownView() —
+ * NO subject() / view() — para no colisionar con los métodos homónimos de
+ * Illuminate\Mail\Mailable (que en Laravel 11+ son setters fluidos). Usa la
+ * API moderna envelope()/content().
  */
 abstract class InnertiaMailable extends Mailable implements ShouldQueue
 {
     use Queueable, SerializesModels;
 
-    abstract public function subject(): string;
+    /** Subject line del correo. */
+    abstract public function subjectLine(): string;
 
-    /** Blade view to render inside the layout. */
-    abstract public function view(): string;
+    /** Vista markdown a renderizar dentro del layout. */
+    abstract public function markdownView(): string;
 
-    public function build(): static
+    public function envelope(): Envelope
     {
-        return $this
-            ->subject($this->subject())
-            ->markdown($this->view(), $this->payload());
+        return new Envelope(subject: $this->subjectLine());
+    }
+
+    public function content(): Content
+    {
+        return new Content(markdown: $this->markdownView(), with: $this->payload());
     }
 
     /**

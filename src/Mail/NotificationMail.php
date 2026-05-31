@@ -94,12 +94,12 @@ class NotificationMail extends InnertiaMailable
 
     // ── InnertiaMailable contract ─────────────────────────────────────────────
 
-    public function subject(): string
+    public function subjectLine(): string
     {
         return $this->emailSubject;
     }
 
-    public function view(): string
+    public function markdownView(): string
     {
         return 'innertia::mail.notification';
     }

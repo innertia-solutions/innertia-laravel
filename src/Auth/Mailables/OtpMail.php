@@ -12,7 +12,7 @@ class OtpMail extends InnertiaMailable
         public readonly string  $action,
     ) {}
 
-    public function subject(): string
+    public function subjectLine(): string
     {
         return match ($this->action) {
             'login'              => 'Tu código de verificación',
@@ -23,7 +23,7 @@ class OtpMail extends InnertiaMailable
         };
     }
 
-    public function view(): string
+    public function markdownView(): string
     {
         return 'innertia::mail.otp';
     }
