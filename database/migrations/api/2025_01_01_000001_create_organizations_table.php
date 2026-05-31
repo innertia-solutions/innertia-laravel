@@ -15,7 +15,11 @@ return new class extends Migration {
             $table->string('status')->default('active')->index(); // active | suspended
             $table->timestamps();
             $table->softDeletes();
+        });
 
+        // Self-referencing FK added in a separate statement so PostgreSQL sees the
+        // primary key (unique constraint on `id`) before the constraint is created.
+        Schema::table('organizations', function (Blueprint $table) {
             $table->foreign('parent_id')
                 ->references('id')
                 ->on('organizations')
