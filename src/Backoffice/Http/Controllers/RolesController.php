@@ -18,9 +18,12 @@ class RolesController extends Controller
 
     public function index(Request $request): JsonResponse
     {
-        $tenantId = $this->tenantId();
+        $query = Role::query();
 
-        $query = Role::where('tenant_id', $tenantId);
+        // El scope por tenant solo aplica en saas; en app mode no hay tenant_id.
+        if (config('innertia.mode') === 'saas') {
+            $query->where('tenant_id', $this->tenantId());
+        }
 
         return DataTable::create('roles')
             ->columns(['name', 'description', 'created_at'])
