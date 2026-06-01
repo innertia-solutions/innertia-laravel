@@ -51,6 +51,9 @@ class DataTree
     /** Columna a usar para búsqueda (LOWER LIKE). */
     private string $searchColumn = 'name';
 
+    /** Expresión SQL cruda para búsqueda (concatenación/calculada). Si se setea, tiene prioridad sobre searchColumn. */
+    private ?string $searchExpression = null;
+
     private bool $addIdColumn = true;
 
     private bool $debug = false;
@@ -120,6 +123,18 @@ class DataTree
     public function searchColumn(string $column): self
     {
         $this->searchColumn = $column;
+
+        return $this;
+    }
+
+    /**
+     * Define una expresión SQL cruda para la búsqueda (en vez de una sola columna).
+     * Permite buscar sobre datos concatenados o calculados. Ej:
+     *   ->searchExpression("first_name || ' ' || last_name || ' ' || rut")
+     */
+    public function searchExpression(string $expression): self
+    {
+        $this->searchExpression = $expression;
 
         return $this;
     }
@@ -224,9 +239,9 @@ class DataTree
             $query->where($this->parentColumn, $expand);
         }
 
-        if ($search !== '' && $this->searchColumn) {
-            $col = $this->searchColumn;
-            $query->whereRaw("LOWER({$this->q($col)}) LIKE ?", ['%'.strtolower($search).'%']);
+        if ($search !== '' && ($this->searchExpression || $this->searchColumn)) {
+            $expr = $this->searchExpression ?? $this->q($this->searchColumn);
+            $query->whereRaw("LOWER(({$expr})) LIKE ?", ['%'.strtolower($search).'%']);
         }
 
         if (is_callable($this->prepareQueryMethod)) {

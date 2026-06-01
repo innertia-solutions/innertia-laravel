@@ -32,6 +32,9 @@ class DataTable
 
     private array $calculatedColumns = [];
 
+    /** Expresiones SQL crudas marcadas como buscables (alias => expr). */
+    private array $searchableExpressions = [];
+
     private $prepareQueryMethod = null;
 
     private array $jsonColumns = [];
@@ -207,9 +210,27 @@ class DataTable
         return $this;
     }
 
-    public function addCalculatedColumn(string $alias, $callback): self
+    public function addCalculatedColumn(string $alias, $callback, bool $searchable = false): self
     {
         $this->calculatedColumns[$alias] = $callback;
+
+        // Si es buscable y la expresión es SQL cruda (string), registrarla para search.
+        if ($searchable && is_string($callback)) {
+            $this->searchableExpressions[$alias] = $callback;
+        }
+
+        return $this;
+    }
+
+    /**
+     * Registra una expresión SQL cruda buscable que NO se muestra como columna.
+     * Útil para buscar sobre datos concatenados o de tablas relacionadas — ej.
+     * `addSearchableColumn('student_search', "(SELECT s.first_name||' '||s.last_name||' '||s.rut FROM students s WHERE s.id = enrollments.student_id)")`.
+     * El término de búsqueda se aplica como `CAST((expr) AS TEXT) ILIKE %term%`.
+     */
+    public function addSearchableColumn(string $alias, string $expression): self
+    {
+        $this->searchableExpressions[$alias] = $expression;
 
         return $this;
     }
@@ -480,6 +501,7 @@ class DataTable
                     'direct' => $this->applyDirectColumnSearch($q, $column, $search),
                     'relation' => $this->applyRelationSearch($q, $column, $search),
                     'pluck' => $this->applyPluckSearch($q, $column, $search),
+                    'searchexpr' => $this->applySearchExpression($q, $meta['expr'], $search),
                     default => null
                 };
             }
@@ -492,6 +514,15 @@ class DataTable
             $query->orWhereRaw("CAST(\"$column\" AS text) ILIKE ?", ["%{$search}%"]);
         } else {
             $query->orWhere($column, 'like', "%{$search}%");
+        }
+    }
+
+    private function applySearchExpression(Builder $query, string $expr, string $search): void
+    {
+        if (DB::getDriverName() === 'pgsql') {
+            $query->orWhereRaw("CAST(({$expr}) AS TEXT) ILIKE ?", ["%{$search}%"]);
+        } else {
+            $query->orWhereRaw("LOWER(CAST(({$expr}) AS CHAR)) LIKE ?", ['%'.strtolower($search).'%']);
         }
     }
 
@@ -543,6 +574,14 @@ class DataTable
                 'type' => 'pluck',
                 'relation' => $config['relation'],
                 'column' => $config['column'],
+            ];
+        }
+
+        // Expresiones SQL crudas buscables (no se muestran; solo participan del search).
+        foreach ($this->searchableExpressions as $alias => $expr) {
+            $this->resolvedColumns['searchexpr::' . $alias] = [
+                'type' => 'searchexpr',
+                'expr' => $expr,
             ];
         }
     }
