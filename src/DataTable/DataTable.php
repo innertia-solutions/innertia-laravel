@@ -988,17 +988,38 @@ class DataTable
         if ($list) {
             $results = $query->get();
 
-            // Si está habilitado el modo lista, devolver formato especial
+            // enableList(): formato key/value para selects (array plano, sin meta).
             if ($this->enableList) {
                 $transformedResults = $this->processListFormat($results);
 
                 return response()->json($transformedResults);
             }
 
-            // Usar map directamente en la Collection para mejor performance
-            $transformedResults = $results->map(fn ($item) => $this->toSnakeCase($item));
+            // Modo lista de tabla: todas las filas sin paginación, pero conservando
+            // `meta` (total, history/entity) para que el componente siga funcionando igual.
+            $transformedResults = $results->map(fn ($item) => $this->toSnakeCase($item))->values();
+            $count = $transformedResults->count();
 
-            return response()->json($transformedResults);
+            $response = [
+                'data' => $transformedResults,
+                'meta' => [
+                    'total' => $count,
+                    'per_page' => $count,
+                    'current_page' => 1,
+                    'last_page' => 1,
+                    'from' => $count > 0 ? 1 : null,
+                    'to' => $count > 0 ? $count : null,
+                    'request' => $request->all(),
+                    'table_name' => $this->name,
+                    ...$this->resolveHistoryMeta(),
+                ],
+            ];
+
+            if ($this->debug) {
+                $response['meta']['query'] = $query->toRawSql();
+            }
+
+            return response()->json($response);
         }
 
         $table = $query->paginate($perPage, ['*'], 'page', $page);
