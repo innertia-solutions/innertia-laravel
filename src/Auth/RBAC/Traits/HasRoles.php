@@ -135,17 +135,19 @@ trait HasRoles
             return $q->exists();
         }
 
-        $tenantId = $this->currentTenantId();
+        $q = $this->roles()->where('roles.name', $role);
 
-        $q = $this->roles()
-            ->where('roles.name', $role)
-            ->where(function ($q) use ($tenantId) {
+        // tenant_id solo existe en el schema saas; en app/api la columna no está.
+        if (config('innertia.mode') === 'saas') {
+            $tenantId = $this->currentTenantId();
+            $q->where(function ($q) use ($tenantId) {
                 $q->whereNull('roles.tenant_id');
 
                 if ($tenantId !== null) {
                     $q->orWhere('roles.tenant_id', $tenantId);
                 }
             });
+        }
 
         if (OrganizationsFeature::isActive()) {
             $q = $this->applyOrgPivotFilter($q, $organizationId);
@@ -219,9 +221,15 @@ trait HasRoles
      */
     public function revokePermission(string|\BackedEnum $permission): void
     {
-        $name     = $permission instanceof \BackedEnum ? $permission->value : $permission;
-        $tenantId = $this->currentTenantId();
-        $p        = Permission::where('name', $name)->where('tenant_id', $tenantId)->first();
+        $name  = $permission instanceof \BackedEnum ? $permission->value : $permission;
+        $query = Permission::where('name', $name);
+
+        // tenant_id solo existe en el schema saas.
+        if (config('innertia.mode') === 'saas') {
+            $query->where('tenant_id', $this->currentTenantId());
+        }
+
+        $p = $query->first();
 
         if ($p) {
             $this->directPermissions()->detach($p->id);

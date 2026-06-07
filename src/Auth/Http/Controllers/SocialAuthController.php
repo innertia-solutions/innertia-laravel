@@ -29,7 +29,11 @@ class SocialAuthController extends Controller
 
         app(ConfigureSocialite::class)->configure($p);
 
+        // stateless: las rutas API no tienen sesión; el `context` viaja en el
+        // `state` (el callback también usa ->stateless()). Sin esto, Socialite
+        // intenta guardar el state en sesión y falla con "Session store not set".
         $redirect = Socialite::driver($p->driver())
+            ->stateless()
             ->with(['state' => $request->input('context')])
             ->redirect();
 

@@ -49,7 +49,7 @@ return new class extends Migration
 
         Schema::create('model_roles', function (Blueprint $table) {
             $table->string('model_type');
-            $table->string('model_id');
+            $table->uuid('model_id'); // User|Team usan uuid (convención del kit); evita uuid = varchar en pgsql
             $table->uuid('role_id');
 
             $table->foreign('role_id')->references('id')->on('roles')->cascadeOnDelete();
@@ -60,7 +60,7 @@ return new class extends Migration
 
         Schema::create('model_permissions', function (Blueprint $table) {
             $table->string('model_type');
-            $table->string('model_id');
+            $table->uuid('model_id'); // User|Team usan uuid (convención del kit); evita uuid = varchar en pgsql
             $table->uuid('permission_id');
 
             $table->foreign('permission_id')->references('id')->on('permissions')->cascadeOnDelete();
