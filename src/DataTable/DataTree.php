@@ -63,6 +63,11 @@ class DataTree
     /** @var callable|null Aplica filtros adicionales a la query de roots/expand. */
     private $prepareQueryMethod = null;
 
+    /** Modelos extra cuyos canales realtime se declaran además del modelo principal. */
+    private array $realtimeListen = [];
+
+    private bool $realtimeEnabled = true;
+
     public function __construct(string $name, string $modelClass)
     {
         if (! is_subclass_of($modelClass, Model::class)) {
@@ -167,6 +172,39 @@ class DataTree
         return $this;
     }
 
+    /** Agrega canales realtime de otras tablas (alias corto; DataTable usa realtimeListen()). */
+    public function listen(array $modelClasses): self
+    {
+        $this->realtimeListen = array_merge($this->realtimeListen, $modelClasses);
+
+        return $this;
+    }
+
+    public function realtime(bool $enabled = true): self
+    {
+        $this->realtimeEnabled = $enabled;
+
+        return $this;
+    }
+
+    private function resolveChannelsMeta(): array
+    {
+        if (! $this->realtimeEnabled) {
+            return [];
+        }
+
+        $channels = ['entity.'.(new $this->modelClass)->getTable()];
+
+        foreach ($this->realtimeListen as $extra) {
+            try {
+                $channels[] = 'entity.'.(new $extra)->getTable();
+            } catch (\Throwable) {
+            }
+        }
+
+        return ['channels' => array_values(array_unique($channels))];
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Rendering
     // ─────────────────────────────────────────────────────────────────────────
@@ -204,6 +242,7 @@ class DataTree
                 'expand'        => $expand,
                 'total_nodes'   => count($flat),
                 'request'       => $request->all(),
+                ...$this->resolveChannelsMeta(),
             ],
         ];
 
