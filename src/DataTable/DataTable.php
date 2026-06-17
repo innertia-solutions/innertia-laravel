@@ -45,6 +45,10 @@ class DataTable
 
     private $sourceClass;
 
+    private array $realtimeListen = [];
+
+    private bool $realtimeEnabled = true;
+
     private bool $addIdColumn = true;
 
     private bool $enableIncludeTrashed = false;
@@ -774,6 +778,50 @@ class DataTable
         return is_string($this->sourceClass) ? $this->sourceClass : get_class($this->sourceClass);
     }
 
+    /** Agrega canales de otras tablas (vistas que joinean). Recibe clases de modelo. */
+    public function realtimeListen(array $modelClasses): self
+    {
+        $this->realtimeListen = array_merge($this->realtimeListen, $modelClasses);
+
+        return $this;
+    }
+
+    /** Desactiva el auto-refresh por realtime para esta tabla. */
+    public function realtime(bool $enabled = true): self
+    {
+        $this->realtimeEnabled = $enabled;
+
+        return $this;
+    }
+
+    /** Espeja la convención de resolveHistoryMeta(): canales derivados del modelo. */
+    private function resolveChannelsMeta(): array
+    {
+        if (! $this->realtimeEnabled) {
+            return [];
+        }
+
+        $channels = [];
+
+        try {
+            $modelClass = $this->sourceClass instanceof Builder
+                ? get_class($this->sourceClass->getModel())
+                : $this->getModelClass();
+            $channels[] = 'entity.'.(new $modelClass)->getTable();
+        } catch (\Throwable) {
+            $channels[] = 'entity.'.$this->name;
+        }
+
+        foreach ($this->realtimeListen as $extra) {
+            try {
+                $channels[] = 'entity.'.(new $extra)->getTable();
+            } catch (\Throwable) {
+            }
+        }
+
+        return ['channels' => array_values(array_unique($channels))];
+    }
+
     private function resolveHistoryMeta(): array
     {
         if (! $this->sourceClass) {
@@ -1012,6 +1060,7 @@ class DataTable
                     'request' => $request->all(),
                     'table_name' => $this->name,
                     ...$this->resolveHistoryMeta(),
+                    ...$this->resolveChannelsMeta(),
                 ],
             ];
 
@@ -1051,6 +1100,7 @@ class DataTable
                 'request' => $request->all(),
                 'table_name' => $this->name,
                 ...$this->resolveHistoryMeta(),
+                ...$this->resolveChannelsMeta(),
             ],
         ];
 
