@@ -77,6 +77,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->singleton(EntityHistoryService::class);
         $this->app->singleton(PermissionsService::class);
         $this->app->singleton(\Innertia\ApiKeys\Services\ApiKeyService::class);
+        $this->app->singleton(\Innertia\Platform\Realtime\EntityChangeCollector::class);
 
         $isSaas = $this->isSaas();
 
