@@ -1028,6 +1028,15 @@ class DataTable
             $sortColumns = [['column' => $orderBy, 'direction' => $orderDirection]];
         }
 
+        // Board mode: si el request pide orden de tablero y el modelo usa
+        // HasBoardPosition, ordena por position (ignora el sort por defecto).
+        if ($request->boolean('board', false) && $this->sourceUsesBoardPosition($source)) {
+            $sortColumns = [
+                ['column' => 'position', 'direction' => 'asc'],
+                ['column' => 'created_at', 'direction' => 'desc'],
+            ];
+        }
+
         $includeTrashed = $request->boolean('include_trashed', false);
         $onlyTrashed = $request->boolean('trashed', false);
         $filters = $request->input('filters', []) ?? [];
@@ -1348,5 +1357,16 @@ class DataTable
         } catch (\Exception $e) {
             return false;
         }
+    }
+
+    private function sourceUsesBoardPosition(string|Builder $source): bool
+    {
+        $model = is_string($source) ? new $source : $source->getModel();
+
+        return in_array(
+            \Innertia\Platform\Traits\HasBoardPosition::class,
+            class_uses_recursive($model),
+            true
+        );
     }
 }
