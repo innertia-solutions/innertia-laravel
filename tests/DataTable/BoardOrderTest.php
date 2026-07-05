@@ -63,3 +63,16 @@ it('con board=true ordena por position; sin él usa el sort por defecto', functi
     $namesPlain = collect($plain->getData()->data)->pluck('name')->all();
     expect($namesPlain)->toBe(['A', 'C', 'B']);
 });
+
+it('en board mode incluye position en el payload aunque no esté en columns()', function () {
+    BoThing::create(['name' => 'A', 'col' => 'x', 'position' => 100]);
+
+    // columns() SIN position (como los controllers reales) → board mode debe agregarlo.
+    $boardReq = Request::create('/', 'POST', ['board' => true, 'list' => true]);
+    $res = (new DataTable('bo_things'))->columns(['name'])->render(BoThing::class, $boardReq, 'created_at', 'desc');
+    $row = $res->getData()->data[0];
+
+    // Presente en el payload (el DataTable serializa valores crudos, sin cast → puede ser int/float según driver).
+    expect($row->position)->not->toBeNull();
+    expect((float) $row->position)->toBe(100.0);
+});

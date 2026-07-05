@@ -1037,6 +1037,11 @@ class DataTable
             if ($boardModel->usesTimestamps()) {
                 $sortColumns[] = ['column' => $boardModel->getCreatedAtColumn(), 'direction' => 'desc'];
             }
+            // Incluir `position` en el payload para que el cliente pueda ordenar y
+            // calcular la posición optimista al reordenar (no viene si no está en columns()).
+            if (! in_array('position', $this->columns, true)) {
+                $this->columns[] = 'position';
+            }
         }
 
         $includeTrashed = $request->boolean('include_trashed', false);
