@@ -1029,12 +1029,14 @@ class DataTable
         }
 
         // Board mode: si el request pide orden de tablero y el modelo usa
-        // HasBoardPosition, ordena por position (ignora el sort por defecto).
+        // HasBoardPosition, ordena por position (sobrescribe cualquier sort,
+        // por defecto o del cliente). created_at solo como desempate si hay timestamps.
         if ($request->boolean('board', false) && $this->sourceUsesBoardPosition($source)) {
-            $sortColumns = [
-                ['column' => 'position', 'direction' => 'asc'],
-                ['column' => 'created_at', 'direction' => 'desc'],
-            ];
+            $boardModel = is_string($source) ? new $source : $source->getModel();
+            $sortColumns = [['column' => 'position', 'direction' => 'asc']];
+            if ($boardModel->usesTimestamps()) {
+                $sortColumns[] = ['column' => $boardModel->getCreatedAtColumn(), 'direction' => 'desc'];
+            }
         }
 
         $includeTrashed = $request->boolean('include_trashed', false);

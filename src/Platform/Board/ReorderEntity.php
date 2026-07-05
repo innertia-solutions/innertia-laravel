@@ -12,8 +12,6 @@ use Innertia\Platform\Contracts\UseCase;
  */
 class ReorderEntity extends UseCase
 {
-    private const EPSILON = 0.0000001;
-
     public function __construct(
         public readonly Model $model,
         public readonly ?string $beforeId = null,
@@ -24,19 +22,13 @@ class ReorderEntity extends UseCase
     {
         $step = (float) $this->model::BOARD_POSITION_STEP;
         [$before, $after] = $this->neighborPositions();
+        $pos = $this->computePosition($before, $after, $step);
 
-        if ($before !== null && $after !== null) {
-            if (abs($before - $after) < self::EPSILON) {
-                $this->rebalance();
-                [$before, $after] = $this->neighborPositions();
-            }
-            $pos = ($before + $after) / 2;
-        } elseif ($before !== null) {
-            $pos = $before + $step;
-        } elseif ($after !== null) {
-            $pos = $after - $step;
-        } else {
-            $pos = $step;
+        // Si el midpoint colisionó con un vecino (precisión float), rebalancea y recomputa.
+        if ($before !== null && $after !== null && ($pos <= $before || $pos >= $after)) {
+            $this->rebalance();
+            [$before, $after] = $this->neighborPositions();
+            $pos = $this->computePosition($before, $after, $step);
         }
 
         $this->model->position = $pos;
@@ -45,17 +37,34 @@ class ReorderEntity extends UseCase
         return $this->model;
     }
 
+    private function computePosition(?float $before, ?float $after, float $step): float
+    {
+        if ($before !== null && $after !== null) {
+            return ($before + $after) / 2;
+        }
+        if ($before !== null) {
+            return $before + $step;
+        }
+        if ($after !== null) {
+            return $after - $step;
+        }
+        return $step;
+    }
+
     /** @return array{0: float|null, 1: float|null} */
     private function neighborPositions(): array
     {
-        $before = $this->beforeId
-            ? (float) $this->model->newBoardQuery()->whereKey($this->beforeId)->value('position')
-            : null;
-        $after = $this->afterId
-            ? (float) $this->model->newBoardQuery()->whereKey($this->afterId)->value('position')
-            : null;
+        return [$this->resolvePosition($this->beforeId), $this->resolvePosition($this->afterId)];
+    }
 
-        return [$before, $after];
+    private function resolvePosition(?string $id): ?float
+    {
+        if (! $id) {
+            return null;
+        }
+        $val = $this->model->newBoardQuery()->whereKey($id)->value('position');
+
+        return $val === null ? null : (float) $val;
     }
 
     /** Renumera toda la columna con posiciones espaciadas por STEP. */

@@ -8,6 +8,7 @@ use Innertia\Platform\Board\ReorderEntity;
 /**
  * Azúcar para exponer `POST {resource}/reorder`. El controller define
  * `boardModelClass(): class-string` y `boardColumnField(): ?string`.
+ * NOTA: no aplica autorización — el producto debe protegerlo vía middleware/policy si aplica.
  */
 trait ReordersBoard
 {

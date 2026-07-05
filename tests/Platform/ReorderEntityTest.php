@@ -51,6 +51,16 @@ it('al inicio de la columna resta un paso al primero', function () {
     expect($moved->fresh()->position)->toBe(1000.0 - ReThing::BOARD_POSITION_STEP);
 });
 
+it('trata un before_id inexistente como sin-vecino (no cae en 0)', function () {
+    $a = ReThing::create(['col' => 'x', 'position' => 1000]);
+    $moved = ReThing::create(['col' => 'x', 'position' => 5000]);
+
+    // before_id inexistente + after = $a → debe caer arriba de $a (after - step), no en ~0.
+    (new ReorderEntity($moved, beforeId: '999999', afterId: (string) $a->id))->execute();
+
+    expect($moved->fresh()->position)->toBe(1000.0 - ReThing::BOARD_POSITION_STEP);
+});
+
 it('rebalancea cuando los vecinos colisionan por precisión', function () {
     $a = ReThing::create(['col' => 'x', 'position' => 1.0000001]);
     $b = ReThing::create(['col' => 'x', 'position' => 1.0000002]);

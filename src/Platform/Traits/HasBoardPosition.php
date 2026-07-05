@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Model;
  * Personalización:
  *   - boardColumnKey(): ?string  → columna que scopea la secuencia (ej. 'status').
  *                                   null = secuencia única en toda la tabla.
+ *   - Requiere una columna `position` (double, nullable). El desempate secundario usa created_at solo si el modelo tiene timestamps.
  */
 trait HasBoardPosition
 {
@@ -34,11 +35,6 @@ trait HasBoardPosition
         return null;
     }
 
-    public function boardColumn(): ?string
-    {
-        return $this->boardColumnKey();
-    }
-
     public function newBoardQuery(): Builder
     {
         $q = static::query();
@@ -56,6 +52,10 @@ trait HasBoardPosition
 
     public function scopeOrderByBoard(Builder $query): Builder
     {
-        return $query->orderBy('position')->orderByDesc('created_at');
+        $query->orderBy('position');
+        if ($this->usesTimestamps()) {
+            $query->orderByDesc($this->getCreatedAtColumn());
+        }
+        return $query;
     }
 }
