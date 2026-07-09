@@ -37,16 +37,40 @@ class EntityChanged extends DomainEvent implements ShouldBroadcastNow
         return ['realtime'];
     }
 
+    /**
+     * Nombre del canal para una tabla. Fuente ÚNICA usada por el evento (channel/
+     * broadcastAs) y por DataTable (meta.channels) para que emisor y suscriptor
+     * coincidan siempre.
+     *
+     * En modo `saas` el canal se scopea por el tenant activo
+     * (`entity.{table}.{tenantId}`) para aislar el realtime entre tenants que
+     * comparten el mismo servidor de sockets. En modo `app`/single (sin tenant)
+     * queda global (`entity.{table}`), idéntico al comportamiento previo.
+     */
+    public static function channelName(string $table): string
+    {
+        $suffix = '';
+
+        if (config('innertia.mode') === 'saas') {
+            $tenantId = \Innertia\Facades\Innertia::tenant()?->getKey();
+            if ($tenantId !== null && $tenantId !== '') {
+                $suffix = '.'.$tenantId;
+            }
+        }
+
+        return 'entity.'.$table.$suffix;
+    }
+
     public function channel(): Channel
     {
-        $name = 'entity.'.$this->table;
+        $name = self::channelName($this->table);
 
         return $this->private ? new PrivateChannel($name) : new Channel($name);
     }
 
     public function broadcastAs(): string
     {
-        return 'entity.'.$this->table.'.changed';
+        return self::channelName($this->table).'.changed';
     }
 
     public function broadcastWith(): array

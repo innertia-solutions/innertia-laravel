@@ -8,6 +8,7 @@ use Innertia\DataTable\Exporters\XlsxExporter;
 use Innertia\DataTable\Exporters\JsonExporter;
 use Innertia\DataTable\Exporters\PdfExporter;
 use Innertia\DataTable\Exceptions\UnsupportedExportFormatException;
+use Innertia\Platform\Events\EntityChanged;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
@@ -807,14 +808,14 @@ class DataTable
             $modelClass = $this->sourceClass instanceof Builder
                 ? get_class($this->sourceClass->getModel())
                 : $this->getModelClass();
-            $channels[] = 'entity.'.(new $modelClass)->getTable();
+            $channels[] = EntityChanged::channelName((new $modelClass)->getTable());
         } catch (\Throwable) {
-            $channels[] = 'entity.'.$this->name;
+            $channels[] = EntityChanged::channelName($this->name);
         }
 
         foreach ($this->realtimeListen as $extra) {
             try {
-                $channels[] = 'entity.'.(new $extra)->getTable();
+                $channels[] = EntityChanged::channelName((new $extra)->getTable());
             } catch (\Throwable) {
             }
         }
