@@ -24,18 +24,26 @@ class ValidateTenantMembership
 {
     public function handle(Request $request, Closure $next): Response
     {
+        // Devolvemos JsonResponse directo (no abort()): el handler de la lib no
+        // mapea HttpException/AccessDeniedHttpException y renderiza 500 en su lugar.
         $tenant = Innertia::tenant();
-        abort_if($tenant === null, 401, 'Tenant no resuelto.');
+        if ($tenant === null) {
+            return response()->json(['message' => 'Tenant no resuelto.'], 401);
+        }
 
         $user = $request->user();
-        abort_if($user === null, 401, 'No autenticado.');
+        if ($user === null) {
+            return response()->json(['message' => 'No autenticado.'], 401);
+        }
 
         $belongs = UserContext::query()
             ->where('user_id', $user->getKey())
             ->where('tenant_id', (string) $tenant->getKey())
             ->exists();
 
-        abort_unless($belongs, 403, 'No perteneces a este gym.');
+        if (! $belongs) {
+            return response()->json(['message' => 'No perteneces a este gym.'], 403);
+        }
 
         return $next($request);
     }
