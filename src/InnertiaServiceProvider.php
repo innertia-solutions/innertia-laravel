@@ -41,6 +41,7 @@ class InnertiaServiceProvider extends ServiceProvider
      * InnertiaApiProvider  → isSaas: false, isApi: true
      */
     protected function isSaas(): bool { return config('innertia.mode') === 'saas'; }
+    protected function isOpen(): bool { return config('innertia.mode') === 'open'; }
     protected function isApi(): bool  { return config('innertia.mode') === 'api'; }
 
     public function register(): void
@@ -48,8 +49,8 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->mergeConfigFrom(__DIR__ . '/../config/innertia.php', 'innertia');
         $this->mergeConfigFrom(__DIR__ . '/../config/jwt.php', 'jwt');
 
-        // Make the mode authoritative. Valid values: 'app' | 'saas' | 'api'
-        $mode = $this->isSaas() ? 'saas' : ($this->isApi() ? 'api' : 'app');
+        // Make the mode authoritative. Valid values: 'app' | 'saas' | 'open' | 'api'
+        $mode = $this->isSaas() ? 'saas' : ($this->isOpen() ? 'open' : ($this->isApi() ? 'api' : 'app'));
         config(['innertia.mode' => $mode]);
 
         // TenantContext + InnertiaManager — siempre registrados; no-op en App mode.
@@ -62,7 +63,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->singleton(\Innertia\InnertiaManager::class, function ($app) {
             return new \Innertia\InnertiaManager(
                 $app->make(\Innertia\Saas\TenantContext::class),
-                $this->isSaas(),
+                $this->isSaas() || $this->isOpen(),
                 OrganizationsFeature::isActive()
                     ? $app->make(\Innertia\Platform\Organizations\OrganizationContext::class)
                     : null,
@@ -79,7 +80,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->singleton(\Innertia\ApiKeys\Services\ApiKeyService::class);
         $this->app->singleton(\Innertia\Platform\Realtime\EntityChangeCollector::class);
 
-        $isSaas = $this->isSaas();
+        $isSaas = $this->isSaas() || $this->isOpen();
 
         $this->app->singleton(
             AppSettingsService::class,
@@ -94,15 +95,15 @@ class InnertiaServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        $isSaas = $this->isSaas();
+        $isSaas = $this->isSaas() || $this->isOpen();
 
         // ── Migrations ────────────────────────────────────────────────────────
         // Each mode has its own clean migration set — no conditionals inside files.
         $mode           = config('innertia.mode');
         $migrationsPath = __DIR__ . '/../database/migrations/' . match($mode) {
-            'saas' => 'saas',
-            'api'  => 'api',
-            default => 'app',   // 'app' mode
+            'saas', 'open' => 'saas',
+            'api'          => 'api',
+            default        => 'app',   // 'app' mode
         };
 
         // Load from vendor so migrate works out-of-the-box without publishing.
@@ -282,9 +283,9 @@ class InnertiaServiceProvider extends ServiceProvider
         // Stubs de rutas: api.php + api.public.php + api.private.php
         // Se publican una sola vez durante el scaffold; el developer los edita libremente.
         $stub = match($mode) {
-            'saas' => 'saas',
-            'api'  => 'api',
-            default => 'app',
+            'saas', 'open' => 'saas',
+            'api'          => 'api',
+            default        => 'app',
         };
         $routeStubs = [
             __DIR__ . "/../stubs/{$stub}/api.php"         => base_path('routes/api.php'),

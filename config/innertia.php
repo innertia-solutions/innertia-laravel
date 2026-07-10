@@ -10,6 +10,9 @@ return [
     | 'app'  — single-tenant. Settings are global (tenant_id = null).
     | 'saas' — multi-tenant. Settings resolve per active tenant with fallback
     |          to platform level. Tenancy is configured automatically.
+    | 'open' — open SaaS. Same tenant machinery as saas (HasTenant, Innertia::tenant(),
+    |          saas migrations) but tenant resolved by authenticated user selection,
+    |          not by subdomain / X-Tenant header. Use InnertiaOpenProvider.
     | 'api'  — API product mode. No users/tenants. Authenticates via client
     |          API keys. Ideal for internal engines: Cognitia, billing, email.
     |
