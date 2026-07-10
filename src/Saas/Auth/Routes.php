@@ -35,6 +35,10 @@ class Routes
 
                 // Tenant-agnóstico: gyms del usuario, sin tenant activo (ruteo post-login)
                 Route::get($prefix.'/my-gyms', [\Innertia\Auth\Http\Controllers\MyTenantsController::class, 'index']);
+
+                // Alta self-serve de gym (modo open): crea tenant + deja al caller como admin.
+                // Tenant-agnóstico (no exige tenant activo): path literal /gyms.
+                Route::post('gyms', [\Innertia\Saas\Auth\Http\Controllers\CreateGymController::class, 'store']);
             });
         });
     }
