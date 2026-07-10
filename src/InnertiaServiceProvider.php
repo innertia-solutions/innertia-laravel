@@ -197,6 +197,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $router->aliasMiddleware('tenant.resolve',    \Innertia\Saas\Middleware\ResolveTenantFromHeader::class);
         $router->aliasMiddleware('tenant.subdomain',  \Innertia\Saas\Middleware\ResolveTenantFromSubdomain::class);
         $router->aliasMiddleware('tenant.require',    \Innertia\Saas\Middleware\RequireTenant::class);
+        $router->aliasMiddleware('tenant.member',     \Innertia\Saas\Middleware\ValidateTenantMembership::class);
         $router->aliasMiddleware('apikey',            \Innertia\ApiKeys\Middleware\ApiKeyMiddleware::class);
 
         if (OrganizationsFeature::isActive()) {
