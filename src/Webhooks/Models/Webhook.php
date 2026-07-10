@@ -19,7 +19,7 @@ class Webhook extends Model
     {
         $fillable = parent::getFillable();
 
-        if (config('innertia.mode') === 'saas') {
+        if (\Innertia\Facades\Innertia::tenancyEnabled()) {
             array_unshift($fillable, 'tenant_id');
         }
 

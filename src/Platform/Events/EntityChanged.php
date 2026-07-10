@@ -51,7 +51,7 @@ class EntityChanged extends DomainEvent implements ShouldBroadcastNow
     {
         $suffix = '';
 
-        if (config('innertia.mode') === 'saas') {
+        if (\Innertia\Facades\Innertia::tenancyEnabled()) {
             $tenantId = \Innertia\Facades\Innertia::tenant()?->getKey();
             if ($tenantId !== null && $tenantId !== '') {
                 $suffix = '.'.$tenantId;

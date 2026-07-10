@@ -45,7 +45,7 @@ class ApiKeyService
     {
         $query = ApiKey::active()->orderByDesc('created_at');
 
-        if (config('innertia.mode') === 'saas') {
+        if (\Innertia\Facades\Innertia::tenancyEnabled()) {
             $query->forTenant($tenantId ?? $this->currentTenantId());
         }
 
@@ -56,7 +56,7 @@ class ApiKeyService
     {
         $query = ApiKey::query();
 
-        if (config('innertia.mode') === 'saas') {
+        if (\Innertia\Facades\Innertia::tenancyEnabled()) {
             $query->forTenant($tenantId ?? $this->currentTenantId());
         }
 

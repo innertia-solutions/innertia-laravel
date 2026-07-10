@@ -43,7 +43,7 @@ class AppSettingsService
     public function set(string $key, mixed $value, string $type = 'string', bool $encrypted = false): Setting
     {
         $tenantId = $this->tenantId();
-        $isSaas   = config('innertia.mode') === 'saas';
+        $isSaas   = \Innertia\Facades\Innertia::tenancyEnabled();
 
         $attributes = ['key' => $key];
         if ($isSaas) {
@@ -74,7 +74,7 @@ class AppSettingsService
 
     protected function scopeTenant(Builder $query, mixed $tenantId): Builder
     {
-        if (config('innertia.mode') !== 'saas') {
+        if (! \Innertia\Facades\Innertia::tenancyEnabled()) {
             return $query;
         }
 

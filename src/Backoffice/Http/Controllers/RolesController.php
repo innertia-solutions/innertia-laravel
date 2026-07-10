@@ -20,8 +20,8 @@ class RolesController extends Controller
     {
         $query = Role::query();
 
-        // El scope por tenant solo aplica en saas; en app mode no hay tenant_id.
-        if (config('innertia.mode') === 'saas') {
+        // El scope por tenant aplica en saas/open; en app mode no hay tenant_id.
+        if (\Innertia\Facades\Innertia::tenancyEnabled()) {
             $query->where('tenant_id', $this->tenantId());
         }
 

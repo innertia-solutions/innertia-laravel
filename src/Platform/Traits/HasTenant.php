@@ -8,8 +8,8 @@ trait HasTenant
 {
     public static function bootHasTenant(): void
     {
-        if (config('innertia.mode') !== 'saas') {
-            return; // no-op en modo single-tenant
+        if (! Innertia::tenancyEnabled()) {
+            return; // no-op en modo single-tenant (app/api); activo en saas y open
         }
 
         static::creating(function ($model) {

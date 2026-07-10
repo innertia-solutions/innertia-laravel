@@ -4,6 +4,7 @@ namespace Innertia\Auth\RBAC\Traits;
 
 use Illuminate\Support\Facades\Cache;
 use Innertia\Auth\Models\UserContext;
+use Innertia\Facades\Innertia;
 
 /**
  * Add to your User model to manage context access.
@@ -44,7 +45,7 @@ trait HasContexts
             $configured = array_keys(config('innertia.contexts', []));
 
             return UserContext::where('user_id', $this->getKey())
-                ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentContextTenantId()))
+                ->when(Innertia::tenancyEnabled(), fn ($q) => $q->where('tenant_id', $this->currentContextTenantId()))
                 ->whereIn('context', $configured)
                 ->distinct()
                 ->pluck('context')
@@ -65,7 +66,7 @@ trait HasContexts
         $configured = array_keys(config('innertia.contexts', []));
 
         return UserContext::where('user_id', $this->getKey())
-            ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentContextTenantId()))
+            ->when(Innertia::tenancyEnabled(), fn ($q) => $q->where('tenant_id', $this->currentContextTenantId()))
             ->when($organizationId === null, fn ($q) => $q->whereNull('organization_id'))
             ->when($organizationId !== null, fn ($q) => $q->where(function ($qq) use ($organizationId) {
                 $qq->where('organization_id', $organizationId)->orWhereNull('organization_id');
@@ -85,7 +86,7 @@ trait HasContexts
         $configured = array_keys(config('innertia.contexts', []));
 
         $rows = UserContext::where('user_id', $this->getKey())
-            ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentContextTenantId()))
+            ->when(Innertia::tenancyEnabled(), fn ($q) => $q->where('tenant_id', $this->currentContextTenantId()))
             ->whereIn('context', $configured)
             ->get(['context', 'organization_id']);
 
@@ -120,7 +121,7 @@ trait HasContexts
 
             $data = ['user_id' => (string) $this->getKey(), 'context' => $key];
 
-            if (config('innertia.mode') === 'saas') {
+            if (Innertia::tenancyEnabled()) {
                 $data['tenant_id'] = $this->currentContextTenantId();
             }
 
@@ -138,7 +139,7 @@ trait HasContexts
     {
         UserContext::where('user_id', $this->getKey())
             ->where('context', $key)
-            ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $this->currentContextTenantId()))
+            ->when(Innertia::tenancyEnabled(), fn ($q) => $q->where('tenant_id', $this->currentContextTenantId()))
             ->when(\Innertia\Platform\Organizations\OrganizationsFeature::isActive(),
                 fn ($q) => $q->where('organization_id', $organizationId))
             ->delete();
@@ -154,7 +155,7 @@ trait HasContexts
     {
         $query = UserContext::where('user_id', $this->getKey());
 
-        if (config('innertia.mode') === 'saas') {
+        if (Innertia::tenancyEnabled()) {
             $query->where('tenant_id', $this->currentContextTenantId());
         }
 

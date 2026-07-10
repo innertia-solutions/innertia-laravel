@@ -48,8 +48,8 @@ class ApiKeyMiddleware
             }
         }
 
-        // Tenant resolution — only in saas mode
-        if (config('innertia.mode') === 'saas') {
+        // Tenant resolution — solo con multitenancy activa (saas/open)
+        if (Innertia::tenancyEnabled()) {
             $activeTenant = Innertia::tenant();
 
             if ($activeTenant) {

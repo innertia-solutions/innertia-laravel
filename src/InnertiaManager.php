@@ -50,6 +50,18 @@ class InnertiaManager
     }
 
     /**
+     * True cuando la multitenancy está activa (modos 'saas' y 'open').
+     *
+     * Fuente única de verdad para el gating de comportamiento tenant-scoped
+     * (global scope, auto-inject de tenant_id, filtros por tenant en RBAC,
+     * settings, webhooks, realtime, etc.). En 'app'/'api' es false.
+     */
+    public function tenancyEnabled(): bool
+    {
+        return $this->isSaas;
+    }
+
+    /**
      * Sin argumento: devuelve el tenant activo en runtime.
      * Con argumento: busca el tenant por key en la BD (nunca setea el contexto).
      */

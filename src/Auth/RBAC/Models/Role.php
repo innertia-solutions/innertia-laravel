@@ -51,7 +51,7 @@ class Role extends Model
     ): ?static {
         $query = static::where('name', $name);
 
-        if (config('innertia.mode') === 'saas') {
+        if (\Innertia\Facades\Innertia::tenancyEnabled()) {
             $query->where('tenant_id', $tenantId);
         }
 
@@ -96,7 +96,7 @@ class Role extends Model
 
         $attributes = ['name' => $name, 'description' => $description];
 
-        if (config('innertia.mode') === 'saas') {
+        if (\Innertia\Facades\Innertia::tenancyEnabled()) {
             $attributes['tenant_id'] = $tenantId;
         }
 

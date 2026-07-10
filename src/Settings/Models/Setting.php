@@ -24,7 +24,7 @@ class Setting extends Model
     {
         $fillable = parent::getFillable();
 
-        if (config('innertia.mode') === 'saas') {
+        if (\Innertia\Facades\Innertia::tenancyEnabled()) {
             $fillable[] = 'tenant_id';
         }
 

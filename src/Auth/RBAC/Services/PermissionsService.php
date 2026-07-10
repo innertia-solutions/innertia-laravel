@@ -172,7 +172,7 @@ class PermissionsService
     public function sync(bool $prune = false): array
     {
         $definitions = $this->definitions();
-        $isSaas      = config('innertia.mode') === 'saas';
+        $isSaas      = \Innertia\Facades\Innertia::tenancyEnabled();
         $tenantId    = $isSaas && \Innertia\Facades\Innertia::tenant()
             ? (string) \Innertia\Facades\Innertia::tenant()->getKey()
             : null;

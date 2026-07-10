@@ -19,7 +19,7 @@ class WebhookService
 
         $query = Webhook::query()->where('active', true);
 
-        if (config('innertia.mode') === 'saas') {
+        if (\Innertia\Facades\Innertia::tenancyEnabled()) {
             $query->where(function ($q) use ($tenantId) {
                 $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId);
             });

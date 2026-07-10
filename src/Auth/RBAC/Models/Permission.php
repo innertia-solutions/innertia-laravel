@@ -38,11 +38,9 @@ class Permission extends Model
      */
     public static function findOrCreate(string $name, ?string $description = null): static
     {
-        $isSaas = config('innertia.mode') === 'saas';
-
         $lookup = ['name' => $name];
 
-        if ($isSaas) {
+        if (Innertia::tenancyEnabled()) {
             $lookup['tenant_id'] = Innertia::tenant() ? (string) Innertia::tenant()->getKey() : null;
         }
 

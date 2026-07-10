@@ -4,6 +4,7 @@ namespace Innertia\Auth\RBAC\Traits;
 
 use Illuminate\Support\Collection;
 use Innertia\Exceptions\NotFoundException;
+use Innertia\Facades\Innertia;
 use Innertia\Facades\Permissions;
 use Innertia\Auth\RBAC\Models\Permission;
 use Innertia\Auth\RBAC\Models\Role;
@@ -137,8 +138,8 @@ trait HasRoles
 
         $q = $this->roles()->where('roles.name', $role);
 
-        // tenant_id solo existe en el schema saas; en app/api la columna no está.
-        if (config('innertia.mode') === 'saas') {
+        // tenant_id solo existe en el schema tenant-scoped (saas/open); en app/api la columna no está.
+        if (Innertia::tenancyEnabled()) {
             $tenantId = $this->currentTenantId();
             $q->where(function ($q) use ($tenantId) {
                 $q->whereNull('roles.tenant_id');
@@ -224,8 +225,8 @@ trait HasRoles
         $name  = $permission instanceof \BackedEnum ? $permission->value : $permission;
         $query = Permission::where('name', $name);
 
-        // tenant_id solo existe en el schema saas.
-        if (config('innertia.mode') === 'saas') {
+        // tenant_id solo existe en el schema tenant-scoped (saas/open).
+        if (Innertia::tenancyEnabled()) {
             $query->where('tenant_id', $this->currentTenantId());
         }
 

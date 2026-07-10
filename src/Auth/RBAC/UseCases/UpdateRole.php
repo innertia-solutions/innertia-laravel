@@ -31,7 +31,7 @@ class UpdateRole extends UseCase
         // En modo 'app' la tabla roles no tiene columna tenant_id.
         $exists = Role::where('name', $this->name)
             ->where('id', '!=', $this->roleId)
-            ->when(config('innertia.mode') === 'saas', fn ($q) => $q->where('tenant_id', $role->tenant_id))
+            ->when(\Innertia\Facades\Innertia::tenancyEnabled(), fn ($q) => $q->where('tenant_id', $role->tenant_id))
             ->when(OrganizationsFeature::isActive(), fn ($q) => $q->where('organization_id', $role->organization_id))
             ->exists();
 

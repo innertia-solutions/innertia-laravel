@@ -91,7 +91,7 @@ class ApiKey extends Model
         ?string $userId = null,
         ?\Carbon\Carbon $expiresAt = null,
     ): array {
-        $isSaas = config('innertia.mode') === 'saas';
+        $isSaas = \Innertia\Facades\Innertia::tenancyEnabled();
         $type   = $userId ? 'user' : ($isSaas ? 'tenant' : 'app');
         $prefix = match($type) {
             'user'   => 'inn_u_',
