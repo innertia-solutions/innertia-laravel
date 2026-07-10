@@ -32,6 +32,9 @@ class Routes
             // Autenticado (no exige tenant activo: se usa antes/después de elegir tenant)
             Route::middleware(Authenticate::class)->group(function () use ($prefix) {
                 AuthRoutes::sessionRoutes($prefix);
+
+                // Tenant-agnóstico: gyms del usuario, sin tenant activo (ruteo post-login)
+                Route::get($prefix.'/my-gyms', [\Innertia\Auth\Http\Controllers\MyTenantsController::class, 'index']);
             });
         });
     }
