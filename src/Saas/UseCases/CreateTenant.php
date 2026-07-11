@@ -44,6 +44,13 @@ class CreateTenant extends UseCase
             ];
         }
 
-        return $model::create($data);
+        $tenant = $model::create($data);
+
+        // Se dispara para TODOS los paths de creación (open, consola, provisioning)
+        // así cualquier tenant nuevo obtiene su suscripción/trial vía listeners.
+        // CreateTenant no tiene owner user id → null (el listener solo usa el tenant).
+        event(new \Innertia\Saas\Events\TenantCreated($tenant, null));
+
+        return $tenant;
     }
 }
