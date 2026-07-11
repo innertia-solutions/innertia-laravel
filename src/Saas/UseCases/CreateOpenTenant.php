@@ -34,6 +34,8 @@ class CreateOpenTenant extends UseCase
             'tenant_id' => (string) $tenant->getKey(), // id NUMÉRICO, así se almacena
         ]);
 
+        event(new \Innertia\Saas\Events\TenantCreated($tenant, $this->ownerUserId));
+
         return ['tenant' => $tenant];
     }
 
