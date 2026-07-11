@@ -48,12 +48,17 @@ class SocialAuthController extends Controller
     /**
      * Handle the provider callback.
      *
-     * GET /auth/{provider}/callback?code=xxx&state=backoffice
+     * GET /auth/{provider}/callback?code=xxx&state=backoffice[:join_token]
+     *
+     * El `state` puede llevar `context` o `context:join_token`. Flujo SPA (XHR) →
+     * JSON {token,user}; flujo browser (el provider redirige aquí directo) → redirige
+     * al front con el token en el fragmento (#token=...&context=...).
      */
-    public function callback(string $provider, Request $request): JsonResponse
+    public function callback(string $provider, Request $request): JsonResponse|RedirectResponse
     {
-        $p       = SocialProvider::from($provider);
-        $context = $request->input('state');
+        $p   = SocialProvider::from($provider);
+        $raw = (string) $request->input('state');
+        [$context, $joinToken] = array_pad(explode(':', $raw, 2), 2, null);
 
         if (! $context) {
             return response()->json(['message' => 'Missing context.'], 422);
@@ -66,8 +71,20 @@ class SocialAuthController extends Controller
         $result = (new SocialLogin(
             provider:   $p,
             socialUser: $socialUser,
-            context:    $context,
+            state:      array_filter(['context' => $context, 'join_token' => $joinToken]),
         ))->execute();
+
+        // Flujo browser → redirige al front con el token en el fragmento.
+        if (! $request->expectsJson()) {
+            $frontend = rtrim(config('app.frontend_url', config('app.url')), '/');
+            $frag = http_build_query([
+                'token'   => $result['token'],
+                'context' => $context,
+                'created' => ! empty($result['created']) ? '1' : '0',
+            ]);
+
+            return redirect()->away($frontend.'/auth/callback#'.$frag);
+        }
 
         return response()->json($result);
     }

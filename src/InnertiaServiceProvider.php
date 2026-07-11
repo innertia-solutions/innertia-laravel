@@ -80,6 +80,13 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->singleton(\Innertia\ApiKeys\Services\ApiKeyService::class);
         $this->app->singleton(\Innertia\Platform\Realtime\EntityChangeCollector::class);
 
+        // Login social: por defecto NO crea usuarios (login-only). Las apps que
+        // quieran registro social ligan su propia implementación del contrato.
+        $this->app->bind(
+            \Innertia\Auth\Social\SocialProvisioner::class,
+            \Innertia\Auth\Social\DefaultSocialProvisioner::class,
+        );
+
         $isSaas = $this->isSaas() || $this->isOpen();
 
         $this->app->singleton(
