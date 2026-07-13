@@ -279,6 +279,11 @@ class InnertiaServiceProvider extends ServiceProvider
             }
         );
 
+        // ── Notifications: broadcast al crear ────────────────────────────────
+        \Innertia\Notifications\Models\Notification::created(function (\Innertia\Notifications\Models\Notification $n) {
+            event(new \Innertia\Notifications\Events\NotificationSent($n));
+        });
+
         // ── Publishables ──────────────────────────────────────────────────────
         $this->publishes([
             __DIR__ . '/../config/innertia.php' => config_path('innertia.php'),
