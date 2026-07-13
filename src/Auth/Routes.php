@@ -52,7 +52,7 @@ class Routes
             $authController, $passwordController, $otpController,
             $twoFactorController, $emailController, $socialController, $oauthProviders
         ) {
-            Route::post('login',             [$authController, 'login']);
+            Route::post('login',             [$authController, 'login'])->middleware('throttle:10,1');
 
             Route::post('otp/send',          [$otpController, 'send']);
             Route::post('otp/verify',        [$otpController, 'verify']);
