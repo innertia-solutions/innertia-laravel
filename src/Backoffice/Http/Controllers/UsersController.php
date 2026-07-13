@@ -35,10 +35,22 @@ class UsersController extends Controller
                 if (!empty($statuses)) {
                     $query->whereRaw("({$statusExpr}) IN (" . implode(',', array_fill(0, count($statuses), '?')) . ")", $statuses);
                 }
+                $this->applyIndexScope($query);
+
                 return $query;
             })
             ->enableExport()
             ->render($model, $request, 'created_at', 'desc');
+    }
+
+    /**
+     * Hook para que los productos restrinjan el listado de usuarios (p.ej. por
+     * contexto/rol). No-op por defecto — extendé el controller y montalo vía
+     * `Routes::register(prefix, TuUsersController::class)`.
+     */
+    protected function applyIndexScope($query): void
+    {
+        // no-op
     }
 
     // ── Show ──────────────────────────────────────────────────────────────────
