@@ -27,7 +27,7 @@ class UsersController extends Controller
 
         return DataTable::create('users')
             ->columns(['name', 'email', 'force_password_change', 'two_factor_enabled', 'seen_at', 'created_at', 'created_by'])
-            ->addCalculatedColumn('"roles"', "(SELECT COALESCE(jsonb_agg(jsonb_build_object('id', roles.id, 'name', roles.name)), '[]'::jsonb) FROM roles INNER JOIN model_roles ON roles.id::text = model_roles.role_id::text WHERE model_roles.model_id = users.id::text AND model_roles.model_type LIKE '%User')")
+            ->addCalculatedColumn('"roles"', "(SELECT COALESCE(jsonb_agg(jsonb_build_object('id', roles.id, 'name', roles.name)), '[]'::jsonb) FROM roles INNER JOIN model_roles ON roles.id::text = model_roles.role_id::text WHERE model_roles.model_id::text = users.id::text AND model_roles.model_type LIKE '%User')")
             ->addCalculatedColumn('"otp_configured"', 'users.two_factor_secret IS NOT NULL')
             ->addCalculatedColumn('"status"', $statusExpr)
             ->addCalculatedColumn('"created_by_name"', '(SELECT u.name FROM users u WHERE u.id::text = users.created_by::text LIMIT 1)')
