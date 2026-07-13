@@ -45,7 +45,15 @@ trait HasContexts
             $configured = array_keys(config('innertia.contexts', []));
 
             return UserContext::where('user_id', $this->getKey())
-                ->when(Innertia::tenancyEnabled(), fn ($q) => $q->where('tenant_id', $this->currentContextTenantId()))
+                // Solo se scopea por tenant cuando hay uno activo. En modo `open`,
+                // el login es global (sin X-Tenant): antes de elegir tenant no hay
+                // tenant activo, así que los contextos se resuelven cross-tenant
+                // para poder validar acceso a un contexto que el user tenga en
+                // CUALQUIER tenant. Post-selección (X-Tenant) o en `saas` sí scopea.
+                ->when(
+                    Innertia::tenancyEnabled() && Innertia::tenant() !== null,
+                    fn ($q) => $q->where('tenant_id', $this->currentContextTenantId())
+                )
                 ->whereIn('context', $configured)
                 ->distinct()
                 ->pluck('context')
