@@ -6,6 +6,7 @@ use Illuminate\Auth\Access\AuthorizationException;
 use Illuminate\Auth\AuthenticationException;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Foundation\Configuration\Exceptions;
+use Illuminate\Http\Exceptions\ThrottleRequestsException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\ValidationException;
@@ -55,6 +56,10 @@ class InnertiaExceptionHandler
 
         if ($e instanceof AuthorizationException || $e instanceof SpatieUnauthorizedException) {
             return static::json('Forbidden.', 'forbidden', 403, [], $e);
+        }
+
+        if ($e instanceof ThrottleRequestsException) {
+            return static::json('Too many requests.', 'too_many_requests', 429, [], $e);
         }
 
         if ($e instanceof NotFoundHttpException) {
