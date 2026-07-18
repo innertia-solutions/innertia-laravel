@@ -34,6 +34,8 @@ class XlsxExporter implements ExporterInterface
 
         // Data rows
         foreach ($data as $row) {
+            // toSnakeCase() del DataTable puede devolver stdClass — normalizar a array.
+            $row = is_object($row) ? (array) $row : $row;
             $values = array_map(fn ($col) => $this->flatten($row[$col] ?? ''), $columns);
             $writer->addRow(Row::fromValues($values));
         }
