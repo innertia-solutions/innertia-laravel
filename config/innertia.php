@@ -406,6 +406,21 @@ return [
         'login_path'  => env('MAIL_LOGIN_PATH', '/login'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Platform (identidad de plataforma separada)
+    |--------------------------------------------------------------------------
+    |
+    | Cuando 'separate_identity' está on, los platform-admins son una clase de
+    | cuenta distinta de los usuarios de tenant: login de plataforma dedicado
+    | SIN contexto, y el login de tenant RECHAZA platform-admins (409).
+    | Default false → cero impacto en productos que no lo activen.
+    |
+    */
+    'platform' => [
+        'separate_identity' => env('INNERTIA_PLATFORM_SEPARATE', false),
+    ],
+
     'auth' => [
         /*
         |----------------------------------------------------------------------
