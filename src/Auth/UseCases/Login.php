@@ -7,6 +7,7 @@ use Innertia\Auth\Services\JwtService;
 use Innertia\Auth\Services\OtpService;
 use Innertia\Exceptions\ForbiddenException;
 use Innertia\Exceptions\NotFoundException;
+use Innertia\Exceptions\PlatformAccountException;
 use Innertia\Facades\Settings;
 use Innertia\Platform\Contracts\UseCase;
 
@@ -30,6 +31,12 @@ class Login extends UseCase
                 validator([], []),
                 response()->json(['message' => 'Invalid credentials.'], 422)
             );
+        }
+
+        // 1b — Rechazo de cuentas de plataforma (opt-in). Tras validar el
+        // password: una password incorrecta ya cayó arriba (anti-enumeración).
+        if (config('innertia.platform.separate_identity') && $user->is_platform_admin) {
+            throw new PlatformAccountException();
         }
 
         // 2 — Context exists in config
