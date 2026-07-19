@@ -7,6 +7,7 @@ use Innertia\Auth\Http\Controllers\AuthController;
 use Innertia\Auth\Http\Controllers\EmailVerificationController;
 use Innertia\Auth\Http\Controllers\OtpController;
 use Innertia\Auth\Http\Controllers\PasswordController;
+use Innertia\Auth\Http\Controllers\PlatformAuthController;
 use Innertia\Auth\Http\Controllers\SocialAuthController;
 use Innertia\Auth\Http\Controllers\TwoFactorController;
 
@@ -99,7 +100,7 @@ class Routes
     public static function platformRoutes(string $prefix = 'platform'): void
     {
         Route::post($prefix.'/auth/login', [
-            \Innertia\Auth\Http\Controllers\PlatformAuthController::class, 'login',
+            PlatformAuthController::class, 'login',
         ])->middleware('throttle:10,1');
     }
 }

@@ -30,10 +30,13 @@ trait RejectsPlatformAccounts
         $user  = $model::where('email', $email)->first();
 
         if ($user && $user->is_platform_admin && Hash::check((string) $request->input('password'), $user->password)) {
+            $e = new \Innertia\Exceptions\PlatformAccountException();
+
             return response()->json([
-                'message' => 'Esta es una cuenta de plataforma. Usa el acceso de plataforma.',
-                'error'   => 'platform_account',
-            ], 409);
+                'message' => $e->getMessage(),
+                'error'   => $e->getErrorKey(),
+                'errors'  => [],
+            ], $e->getStatusCode());
         }
 
         return null;
