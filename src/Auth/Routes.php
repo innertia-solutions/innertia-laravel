@@ -91,4 +91,15 @@ class Routes
             Route::post('2fa/disable',    [$twoFactorController, 'disable']);
         });
     }
+
+    /**
+     * Ruta pública de auth de plataforma (sin contexto ni tenant).
+     * Registrar SIN middleware de resolución de tenant.
+     */
+    public static function platformRoutes(string $prefix = 'platform'): void
+    {
+        Route::post($prefix.'/auth/login', [
+            \Innertia\Auth\Http\Controllers\PlatformAuthController::class, 'login',
+        ])->middleware('throttle:10,1');
+    }
 }

@@ -25,6 +25,11 @@ class Routes
 {
     public static function register(string $prefix = 'auth'): void
     {
+        // Auth de plataforma separada (opt-in): pública, fuera del grupo de tenant.
+        if (config('innertia.platform.separate_identity')) {
+            AuthRoutes::platformRoutes();
+        }
+
         Route::middleware(ResolveTenantFromHeader::class)->group(function () use ($prefix) {
             // Público (resuelve tenant, sin auth)
             AuthRoutes::publicRoutes($prefix);
