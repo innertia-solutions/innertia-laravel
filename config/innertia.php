@@ -203,6 +203,8 @@ return [
     'files' => [
         'trash_retention_days' => env('INNERTIA_FILES_TRASH_RETENTION_DAYS', null),
         'max_upload_mb'        => (int) env('INNERTIA_FILES_MAX_UPLOAD_MB', 100),
+        // Lifetime (minutes) of own-domain signed serving URLs (signedViewUrl / FileResource).
+        'url_ttl'              => (int) env('INNERTIA_FILES_URL_TTL', 15),
     ],
 
     'directories' => [

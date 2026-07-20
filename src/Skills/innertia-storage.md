@@ -116,13 +116,28 @@ luego cascade vía `$file->owner->canAccess($user)` si el owner implementa ese m
 ## URLs
 
 ```php
-$file->url()             // /files/{id}/download — siempre forzado como descarga
-$file->viewUrl()         // /files/{id}/view — inline (PDF/imagen en browser)
-$file->temporaryUrl(60)  // URL firmada del driver (S3/etc.) — bypasses permission check
+$file->url()               // /files/{id}/download — siempre forzado como descarga
+$file->viewUrl()           // /files/{id}/view — inline (PDF/imagen en browser)
+$file->signedViewUrl()     // URL firmada de DOMINIO PROPIO — inline
+$file->signedDownloadUrl() // URL firmada de dominio propio — descarga
+$file->temporaryUrl(60)    // URL firmada del DRIVER (S3/R2, expone el proveedor) — bypasses permission check
 ```
 
 Las rutas de serving (`/view` y `/download`) se registran automáticamente por el ServiceProvider.
 No requieren `Routes::register()`.
+
+### URLs firmadas de dominio propio (agnóstico de disk + proveedor)
+
+`signedViewUrl()`/`signedDownloadUrl()` generan una URL de **tu dominio** con firma HMAC +
+expiración (`config('innertia.files.url_ttl')`, default 15 min). **La firma ES la credencial**:
+`FileController` sirve el archivo con una firma válida sin usuario autenticado, así funciona en
+`<img>`/`<iframe>`/`fetch` (que no mandan Bearer). La ruta streamea desde `Storage::disk($file->disk)`,
+así que es agnóstica del disk (local en dev, bucket en prod) y **nunca expone la URL del proveedor**.
+El `FileResource` (`view_url`/`download_url`) ya emite estas URLs firmadas.
+
+Firma inválida/vencida → 403; sin firma → cae a auth por usuario (401 si no hay sesión).
+A diferencia de `temporaryUrl()` (presigned del driver, expone el bucket), esta mantiene todo
+tras tu dominio — apto para CDN/Worker por delante.
 
 > **BREAKING (migración):** El endpoint inline view cambió de `/files/{id}` → `/files/{id}/view`.
 > Usar `route('innertia.files.view', $id)` o `$file->viewUrl()` — ambos son estables.

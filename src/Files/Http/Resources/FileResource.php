@@ -22,8 +22,8 @@ class FileResource extends JsonResource
             'deleted_at'     => $this->deleted_at?->toIso8601String(),
             'created_at'     => $this->created_at?->toIso8601String(),
             'created_by'     => $this->created_by,
-            'view_url'       => $this->tryFileUrl(fn () => $this->viewUrl()),
-            'download_url'   => $this->tryFileUrl(fn () => $this->url()),
+            'view_url'       => $this->tryFileUrl(fn () => $this->signedViewUrl()),
+            'download_url'   => $this->tryFileUrl(fn () => $this->signedDownloadUrl()),
             'tags'           => $this->whenLoaded('tags', fn () => $this->tags->pluck('slug')),
         ];
     }

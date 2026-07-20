@@ -42,6 +42,19 @@ class FileController extends Controller
             return;
         }
 
+        // Own-domain signed URL — the HMAC signature IS the credential, so the
+        // file streams without a Bearer token (works in <img>/<iframe>/fetch).
+        // Authorization was enforced when the signed URL was issued; expiry keeps
+        // the leak window short. A present-but-invalid/expired signature is
+        // rejected outright (403); no signature at all falls back to user auth.
+        if ($request->hasValidSignature()) {
+            return;
+        }
+
+        if ($request->query('signature') !== null) {
+            abort(403, 'Invalid or expired signature.');
+        }
+
         $user = $request->user();
 
         if (! $user) {

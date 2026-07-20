@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 use Innertia\Auth\RBAC\Models\EntityPermission;
 use Innertia\Files\Directories\Models\Directory;
 use Innertia\Platform\Traits\HasEntityPermissions;
@@ -24,9 +25,11 @@ use Innertia\Tags\Traits\HasTags;
  *   $file = File::fromUrl('https://example.com/data.xlsx');
  *   $file = File::fromUploadedFile($uploadedFile);
  *
- *   $file->url()           // → /files/{id}/download (goes through permission check)
- *   $file->viewUrl()       // → /files/{id}/view    (inline, permission check)
- *   $file->temporaryUrl()  // → signed cloud URL    (bypasses permission check)
+ *   $file->url()               // → /files/{id}/download (goes through permission check)
+ *   $file->viewUrl()           // → /files/{id}/view    (inline, permission check)
+ *   $file->signedViewUrl()     // → own-domain signed inline URL (signature is the credential)
+ *   $file->signedDownloadUrl() // → own-domain signed download URL
+ *   $file->temporaryUrl()      // → signed cloud URL    (bypasses permission check)
  *
  * Visibility:
  *   public     — anyone can access (even unauthenticated)
@@ -170,6 +173,30 @@ class File extends Model
     public function viewUrl(): string
     {
         return route('innertia.files.view', $this->id);
+    }
+
+    /**
+     * Own-domain signed inline-view URL. The HMAC signature IS the credential:
+     * FileController::authorize() serves the file for a valid signature without
+     * an authenticated user, so it works in <img>/<iframe>/fetch that cannot
+     * send a Bearer token. Disk-agnostic (local in dev, bucket in prod) — the
+     * route streams from Storage::disk($this->disk), never exposing the provider.
+     */
+    public function signedViewUrl(?int $minutes = null): string
+    {
+        return URL::temporarySignedRoute('innertia.files.view', now()->addMinutes($minutes ?? self::urlTtl()), ['id' => $this->id]);
+    }
+
+    /** Own-domain signed force-download URL. See signedViewUrl(). */
+    public function signedDownloadUrl(?int $minutes = null): string
+    {
+        return URL::temporarySignedRoute('innertia.files.download', now()->addMinutes($minutes ?? self::urlTtl()), ['id' => $this->id]);
+    }
+
+    /** Signed-URL lifetime in minutes (config('innertia.files.url_ttl'), default 15). */
+    private static function urlTtl(): int
+    {
+        return (int) config('innertia.files.url_ttl', 15);
     }
 
     /**
