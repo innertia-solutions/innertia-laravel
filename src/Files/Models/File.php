@@ -162,41 +162,60 @@ class File extends Model
     }
 
     // ── URLs ──────────────────────────────────────────────────────────────────
+    //
+    // Todas las URLs absolutas se construyen desde config('app.url') (NO desde
+    // url()/route() con contexto de request), porque detrás de un proxy el host
+    // que ve la app es el interno (p.ej. api:80) y no el público que usa el
+    // browser. app.url es la fuente de verdad del origen público.
+
+    /** Origen público (config app.url), sin barra final. */
+    private static function publicRoot(): string
+    {
+        return rtrim((string) config('app.url'), '/');
+    }
 
     /** Route through Innertia's FileController — respects permission check. */
     public function url(): string
     {
-        return route('innertia.files.download', $this->id);
+        return self::publicRoot() . route('innertia.files.download', $this->id, absolute: false);
     }
 
     /** Inline view route — respects permission check. */
     public function viewUrl(): string
     {
-        return route('innertia.files.view', $this->id);
+        return self::publicRoot() . route('innertia.files.view', $this->id, absolute: false);
+    }
+
+    /** Path relativo firmado (inline). Ideal para embeber: el browser lo resuelve
+     *  contra su propio origen; la firma relativa valida tras cualquier proxy. */
+    public function signedViewPath(?int $minutes = null): string
+    {
+        return URL::temporarySignedRoute('innertia.files.view', now()->addMinutes($minutes ?? self::urlTtl()), ['id' => $this->id], absolute: false);
+    }
+
+    /** Path relativo firmado (descarga). Ver signedViewPath(). */
+    public function signedDownloadPath(?int $minutes = null): string
+    {
+        return URL::temporarySignedRoute('innertia.files.download', now()->addMinutes($minutes ?? self::urlTtl()), ['id' => $this->id], absolute: false);
     }
 
     /**
-     * Own-domain signed inline-view URL. The HMAC signature IS the credential:
-     * FileController::authorize() serves the file for a valid signature without
-     * an authenticated user, so it works in <img>/<iframe>/fetch that cannot
-     * send a Bearer token. Disk-agnostic (local in dev, bucket in prod) — the
-     * route streams from Storage::disk($this->disk), never exposing the provider.
-     *
-     * The signature is RELATIVE (path + query only, host excluded), so it stays
-     * valid behind any proxy/load balancer where the host the app sees differs
-     * from the one the browser used (dev Nuxt proxy, prod edge/CDN). The absolute
-     * URL is built by prefixing app.url for embedding/sharing; validation ignores
-     * the host (see FileController::authorize, hasValidSignature(absolute: false)).
+     * Own-domain signed inline-view URL (absoluta, para compartir). La firma HMAC
+     * ES la credencial: FileController::authorize() sirve el archivo con una firma
+     * válida sin usuario, así funciona en <img>/<iframe>/fetch (sin Bearer). La
+     * firma es RELATIVA (path+query), por lo que valida tras cualquier proxy donde
+     * el host que ve la app difiere del que usó el browser; el host absoluto viene
+     * de config('app.url'). Disk-agnóstico — jamás expone el proveedor.
      */
     public function signedViewUrl(?int $minutes = null): string
     {
-        return url(URL::temporarySignedRoute('innertia.files.view', now()->addMinutes($minutes ?? self::urlTtl()), ['id' => $this->id], absolute: false));
+        return self::publicRoot() . $this->signedViewPath($minutes);
     }
 
-    /** Own-domain signed force-download URL (relative signature). See signedViewUrl(). */
+    /** Own-domain signed force-download URL (absoluta). See signedViewUrl(). */
     public function signedDownloadUrl(?int $minutes = null): string
     {
-        return url(URL::temporarySignedRoute('innertia.files.download', now()->addMinutes($minutes ?? self::urlTtl()), ['id' => $this->id], absolute: false));
+        return self::publicRoot() . $this->signedDownloadPath($minutes);
     }
 
     /** Signed-URL lifetime in minutes (config('innertia.files.url_ttl'), default 15). */
