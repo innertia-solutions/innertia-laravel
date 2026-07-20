@@ -16,7 +16,7 @@ class FileController extends Controller
      */
     public function view(Request $request, string $id): StreamedResponse
     {
-        $file = File::findOrFail($id);
+        $file = $this->resolve($id);
 
         $this->authorize($request, $file);
 
@@ -32,11 +32,22 @@ class FileController extends Controller
      */
     public function download(Request $request, string $id): StreamedResponse
     {
-        $file = File::findOrFail($id);
+        $file = $this->resolve($id);
 
         $this->authorize($request, $file);
 
         return $this->stream($file, 'attachment');
+    }
+
+    /**
+     * Resuelve el archivo por id. Un id malformado (no-uuid) da 404 limpio en vez
+     * de un error de driver (Postgres rechaza uuids inválidos con SQLSTATE 22P02).
+     */
+    private function resolve(string $id): File
+    {
+        abort_unless(\Illuminate\Support\Str::isUuid($id), 404, 'File not found.');
+
+        return File::findOrFail($id);
     }
 
     private function authorize(Request $request, File $file): void

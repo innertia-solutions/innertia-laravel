@@ -169,3 +169,7 @@ it('FileResource de un archivo público expone URL estable SIN firma', function 
     expect($data['view_url'])->toContain('/files/' . $file->id . '/view');
     expect($data['download_url'])->not->toContain('signature=');
 });
+
+it('un id malformado (no-uuid) devuelve 404, no un error de SQL', function () {
+    test()->get('/files/not-a-valid-uuid/view')->assertStatus(404);
+});

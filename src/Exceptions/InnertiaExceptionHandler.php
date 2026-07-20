@@ -73,10 +73,44 @@ class InnertiaExceptionHandler
             return static::json('Not found.', 'not_found', 404, [], $e);
         }
 
+        // Cualquier HttpException con status explícito (abort(401/403/404/422/…)).
+        // Debe respetar su código y mensaje, no colapsar a 500 server_error.
+        if ($e instanceof \Symfony\Component\HttpKernel\Exception\HttpExceptionInterface) {
+            $status  = $e->getStatusCode();
+            $message = $e->getMessage() !== '' ? $e->getMessage() : static::defaultMessageFor($status);
+
+            return static::json($message, static::errorKeyFor($status), $status, [], $e);
+        }
+
         // Unexpected — never expose internal details in production
         $message = app()->isLocal() ? $e->getMessage() : 'Server error.';
 
         return static::json($message, 'server_error', 500, [], $e);
+    }
+
+    private static function errorKeyFor(int $status): string
+    {
+        return match ($status) {
+            401 => 'unauthenticated',
+            403 => 'forbidden',
+            404 => 'not_found',
+            409 => 'conflict',
+            422 => 'validation_error',
+            429 => 'too_many_requests',
+            default => $status >= 500 ? 'server_error' : 'http_error',
+        };
+    }
+
+    private static function defaultMessageFor(int $status): string
+    {
+        return match ($status) {
+            401 => 'Unauthenticated.',
+            403 => 'Forbidden.',
+            404 => 'Not found.',
+            409 => 'Conflict.',
+            429 => 'Too many requests.',
+            default => 'Request failed.',
+        };
     }
 
     private static function json(
