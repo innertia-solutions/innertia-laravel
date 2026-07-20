@@ -22,8 +22,10 @@ class FileResource extends JsonResource
             'deleted_at'     => $this->deleted_at?->toIso8601String(),
             'created_at'     => $this->created_at?->toIso8601String(),
             'created_by'     => $this->created_by,
-            'view_url'       => $this->tryFileUrl(fn () => $this->signedViewUrl()),
-            'download_url'   => $this->tryFileUrl(fn () => $this->signedDownloadUrl()),
+            // Público → URL estable permanente (sin firma; apta para firmas de
+            // correo, web, CDN). Privado → URL firmada de corta vida.
+            'view_url'       => $this->tryFileUrl(fn () => $this->visibility === 'public' ? $this->viewUrl() : $this->signedViewUrl()),
+            'download_url'   => $this->tryFileUrl(fn () => $this->visibility === 'public' ? $this->url() : $this->signedDownloadUrl()),
             'tags'           => $this->whenLoaded('tags', fn () => $this->tags->pluck('slug')),
         ];
     }

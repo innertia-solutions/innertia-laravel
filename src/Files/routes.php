@@ -50,6 +50,7 @@ class Routes
 
             Route::get   ('/',             [$controller, 'index'])->name('files.index');
             Route::post  ('/',             [$controller, 'store'])->name('files.store');
+            Route::get   ('{id}/share-link', [$controller, 'shareLink'])->name('files.share-link');
             Route::get   ('{id}',          [$controller, 'show'])->name('files.show');
             Route::patch ('{id}',          [$controller, 'update'])->name('files.update');
             Route::delete('{id}',          [$controller, 'destroy'])->name('files.destroy');

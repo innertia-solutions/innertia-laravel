@@ -22,6 +22,9 @@ beforeEach(function () {
     Route::middleware([])->group(function () {
         \Innertia\Files\Routes::register();
     });
+    // Serving routes (innertia.files.view/download) — necesarias para que
+    // signedViewUrl()/share-link/view_url firmado resuelvan la ruta.
+    \Innertia\Files\Routes::registerFileServing();
 });
 
 afterEach(fn () => innertiaFilesMigrateDown());
@@ -152,6 +155,23 @@ it('rejects name with path separator on PATCH', function () {
         ->assertStatus(422);
 });
 
+it('cambia la visibilidad a public via PATCH', function () {
+    $file = (new UploadFile(TestFile::create('doc.pdf', 100, 'application/pdf')))->execute();
+
+    $this->patchJson("/files/{$file->id}", ['visibility' => 'public'])
+        ->assertOk()
+        ->assertJsonPath('data.visibility', 'public');
+
+    expect(File::find($file->id)->visibility)->toBe('public');
+});
+
+it('rechaza una visibilidad inválida via PATCH', function () {
+    $file = (new UploadFile(TestFile::create('doc.pdf', 100, 'application/pdf')))->execute();
+
+    $this->patchJson("/files/{$file->id}", ['visibility' => 'nope'])
+        ->assertStatus(422);
+});
+
 // ── destroy ───────────────────────────────────────────────────────────────────
 
 it('soft deletes a file via DELETE', function () {
@@ -219,4 +239,39 @@ it('empties trash via POST /files/trash/empty', function () {
         ->assertJsonPath('deleted', 2);
 
     expect(File::withTrashed()->count())->toBe(0);
+});
+
+// ── share-link (URL firmada con TTL en horas) ───────────────────────────────────
+
+it('genera un share-link firmado con TTL en horas', function () {
+    $file = (new UploadFile(TestFile::create('doc.pdf', 100, 'application/pdf')))->execute();
+
+    $res = $this->getJson("/files/{$file->id}/share-link?hours=48")
+        ->assertOk()
+        ->assertJsonPath('expires_in_hours', 48);
+
+    expect($res->json('url'))->toContain('signature=');
+    expect($res->json('url'))->toContain("/files/{$file->id}/view");
+});
+
+it('el share-link con download=1 apunta a la ruta de descarga', function () {
+    $file = (new UploadFile(TestFile::create('doc.pdf', 100, 'application/pdf')))->execute();
+
+    $res = $this->getJson("/files/{$file->id}/share-link?hours=2&download=1")->assertOk();
+
+    expect($res->json('url'))->toContain("/files/{$file->id}/download");
+});
+
+it('el share-link usa 24h por defecto', function () {
+    $file = (new UploadFile(TestFile::create('doc.pdf', 100, 'application/pdf')))->execute();
+
+    $this->getJson("/files/{$file->id}/share-link")
+        ->assertOk()
+        ->assertJsonPath('expires_in_hours', 24);
+});
+
+it('el share-link rechaza hours fuera de rango', function () {
+    $file = (new UploadFile(TestFile::create('doc.pdf', 100, 'application/pdf')))->execute();
+
+    $this->getJson("/files/{$file->id}/share-link?hours=0")->assertStatus(422);
 });

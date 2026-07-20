@@ -20,7 +20,10 @@ class FileController extends Controller
 
         $this->authorize($request, $file);
 
-        return $this->stream($file, 'inline');
+        // Inline solo para tipos que el browser renderiza de forma segura; los
+        // riesgosos (HTML/SVG/etc.) se fuerzan a descarga para evitar que un
+        // archivo subido ejecute script en el origen (XSS).
+        return $this->stream($file, $this->inlineSafe($file) ? 'inline' : 'attachment');
     }
 
     /**
@@ -71,6 +74,30 @@ class FileController extends Controller
         }
     }
 
+    /**
+     * ¿Es seguro renderizar este archivo inline en el browser? Los tipos que
+     * pueden ejecutar script al renderizarse (HTML, SVG, XHTML) NUNCA van inline.
+     */
+    private function inlineSafe(File $file): bool
+    {
+        $mime = strtolower((string) $file->mime_type);
+        $ext  = strtolower((string) $file->extension);
+
+        // Peligrosos: pueden ejecutar script si se renderizan inline.
+        if ($mime === 'image/svg+xml' || $ext === 'svg') {
+            return false;
+        }
+        if ($mime === 'text/html' || $mime === 'application/xhtml+xml' || in_array($ext, ['html', 'htm', 'xhtml'], true)) {
+            return false;
+        }
+
+        return str_starts_with($mime, 'image/')
+            || $mime === 'application/pdf'
+            || str_starts_with($mime, 'video/')
+            || str_starts_with($mime, 'audio/')
+            || $mime === 'text/plain';
+    }
+
     private function stream(File $file, string $disposition): StreamedResponse
     {
         abort_unless(
@@ -83,6 +110,11 @@ class FileController extends Controller
         $mimeType = $file->mime_type ?? 'application/octet-stream';
         $name     = $file->original_name;
 
+        // Público → cacheable (apto CDN, firmas de correo, web); privado → sin caché.
+        $cacheControl = $file->visibility === 'public'
+            ? 'public, max-age=86400'
+            : 'no-store, no-cache, private';
+
         return response()->stream(
             function () use ($file) {
                 $stream = Storage::disk($file->disk)->readStream($file->path);
@@ -91,10 +123,11 @@ class FileController extends Controller
             },
             200,
             [
-                'Content-Type'        => $mimeType,
-                'Content-Length'      => $size,
-                'Content-Disposition' => "{$disposition}; filename=\"{$name}\"",
-                'Cache-Control'       => 'no-store, no-cache',
+                'Content-Type'           => $mimeType,
+                'Content-Length'         => $size,
+                'Content-Disposition'    => "{$disposition}; filename=\"{$name}\"",
+                'Cache-Control'          => $cacheControl,
+                'X-Content-Type-Options' => 'nosniff',
             ]
         );
     }

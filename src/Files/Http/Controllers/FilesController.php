@@ -129,6 +129,7 @@ class FilesController extends Controller
         $rules = array_merge([
             'original_name' => ['sometimes', 'string', 'max:255'],
             'directory_id'  => ['sometimes', 'nullable', 'uuid'],
+            'visibility'    => ['sometimes', 'in:public,auth,restricted'],
         ], $this->extraUpdateRules());
 
         $request->validate($rules);
@@ -163,12 +164,45 @@ class FilesController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
+        if ($request->has('visibility')) {
+            $file->forceFill(['visibility' => $request->input('visibility')])->save();
+        }
+
         $extra = $this->extraFields($request, $file);
         if (! empty($extra)) {
             $file->forceFill($extra)->save();
         }
 
         return (new FileResource($file->fresh()))->response();
+    }
+
+    /**
+     * GET /files/{id}/share-link?hours=N[&download=1]
+     * Genera una URL firmada de dominio propio para compartir el archivo por N
+     * horas (default 24). La firma es la credencial: quien abra el link accede
+     * sin login hasta que expire. Con download=1 apunta a la ruta de descarga.
+     */
+    public function shareLink(Request $request, string $id): JsonResponse
+    {
+        $data = $request->validate([
+            'hours'    => ['sometimes', 'integer', 'min:1', 'max:8760'],
+            'download' => ['sometimes', 'boolean'],
+        ]);
+
+        $file = File::find($id);
+
+        if (! $file) {
+            return response()->json(['message' => 'File not found.'], 404);
+        }
+
+        $hours   = (int) ($data['hours'] ?? 24);
+        $minutes = $hours * 60;
+
+        $url = $request->boolean('download')
+            ? $file->signedDownloadUrl($minutes)
+            : $file->signedViewUrl($minutes);
+
+        return response()->json(['url' => $url, 'expires_in_hours' => $hours]);
     }
 
     public function destroy(Request $request, string $id): JsonResponse

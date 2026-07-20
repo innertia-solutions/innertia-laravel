@@ -139,6 +139,24 @@ Firma inválida/vencida → 403; sin firma → cae a auth por usuario (401 si no
 A diferencia de `temporaryUrl()` (presigned del driver, expone el bucket), esta mantiene todo
 tras tu dominio — apto para CDN/Worker por delante.
 
+### Tres modos de URL (según el caso de uso)
+
+| Caso | Visibilidad | URL en el `FileResource` | Vence |
+|---|---|---|---|
+| Previsualizar / servir privado | auth/restricted | firmada corta (`url_ttl`, 15min) | sí |
+| Público permanente (firma de correo, web) | **public** | estable `viewUrl()` **sin firma** | no |
+
+Para **compartir** con TTL a elección: `GET /files/{id}/share-link?hours=N[&download=1]`
+(controller CRUD) → `{ url, expires_in_hours }`. Cambiar a público: `PATCH /files/{id}`
+con `{ visibility: 'public' }`.
+
+### Serving seguro (Content-Disposition + headers)
+
+`GET /files/{id}/view` sirve **inline** solo tipos seguros (imagen, PDF, video, audio, texto
+plano); HTML/SVG/XHTML se fuerzan a `attachment` (anti-XSS). `GET /files/{id}/download` siempre
+`attachment`. Todo lleva `X-Content-Type-Options: nosniff`. Cache: público → `public, max-age`;
+privado → `no-store`.
+
 > **BREAKING (migración):** El endpoint inline view cambió de `/files/{id}` → `/files/{id}/view`.
 > Usar `route('innertia.files.view', $id)` o `$file->viewUrl()` — ambos son estables.
 
