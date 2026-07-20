@@ -40,3 +40,39 @@ it('un error inesperado sigue siendo 500 server_error', function () {
     expect($res->getStatusCode())->toBe(500);
     expect($res->getData(true)['error'])->toBe('server_error');
 });
+
+// ── Content negotiation: HTML para navegación de browser ────────────────────────
+
+use Illuminate\Http\Request;
+
+function _renderFor(\Throwable $e, string $accept): \Symfony\Component\HttpFoundation\Response
+{
+    $req = Request::create('/files/x/view', 'GET', server: ['HTTP_ACCEPT' => $accept]);
+    $m = new ReflectionMethod(InnertiaExceptionHandler::class, 'renderFor');
+    $m->setAccessible(true);
+
+    return $m->invoke(null, $e, $req);
+}
+
+it('navegación de browser (Accept text/html) recibe una página HTML, no JSON', function () {
+    $res = _renderFor(new HttpException(404, 'File not found.'), 'text/html');
+
+    expect($res)->not->toBeInstanceOf(\Illuminate\Http\JsonResponse::class);
+    expect($res->getStatusCode())->toBe(404);
+    expect($res->headers->get('content-type'))->toContain('text/html');
+    expect($res->getContent())->toContain('No encontrado');
+});
+
+it('el SPA (Accept application/json) sigue recibiendo JSON', function () {
+    $res = _renderFor(new HttpException(404, 'File not found.'), 'application/json');
+
+    expect($res)->toBeInstanceOf(\Illuminate\Http\JsonResponse::class);
+    expect($res->getStatusCode())->toBe(404);
+});
+
+it('un link expirado en browser (403) muestra página HTML de enlace no válido', function () {
+    $res = _renderFor(new HttpException(403, 'Invalid or expired signature.'), 'text/html');
+
+    expect($res->getStatusCode())->toBe(403);
+    expect($res->headers->get('content-type'))->toContain('text/html');
+});
