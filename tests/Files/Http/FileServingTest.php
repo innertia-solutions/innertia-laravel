@@ -62,7 +62,7 @@ it('serves a restricted file via a valid signed URL — the signature is the cre
 
 it('rejects an expired signed URL with 403', function () {
     $file = _servingFile('auth');
-    $url  = URL::temporarySignedRoute('innertia.files.view', now()->subMinute(), ['id' => $file->id]);
+    $url  = url(URL::temporarySignedRoute('innertia.files.view', now()->subMinute(), ['id' => $file->id], absolute: false));
 
     test()->get($url)->assertStatus(403);
 });

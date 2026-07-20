@@ -181,16 +181,22 @@ class File extends Model
      * an authenticated user, so it works in <img>/<iframe>/fetch that cannot
      * send a Bearer token. Disk-agnostic (local in dev, bucket in prod) — the
      * route streams from Storage::disk($this->disk), never exposing the provider.
+     *
+     * The signature is RELATIVE (path + query only, host excluded), so it stays
+     * valid behind any proxy/load balancer where the host the app sees differs
+     * from the one the browser used (dev Nuxt proxy, prod edge/CDN). The absolute
+     * URL is built by prefixing app.url for embedding/sharing; validation ignores
+     * the host (see FileController::authorize, hasValidSignature(absolute: false)).
      */
     public function signedViewUrl(?int $minutes = null): string
     {
-        return URL::temporarySignedRoute('innertia.files.view', now()->addMinutes($minutes ?? self::urlTtl()), ['id' => $this->id]);
+        return url(URL::temporarySignedRoute('innertia.files.view', now()->addMinutes($minutes ?? self::urlTtl()), ['id' => $this->id], absolute: false));
     }
 
-    /** Own-domain signed force-download URL. See signedViewUrl(). */
+    /** Own-domain signed force-download URL (relative signature). See signedViewUrl(). */
     public function signedDownloadUrl(?int $minutes = null): string
     {
-        return URL::temporarySignedRoute('innertia.files.download', now()->addMinutes($minutes ?? self::urlTtl()), ['id' => $this->id]);
+        return url(URL::temporarySignedRoute('innertia.files.download', now()->addMinutes($minutes ?? self::urlTtl()), ['id' => $this->id], absolute: false));
     }
 
     /** Signed-URL lifetime in minutes (config('innertia.files.url_ttl'), default 15). */

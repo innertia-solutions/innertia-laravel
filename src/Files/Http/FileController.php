@@ -50,7 +50,7 @@ class FileController extends Controller
         // Authorization was enforced when the signed URL was issued; expiry keeps
         // the leak window short. A present-but-invalid/expired signature is
         // rejected outright (403); no signature at all falls back to user auth.
-        if ($request->hasValidSignature()) {
+        if ($request->hasValidSignature(absolute: false)) {
             return;
         }
 
