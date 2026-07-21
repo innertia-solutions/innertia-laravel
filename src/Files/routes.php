@@ -62,5 +62,19 @@ class Routes
             Route::delete('{id}/grants',   [$grantsController, 'destroy'])->name('files.grants.destroy');
         });
     }
+
+    /**
+     * Register the provider connection routes (connect/callback/status/disconnect).
+     */
+    public static function registerProviderConnections(string $prefix = 'files/providers'): void
+    {
+        $c = \Innertia\Files\Providers\Http\ProviderConnectionController::class;
+        Route::prefix($prefix)->group(function () use ($c) {
+            Route::get   ('{provider}/connect',    [$c, 'connect'])->name('innertia.files.providers.connect');
+            Route::get   ('{provider}/callback',   [$c, 'callback'])->name('innertia.files.providers.callback');
+            Route::get   ('{provider}/status',     [$c, 'status'])->name('innertia.files.providers.status');
+            Route::delete('{provider}/connection', [$c, 'disconnect'])->name('innertia.files.providers.disconnect');
+        });
+    }
 }
 
