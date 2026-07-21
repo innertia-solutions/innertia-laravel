@@ -258,6 +258,9 @@ class InnertiaServiceProvider extends ServiceProvider
             $commands[] = \Innertia\Files\Directories\Console\PurgeTrashCommand::class;
             $commands[] = \Innertia\Files\Console\PurgeFilesTrashCommand::class;
 
+            // Providers install command — provider_connections + link columns on files.
+            $commands[] = \Innertia\Files\Providers\Console\ProvidersInstallCommand::class;
+
             // Claude Code skills installer — instala skills del paquete en .claude/skills/innertia/
             $commands[] = \Innertia\Console\SkillsInstallCommand::class;
 
