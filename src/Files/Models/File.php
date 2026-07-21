@@ -78,6 +78,11 @@ class File extends Model
         'created_by',
         'directory_id',
         'trash_group_id',
+        'provider',
+        'link_mode',
+        'external_id',
+        'external_url',
+        'external_account_id',
     ];
 
     // ── Static factories ──────────────────────────────────────────────────────
