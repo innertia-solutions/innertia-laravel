@@ -205,6 +205,23 @@ return [
         'max_upload_mb'        => (int) env('INNERTIA_FILES_MAX_UPLOAD_MB', 100),
         // Lifetime (minutes) of own-domain signed serving URLs (signedViewUrl / FileResource).
         'url_ttl'              => (int) env('INNERTIA_FILES_URL_TTL', 15),
+
+        'providers' => [
+            'google_drive' => [
+                'enabled'          => env('INNERTIA_GDRIVE_ENABLED', false),
+                'driver'           => \Innertia\Files\Providers\GoogleDriveProvider::class,
+                'client_id'        => env('INNERTIA_GDRIVE_CLIENT_ID'),
+                'client_secret'    => env('INNERTIA_GDRIVE_CLIENT_SECRET'),
+                'api_key'          => env('INNERTIA_GDRIVE_API_KEY'),
+                'scopes'           => ['https://www.googleapis.com/auth/drive.file'],
+                'app_folder_name'  => env('INNERTIA_GDRIVE_FOLDER', 'Innertia — Documentos'),
+                'contexts'         => [
+                    'default'  => ['scope' => 'user'],
+                    'platform' => ['scope' => 'shared_drive', 'shared_drive_id' => env('INNERTIA_GDRIVE_PLATFORM_DRIVE_ID')],
+                ],
+                'service_account'  => env('INNERTIA_GDRIVE_SERVICE_ACCOUNT_JSON'),
+            ],
+        ],
     ],
 
     'directories' => [
