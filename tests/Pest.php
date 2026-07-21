@@ -17,6 +17,7 @@ class BaseTestCase extends TestCase
     protected function getPackageProviders($app)
     {
         return [
+            \Laravel\Socialite\SocialiteServiceProvider::class,
             \Innertia\InnertiaServiceProvider::class,
         ];
     }
