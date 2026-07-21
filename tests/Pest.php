@@ -24,6 +24,9 @@ class BaseTestCase extends TestCase
     protected function defineEnvironment($app)
     {
         $app['config']->set('broadcasting.default', 'log');
+        // Generate a 32-byte key for AES-256-CBC
+        $app['config']->set('app.key', 'base64:' . base64_encode(str_repeat('a', 32)));
+        $app['config']->set('app.cipher', 'AES-256-CBC');
     }
 }
 
