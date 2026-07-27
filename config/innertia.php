@@ -417,6 +417,17 @@ return [
         'handler' => null,
     ],
 
+    'backups' => [
+        // Driver mode-aware: 'app' (dump de BD completa) | 'saas' | 'open' (diferidos).
+        'mode' => env('BACKUP_MODE', 'app'),
+
+        // Disk dedicado para los artefactos de respaldo. SEPARADO del Drive/Files de usuario.
+        'disk' => env('BACKUP_DISK', 'backups'),
+
+        // Días de retención (config lista; el barrido por cron queda diferido).
+        'retention_days' => (int) env('BACKUP_RETENTION_DAYS', 30),
+    ],
+
     'mail' => [
         'logo_url'    => env('MAIL_LOGO_URL', null),
         'brand_color' => env('MAIL_BRAND_COLOR', '#6366f1'),
