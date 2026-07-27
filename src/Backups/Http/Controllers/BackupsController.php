@@ -77,6 +77,7 @@ class BackupsController
     public function destroy(string $id): JsonResponse
     {
         $backup = Backup::findOrFail($id);
+        abort_if($backup->is_safety, 403, 'Safety backups cannot be deleted manually.');
         (new DeleteBackup($backup))->execute();
 
         return response()->json(['status' => 'deleted']);

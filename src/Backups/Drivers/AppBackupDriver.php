@@ -29,7 +29,7 @@ class AppBackupDriver implements BackupDriver
 
         $result = $this->runner->run(
             command: [
-                'pg_dump', '-Fc',
+                'pg_dump', '-Fc', '--no-owner', '--no-acl',
                 '-h', (string) $conn['host'],
                 '-p', (string) $conn['port'],
                 '-U', (string) $conn['username'],

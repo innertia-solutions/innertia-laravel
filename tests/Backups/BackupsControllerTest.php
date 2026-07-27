@@ -81,6 +81,18 @@ it('restore rejects a non-completed backup with 422', function () {
     ))->toThrow(\Symfony\Component\HttpKernel\Exception\HttpException::class);
 });
 
+it('destroy refuses to delete a safety backup with 403', function () {
+    $safety = Backup::create([
+        'disk' => 'backups', 'driver' => 'app', 'mode' => 'app',
+        'is_safety' => true, 'status' => 'completed',
+    ]);
+
+    expect(fn () => (new BackupsController())->destroy($safety->id))
+        ->toThrow(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+
+    expect(Backup::find($safety->id))->not->toBeNull(); // not deleted
+});
+
 it('download returns 404 when the artifact is missing', function () {
     $backup = Backup::create([
         'disk' => 'backups', 'driver' => 'app', 'mode' => 'app',
