@@ -64,6 +64,7 @@ class TelemetryServiceProvider extends ServiceProvider
         $this->registerEventCapture();
         $this->registerDataTableCapture();
         $this->registerExceptionCapture();
+        $this->registerMailCapture();
     }
 
     private function shouldActivate(): bool
@@ -159,6 +160,19 @@ class TelemetryServiceProvider extends ServiceProvider
             $collector = $this->app->make(TelemetryCollector::class);
             DataTableCollector::handle($collector, $tableName, $rowCount, $durationMs);
         };
+    }
+
+    private function registerMailCapture(): void
+    {
+        if (! config('innertia.telemetry.capture.mail', true)) return;
+
+        \Illuminate\Support\Facades\Event::listen(
+            \Illuminate\Mail\Events\MessageSending::class,
+            function ($event) {
+                $collector = $this->app->make(TelemetryCollector::class);
+                \Innertia\Telemetry\Collectors\MailCollector::handle($collector, $event->message);
+            }
+        );
     }
 
     private function registerExceptionCapture(): void
