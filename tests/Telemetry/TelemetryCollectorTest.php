@@ -44,3 +44,11 @@ it('exposes sessionId', function () {
     $collector = new TelemetryCollector('my-app', 'sess-xyz', 'acme', 'production');
     expect($collector->sessionId())->toBe('sess-xyz');
 });
+
+it('exposes a stable trace id for the request', function () {
+    $collector = new TelemetryCollector('my-app', 'session-abc', 'acme', 'local');
+
+    expect($collector->traceId())->toBeString()->not->toBeEmpty();
+    // Estable dentro del mismo collector (mismo request).
+    expect($collector->traceId())->toBe($collector->traceId());
+});

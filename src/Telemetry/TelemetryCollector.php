@@ -9,12 +9,23 @@ class TelemetryCollector
     /** @var TelemetryEvent[] */
     private array $batch = [];
 
+    private readonly string $traceId;
+
     public function __construct(
         private readonly string  $appName,
         private readonly string  $sessionId,
         private readonly ?string $tenant,
         private readonly string  $env,
-    ) {}
+    ) {
+        $this->traceId = class_exists(\Hidehalo\Nanoid\Client::class)
+            ? (new \Hidehalo\Nanoid\Client())->generateId(21)
+            : \Illuminate\Support\Str::uuid()->toString();
+    }
+
+    public function traceId(): string
+    {
+        return $this->traceId;
+    }
 
     public function record(TelemetryEvent $event): void
     {
