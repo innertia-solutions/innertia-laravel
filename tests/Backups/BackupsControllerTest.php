@@ -28,6 +28,7 @@ it('store creates a pending backup and dispatches RunBackup', function () {
     expect($backup->status)->toBe('pending');
     expect($backup->disk)->toBe('backups');
     expect($backup->mode)->toBe('app');
+    expect($backup->driver)->toBe('app');
     Bus::assertDispatched(RunBackup::class);
 });
 
@@ -59,6 +60,25 @@ it('restore with the correct token (db name) dispatches RestoreBackup', function
 
     expect($res->getStatusCode())->toBe(202);
     Bus::assertDispatched(RestoreBackup::class);
+});
+
+it('store returns 409 when a backup is already in progress', function () {
+    Backup::create(['disk' => 'backups', 'driver' => 'app', 'mode' => 'app', 'status' => 'running']);
+
+    expect(fn () => (new BackupsController())->store(new Request()))
+        ->toThrow(\Symfony\Component\HttpKernel\Exception\HttpException::class);
+});
+
+it('restore rejects a non-completed backup with 422', function () {
+    $backup = Backup::create([
+        'disk' => 'backups', 'driver' => 'app', 'mode' => 'app',
+        'path' => null, 'status' => 'failed',
+    ]);
+
+    expect(fn () => (new BackupsController())->restore(
+        new Request(['confirmation' => 'app_db']),
+        $backup->id,
+    ))->toThrow(\Symfony\Component\HttpKernel\Exception\HttpException::class);
 });
 
 it('download returns 404 when the artifact is missing', function () {

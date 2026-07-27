@@ -18,15 +18,26 @@ class BackupsController
     {
         return DataTable::create('backups')
             ->columns(['id', 'status', 'size_bytes', 'driver', 'mode', 'is_safety', 'completed_at', 'created_at'])
-            ->render(Backup::query(), $request, 'created_at', 'desc');
+            ->render(Backup::query()->where('is_safety', false), $request, 'created_at', 'desc');
     }
 
     public function store(Request $request): JsonResponse
     {
+        // Evita disparar dos dumps concurrentes (doble submit / retry) sobre el mismo disk.
+        abort_if(
+            Backup::whereIn('status', ['pending', 'running'])->exists(),
+            409,
+            'A backup is already in progress.',
+        );
+
+        $mode = config('innertia.backups.mode', 'app');
+
         $backup = Backup::create([
             'disk'   => config('innertia.backups.disk', 'backups'),
-            'driver' => config('innertia.backups.mode', 'app'),
-            'mode'   => config('innertia.backups.mode', 'app'),
+            // Hoy hay un driver por modo (BackupManager resuelve el driver desde el modo),
+            // por eso driver == mode. Se separan cuando exista más de un driver por modo.
+            'driver' => $mode,
+            'mode'   => $mode,
             'status' => 'pending',
         ]);
 
@@ -50,6 +61,8 @@ class BackupsController
     public function restore(Request $request, string $id): JsonResponse
     {
         $backup = Backup::findOrFail($id);
+
+        abort_unless($backup->status === 'completed', 422, 'Backup is not complete.');
 
         // Confirmation token = DB name (predictable, validated server-side).
         $request->validate([
