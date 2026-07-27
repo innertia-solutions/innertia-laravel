@@ -26,6 +26,17 @@ class TelemetryServiceProvider extends ServiceProvider
             );
         });
         $this->app->singleton(\Innertia\Telemetry\Store\TelemetryStore::class);
+
+        // El collector se resuelve SIEMPRE (aunque la captura esté apagada): los
+        // endpoints de beacon/presencia lo necesitan para etiquetar por trace_id.
+        $this->app->singleton(TelemetryCollector::class, function () {
+            return new TelemetryCollector(
+                appName:   config('innertia.telemetry.app_name', config('app.name', 'app')),
+                sessionId: $this->resolveSessionId(),
+                tenant:    $this->resolveTenant(),
+                env:       app()->environment(),
+            );
+        });
     }
 
     public function boot(): void
@@ -41,19 +52,11 @@ class TelemetryServiceProvider extends ServiceProvider
         $appMode = in_array(config('innertia.mode'), ['saas', 'open']) ? 'saas' : 'app';
         $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations/telemetry/' . $appMode);
 
+        $this->loadRoutesFrom(__DIR__ . '/routes.php');
+
         if (! $this->shouldActivate()) {
             return;
         }
-
-        // Singleton del collector para este request
-        $this->app->singleton(TelemetryCollector::class, function () {
-            return new TelemetryCollector(
-                appName:   config('innertia.telemetry.app_name', config('app.name', 'app')),
-                sessionId: $this->resolveSessionId(),
-                tenant:    $this->resolveTenant(),
-                env:       app()->environment(),
-            );
-        });
 
         // Registrar middleware en grupo api
         $this->app['router']->pushMiddlewareToGroup('api', TelemetryMiddleware::class);
