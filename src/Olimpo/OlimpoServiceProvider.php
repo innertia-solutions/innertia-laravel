@@ -42,11 +42,6 @@ class OlimpoServiceProvider extends ServiceProvider
             Event::listen(JobFailed::class, ReportFailedJob::class);
         }
 
-        // Activar telemetría si está habilitada
-        if (config('olimpo.url') || config('innertia.telemetry.enabled')) {
-            $this->app->register(\Innertia\Telemetry\TelemetryServiceProvider::class);
-        }
-
         // Registrar devtools
         $this->app->register(\Innertia\Devtools\DevtoolsServiceProvider::class);
     }

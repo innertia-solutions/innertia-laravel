@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Innertia\Auth\AuthServiceProvider;
 use Innertia\Backups\BackupsServiceProvider;
+use Innertia\Telemetry\TelemetryServiceProvider;
 use Innertia\Auth\Middleware\ContextMiddleware;
 use Innertia\Auth\Middleware\PermissionMiddleware;
 use Innertia\Auth\Middleware\RoleMiddleware;
@@ -97,6 +98,7 @@ class InnertiaServiceProvider extends ServiceProvider
 
         $this->app->register(AuthServiceProvider::class);
         $this->app->register(BackupsServiceProvider::class);
+        $this->app->register(TelemetryServiceProvider::class);
         $this->app->singleton(WebhookService::class);
         $this->app->singleton(\Innertia\Workflow\WorkflowEngine::class);
         $this->app->singleton(\Innertia\Platform\Events\EventBus::class);
