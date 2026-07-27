@@ -1,6 +1,7 @@
 <?php
 
 use Innertia\Backups\Contracts\BackupDriver;
+use Innertia\Backups\Exceptions\SafetyBackupFailedException;
 use Innertia\Backups\Models\Backup;
 use Innertia\Backups\UseCases\RestoreBackup;
 
@@ -40,4 +41,22 @@ it('creates a safety backup before restoring', function () {
     expect(Backup::where('is_safety', true)->count())->toBe(1);
     expect($order[0])->toBe('safety:yes');
     expect($order[1])->toBe('restore:' . $target->id);
+});
+
+it('aborts the restore when the safety backup fails', function () {
+    $restoreCalled = false;
+    bindRestoreDriver(
+        create: function (Backup $b) { throw new RuntimeException('disk full'); },
+        restore: function (Backup $b) use (&$restoreCalled) { $restoreCalled = true; },
+    );
+    $target = Backup::create([
+        'disk' => 'backups', 'driver' => 'app', 'mode' => 'app',
+        'path' => 'backups/target.dump', 'status' => 'completed',
+    ]);
+
+    expect(fn () => (new RestoreBackup($target))->execute())
+        ->toThrow(SafetyBackupFailedException::class);
+
+    expect($restoreCalled)->toBeFalse();
+    expect(Backup::where('is_safety', true)->first()->status)->toBe('failed');
 });
