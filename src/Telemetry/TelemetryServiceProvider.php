@@ -26,7 +26,6 @@ class TelemetryServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 \Innertia\Telemetry\Console\PruneTelemetryCommand::class,
-                \Innertia\Telemetry\Console\InstallTelemetryCommand::class,
             ]);
         }
 
