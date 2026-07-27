@@ -10,6 +10,7 @@ class FakeProcessRunner implements ProcessRunner
     public int $exitCode = 0;
     public string $errorOutput = '';
     public string $artifactContents = 'FAKE_PG_DUMP_ARTIFACT';
+    public bool $writeArtifact = true;
 
     public function run(array $command, array $env = [], int $timeout = 600): ProcessResult
     {
@@ -17,7 +18,7 @@ class FakeProcessRunner implements ProcessRunner
 
         // Si el comando incluye "-f <path>" (pg_dump), escribe el artefacto dummy.
         $fIndex = array_search('-f', $command, true);
-        if ($this->exitCode === 0 && $fIndex !== false && isset($command[$fIndex + 1])) {
+        if ($this->exitCode === 0 && $this->writeArtifact && $fIndex !== false && isset($command[$fIndex + 1])) {
             file_put_contents($command[$fIndex + 1], $this->artifactContents);
         }
 

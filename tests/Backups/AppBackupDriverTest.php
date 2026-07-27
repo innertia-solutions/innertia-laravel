@@ -74,4 +74,25 @@ it('builds a pg_restore command against the artifact', function () {
     expect($cmd)->toContain('pg_restore');
     expect($cmd)->toContain('--clean')->toContain('--if-exists');
     expect($cmd)->toContain('-d')->toContain('app_db');
+    expect(implode(' ', $cmd))->not->toContain('secret');
+    expect($runner->calls[0]['env']['PGPASSWORD'])->toBe('secret');
+});
+
+it('throws when the dump artifact is unreadable despite success', function () {
+    $runner = new FakeProcessRunner();
+    $runner->writeArtifact = false; // pg_dump "succeeds" but writes nothing
+    $driver = new AppBackupDriver($runner);
+    $backup = Backup::create(['disk' => 'backups', 'driver' => 'app', 'mode' => 'app']);
+    expect(fn () => $driver->create($backup))->toThrow(RuntimeException::class);
+    expect($backup->fresh()->path)->toBeNull();
+});
+
+it('throws on restore when the artifact is missing on disk', function () {
+    $runner = new FakeProcessRunner();
+    $driver = new AppBackupDriver($runner);
+    $backup = Backup::create([
+        'disk' => 'backups', 'driver' => 'app', 'mode' => 'app',
+        'path' => 'backups/missing.dump', 'status' => 'completed',
+    ]);
+    expect(fn () => $driver->restore($backup))->toThrow(RuntimeException::class);
 });

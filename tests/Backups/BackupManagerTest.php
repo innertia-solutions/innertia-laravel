@@ -9,11 +9,13 @@ it('resolves the app driver by default', function () {
     expect(app(BackupManager::class)->driver())->toBeInstanceOf(AppBackupDriver::class);
 });
 
-it('throws for deferred saas/open modes', function () {
+it('throws for deferred saas mode', function () {
     config()->set('innertia.backups.mode', 'saas');
     expect(fn () => app(BackupManager::class)->driver())
         ->toThrow(UnsupportedBackupModeException::class);
+});
 
+it('throws for deferred open mode', function () {
     config()->set('innertia.backups.mode', 'open');
     expect(fn () => app(BackupManager::class)->driver())
         ->toThrow(UnsupportedBackupModeException::class);
