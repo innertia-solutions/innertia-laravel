@@ -19,6 +19,13 @@ class TelemetryServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->mergeConfigFrom(__DIR__ . '/../../config/innertia.php', 'innertia');
+
+        $this->app->singleton(\Innertia\Telemetry\Support\PayloadSanitizer::class, function () {
+            return new \Innertia\Telemetry\Support\PayloadSanitizer(
+                config('innertia.telemetry.redact', [])
+            );
+        });
+        $this->app->singleton(\Innertia\Telemetry\Store\TelemetryStore::class);
     }
 
     public function boot(): void
