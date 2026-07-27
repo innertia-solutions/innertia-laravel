@@ -55,6 +55,11 @@ class TelemetryServiceProvider extends ServiceProvider
         $this->loadRoutesFrom(__DIR__ . '/routes.php');
         $this->loadViewsFrom(__DIR__ . '/Mail/views', 'innertia-telemetry');
 
+        // Servidor MCP (stdio + HTTP opcional) — solo si laravel/mcp está instalado.
+        if (class_exists(\Laravel\Mcp\Facades\Mcp::class)) {
+            $this->loadRoutesFrom(__DIR__ . '/Mcp/routes.php');
+        }
+
         if (! $this->shouldActivate()) {
             return;
         }
