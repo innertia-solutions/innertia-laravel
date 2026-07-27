@@ -11,6 +11,7 @@ class TelemetryEvent extends Model
     protected $fillable = [
         'app',
         'session_id',
+        'trace_id',
         'type',
         'occurred_at',
         'duration_ms',

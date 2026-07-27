@@ -13,6 +13,7 @@ return new class extends Migration
             $table->string('tenant_id')->index();
             $table->string('app')->index();
             $table->string('session_id')->index();
+            $table->string('trace_id')->nullable()->index();
             $table->string('type')->index();
             $table->timestamp('occurred_at')->index();
             $table->unsignedInteger('duration_ms')->nullable();
@@ -23,6 +24,7 @@ return new class extends Migration
             $table->index(['tenant_id', 'app', 'type']);
             $table->index(['tenant_id', 'app', 'occurred_at']);
             $table->index(['tenant_id', 'session_id', 'occurred_at']);
+            $table->index(['trace_id', 'occurred_at']);
         });
     }
 
