@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Innertia\Telemetry\Models\TelemetryEvent;
+use Innertia\Telemetry\Support\PayloadSanitizer;
 use Innertia\Telemetry\TelemetryCollector;
 
 class ClientTelemetryController extends Controller
@@ -20,6 +21,8 @@ class ClientTelemetryController extends Controller
         ]);
 
         $collector = app(TelemetryCollector::class);
+        // El context es JSON arbitrario del front: redactar llaves sensibles.
+        $clientContext = app(PayloadSanitizer::class)->redact($data['context'] ?? []);
 
         TelemetryEvent::create([
             'app'         => $collector->appName(),
@@ -35,7 +38,7 @@ class ClientTelemetryController extends Controller
             'context'     => [
                 'tenant'  => $collector->tenant(),
                 'user_id' => auth()->id(),
-                'client'  => $data['context'] ?? [],
+                'client'  => $clientContext,
             ],
         ]);
 

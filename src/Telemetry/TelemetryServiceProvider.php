@@ -26,6 +26,8 @@ class TelemetryServiceProvider extends ServiceProvider
             );
         });
         $this->app->singleton(\Innertia\Telemetry\Store\TelemetryStore::class);
+        $this->app->singleton(\Innertia\Telemetry\Cases\CaseFingerprinter::class);
+        $this->app->singleton(\Innertia\Telemetry\Cases\CaseRecorder::class);
 
         // El collector se resuelve SIEMPRE (aunque la captura esté apagada): los
         // endpoints de beacon/presencia lo necesitan para etiquetar por trace_id.

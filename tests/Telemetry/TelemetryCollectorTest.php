@@ -52,3 +52,22 @@ it('exposes a stable trace id for the request', function () {
     // Estable dentro del mismo collector (mismo request).
     expect($collector->traceId())->toBe($collector->traceId());
 });
+
+it('ignores events recorded while capture is suspended', function () {
+    $collector = new TelemetryCollector('my-app', 'session-abc', 'acme', 'local');
+
+    $collector->withoutCapture(function () use ($collector) {
+        $collector->record(new TelemetryEvent(
+            type: 'query',
+            payload: ['sql' => 'insert into telemetry_events ...'],
+            context: [],
+        ));
+    });
+
+    // La escritura del propio store no se recaptura.
+    expect($collector->batch())->toBeEmpty();
+
+    // Fuera del bloque, la captura sigue funcionando.
+    $collector->record(new TelemetryEvent(type: 'log', payload: ['m' => 'x'], context: []));
+    expect($collector->batch())->toHaveCount(1);
+});

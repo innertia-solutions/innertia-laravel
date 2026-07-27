@@ -588,7 +588,7 @@ return [
             'datatables' => true,
             'events'     => true,
             'requests'   => true,
-            'mail'       => true, // reservado: el MailCollector se cablea en una task posterior
+            'mail'       => true, // captura correos salientes vía listener MessageSending
         ],
 
         'except' => [
@@ -607,6 +607,9 @@ return [
         'mcp' => [
             'enabled' => env('TELEMETRY_MCP_ENABLED', true),
             'web'     => env('TELEMETRY_MCP_WEB', false),
+            // ⚠️ Middleware del endpoint HTTP /platform/mcp cuando web=true. El producto
+            // DEBE poner aquí su guard de plataforma antes de exponerlo en prod.
+            'web_middleware' => ['api'],
         ],
 
         'presence' => [

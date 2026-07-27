@@ -10,7 +10,7 @@ use Innertia\Telemetry\Models\TelemetryTrace;
 
 class PruneTelemetryCommand extends Command
 {
-    protected $signature   = 'telemetry:prune {--days= : Retención de traces/events (default config)}';
+    protected $signature   = 'innertia:telemetry:prune {--days= : Retención de traces/events (default config)}';
     protected $description = 'Purga telemetría: traces/events por retention_days, cases por case_retention_days, presence por TTL';
 
     public function handle(): int

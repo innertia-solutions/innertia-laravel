@@ -18,7 +18,7 @@ it('prunes traces/events older than retention_days but keeps recent cases', func
     TelemetryCase::create(['fingerprint' => str_repeat('d', 64), 'title' => 't', 'exception_class' => 'E', 'file' => '/f', 'line' => 1, 'message_normalized' => 'm', 'status' => 'open', 'times_seen' => 1, 'first_seen' => now()->subDays(10), 'last_seen' => now()->subDays(10), 'sample_trace_ids' => []]);
     TelemetryPresence::create(['session_id' => 'p1', 'last_seen_at' => now()->subMinutes(5)]);
 
-    $this->artisan('telemetry:prune')->assertSuccessful();
+    $this->artisan('innertia:telemetry:prune')->assertSuccessful();
 
     expect(TelemetryTrace::count())->toBe(1)
         ->and(TelemetryEvent::count())->toBe(0)

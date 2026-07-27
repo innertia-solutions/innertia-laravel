@@ -21,6 +21,17 @@ class TelemetryStore
         $traceId = $collector->traceId();
         $batch   = $collector->flush();
 
+        // Suspende la captura mientras el store escribe, así DB::listen no
+        // re-captura los propios INSERT de telemetry_traces/telemetry_events.
+        $collector->withoutCapture(fn () => $this->write($collector, $traceId, $meta, $batch));
+    }
+
+    /**
+     * @param  array<string,mixed>  $meta
+     * @param  \Innertia\Telemetry\TelemetryEvent[]  $batch
+     */
+    private function write(TelemetryCollector $collector, string $traceId, array $meta, array $batch): void
+    {
         TelemetryTrace::create([
             'trace_id'         => $traceId,
             'session_id'       => $collector->sessionId(),

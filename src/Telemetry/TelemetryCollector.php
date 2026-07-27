@@ -9,6 +9,10 @@ class TelemetryCollector
     /** @var TelemetryEvent[] */
     private array $batch = [];
 
+    /** Cuando está suspendido, record() ignora eventos (evita capturar las
+     *  propias escrituras del TelemetryStore vía DB::listen). */
+    private bool $suspended = false;
+
     private readonly string $traceId;
 
     public function __construct(
@@ -29,8 +33,25 @@ class TelemetryCollector
 
     public function record(TelemetryEvent $event): void
     {
+        if ($this->suspended) {
+            return;
+        }
+
         $this->batch[] = $event;
         $this->broadcastToDevtools($event);
+    }
+
+    /** Ejecuta $callback con la captura suspendida (para las escrituras del store). */
+    public function withoutCapture(callable $callback): mixed
+    {
+        $previous = $this->suspended;
+        $this->suspended = true;
+
+        try {
+            return $callback();
+        } finally {
+            $this->suspended = $previous;
+        }
     }
 
     public function flush(): array
