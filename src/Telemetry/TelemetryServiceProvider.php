@@ -30,16 +30,13 @@ class TelemetryServiceProvider extends ServiceProvider
             ]);
         }
 
+        // Telemetría self-contained: las tablas se cargan SIEMPRE en la DB del producto
+        // (independiente del gate de captura runtime).
+        $appMode = in_array(config('innertia.mode'), ['saas', 'open']) ? 'saas' : 'app';
+        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations/telemetry/' . $appMode);
+
         if (! $this->shouldActivate()) {
             return;
-        }
-
-        // En modo standalone/both: cargar migraciones automáticamente (sin publish)
-        // El desarrollador puede también correr innertia:telemetry:install para publicarlas
-        $mode = config('innertia.telemetry.mode', 'remote');
-        if (in_array($mode, ['standalone', 'both'])) {
-            $appMode = config('innertia.mode', 'app');
-            $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations/telemetry/' . $appMode);
         }
 
         // Singleton del collector para este request

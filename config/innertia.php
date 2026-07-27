@@ -563,30 +563,23 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Telemetry
+    | Telemetry (motor de observabilidad self-contained)
     |--------------------------------------------------------------------------
     |
-    | Framework metrics (queries, logs, exceptions, events, requests, datatables)
-    | sent from apps to Olimpo for centralized monitoring.
-    |
-    | mode:
-    |   'remote'     — send to Olimpo via HTTP, no local table (default)
-    |   'standalone' — store in local DB only, no Olimpo
-    |   'both'       — store locally AND send to Olimpo
-    |
-    | For 'standalone' or 'both': php artisan innertia:telemetry:install
+    | Captura queries, logs, exceptions, events, requests, datatables, mail y
+    | errores de cliente, correlacionados por trace_id de request, y los
+    | persiste en la DB del propio producto. Las excepciones se agrupan en
+    | "casos" por fingerprint y notifican a support_email. Expuesto por MCP.
     |
     */
 
     'telemetry' => [
-        'enabled'        => env('TELEMETRY_ENABLED', false),
-        'mode'           => env('TELEMETRY_MODE', 'remote'),
-        'app_name'       => env('APP_NAME', 'app'),
-        'olimpo_url'     => env('OLIMPO_URL'),
-        'olimpo_key'     => env('OLIMPO_KEY'),
-        'queue'          => env('TELEMETRY_QUEUE', 'telemetry'),
-        'timeout'        => 3,
-        'retention_days' => env('TELEMETRY_RETENTION_DAYS', 7),
+        'enabled'             => env('TELEMETRY_ENABLED', false),
+        'app_name'            => env('APP_NAME', 'app'),
+        'queue'               => env('TELEMETRY_QUEUE', 'telemetry'),
+        'retention_days'      => env('TELEMETRY_RETENTION_DAYS', 7),
+        'case_retention_days' => env('TELEMETRY_CASE_RETENTION_DAYS', 90),
+        'support_email'       => env('TELEMETRY_SUPPORT_EMAIL'),
 
         'capture' => [
             'queries'    => true,
@@ -595,6 +588,7 @@ return [
             'datatables' => true,
             'events'     => true,
             'requests'   => true,
+            'mail'       => true, // reservado: el MailCollector se cablea en una task posterior
         ],
 
         'except' => [
@@ -602,6 +596,22 @@ return [
             \Illuminate\Auth\AuthenticationException::class,
             \Illuminate\Auth\Access\AuthorizationException::class,
             \Symfony\Component\HttpKernel\Exception\NotFoundHttpException::class,
+        ],
+
+        // Llaves a redactar en payloads persistidos (case-insensitive, substring).
+        'redact' => [
+            'password', 'password_confirmation', 'token', 'secret',
+            'authorization', 'api_key', 'access_token', 'refresh_token',
+        ],
+
+        'mcp' => [
+            'enabled' => env('TELEMETRY_MCP_ENABLED', true),
+            'web'     => env('TELEMETRY_MCP_WEB', false),
+        ],
+
+        'presence' => [
+            'enabled' => env('TELEMETRY_PRESENCE_ENABLED', true),
+            'ttl'     => env('TELEMETRY_PRESENCE_TTL', 60),
         ],
     ],
 
