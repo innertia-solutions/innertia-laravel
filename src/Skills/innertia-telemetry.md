@@ -20,7 +20,7 @@ TELEMETRY_PRESENCE_ENABLED=true
 TELEMETRY_PRESENCE_TTL=60           # segundos
 ```
 
-En local/testing basta `TELEMETRY_ENABLED=true`. En otros entornos, además de `enabled`, el usuario autenticado necesita permiso `devtools`. Las tablas y las rutas se cargan SIEMPRE (independiente del gate de captura), así que el MCP y el histórico funcionan aunque la captura runtime esté apagada.
+`TELEMETRY_ENABLED=true` activa la captura runtime en TODOS los entornos (incluye producción — es un motor de tracking de errores). El volumen se acota con los flags `capture.*` y la retención. Las tablas y las rutas se cargan SIEMPRE (independiente del gate de captura), así que el MCP y el histórico funcionan aunque la captura esté apagada.
 
 ## Qué captura
 
@@ -77,8 +77,8 @@ Registrar el MCP local en tu `.mcp.json` de Claude Code:
 ## Retención
 
 ```bash
-php artisan telemetry:prune          # traces/events > retention_days, casos > case_retention_days, presence > ttl
-php artisan telemetry:prune --days=3 # override de retention_days (traces/events)
+php artisan innertia:telemetry:prune          # traces/events > retention_days, casos > case_retention_days, presence > ttl
+php artisan innertia:telemetry:prune --days=3 # override de retention_days (traces/events)
 ```
 
 Programar en el scheduler del producto (diario).

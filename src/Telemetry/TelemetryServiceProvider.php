@@ -80,27 +80,11 @@ class TelemetryServiceProvider extends ServiceProvider
 
     private function shouldActivate(): bool
     {
-        if (! config('innertia.telemetry.enabled', false)) {
-            return false;
-        }
-
-        // En local/testing siempre activo
-        if (app()->isLocal() || app()->runningUnitTests()) {
-            return true;
-        }
-
-        // En otros entornos: requiere permiso 'devtools' en el usuario autenticado
-        try {
-            $user = auth()->user();
-            if (! $user) return false;
-            if (method_exists($user, 'hasPermissionTo')) {
-                return $user->hasPermissionTo('devtools');
-            }
-        } catch (\Throwable) {
-            // No hay auth en este punto del ciclo
-        }
-
-        return false;
+        // La captura runtime se activa en TODOS los entornos cuando enabled=true
+        // (incluye producción: es un motor de tracking de errores). El volumen se
+        // acota con los flags capture.* y la retención. El gate corre en boot(),
+        // por eso no depende del usuario autenticado (que aún no existe ahí).
+        return (bool) config('innertia.telemetry.enabled', false);
     }
 
     private function resolveSessionId(): string
