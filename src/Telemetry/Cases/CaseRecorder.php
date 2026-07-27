@@ -38,6 +38,8 @@ class CaseRecorder
                     'sample_trace_ids'   => [$traceId],
                 ]);
 
+                $this->notify($case, isNew: true, isReopened: false);
+
                 return ['case' => $case, 'is_new' => true, 'is_reopened' => false];
             } catch (UniqueConstraintViolationException) {
                 // Race: otro request creó el mismo fingerprint entre el SELECT y el INSERT.
@@ -67,8 +69,34 @@ class CaseRecorder
             'last_trace_id'    => $traceId,
             'sample_trace_ids' => $samples,
             'status'           => $isReopened ? 'open' : $case->status,
+            // Al reabrir, se abre un nuevo "episodio": se limpia notified_at para
+            // que la reclamación atómica de notify() pueda volver a disparar el correo.
+            'notified_at'      => $isReopened ? null : $case->notified_at,
         ]);
 
-        return ['case' => $case->fresh(), 'is_new' => false, 'is_reopened' => $isReopened];
+        $fresh = $case->fresh();
+        $this->notify($fresh, isNew: false, isReopened: $isReopened);
+
+        return ['case' => $fresh, 'is_new' => false, 'is_reopened' => $isReopened];
+    }
+
+    private function notify(TelemetryCase $case, bool $isNew, bool $isReopened): void
+    {
+        if (! $isNew && ! $isReopened) return;
+
+        $to = config('innertia.telemetry.support_email');
+        if (! $to) return;
+
+        // Reclamación atómica: solo UN caller pasa notified_at de null → now(). Bajo
+        // concurrencia (dos requests reabriendo/creando el mismo caso), el segundo
+        // update afecta 0 filas y no reenvía. notified_at ES el guard de idempotencia.
+        $claimed = TelemetryCase::whereKey($case->getKey())
+            ->whereNull('notified_at')
+            ->update(['notified_at' => now()]);
+
+        if ($claimed === 0) return;
+
+        \Illuminate\Support\Facades\Mail::to($to)
+            ->send(new \Innertia\Telemetry\Mail\SupportCaseMail($case, $isReopened));
     }
 }

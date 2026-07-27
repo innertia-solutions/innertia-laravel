@@ -53,6 +53,7 @@ class TelemetryServiceProvider extends ServiceProvider
         $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations/telemetry/' . $appMode);
 
         $this->loadRoutesFrom(__DIR__ . '/routes.php');
+        $this->loadViewsFrom(__DIR__ . '/Mail/views', 'innertia-telemetry');
 
         if (! $this->shouldActivate()) {
             return;
@@ -200,6 +201,14 @@ class TelemetryServiceProvider extends ServiceProvider
                             try {
                                 $collector = app(TelemetryCollector::class);
                                 ExceptionCollector::handle($collector, $e);
+                                // 'except' solo excluye la PROMOCIÓN a caso (no la captura del
+                                // evento crudo del trace, que ya ocurrió arriba a propósito).
+                                $except = config('innertia.telemetry.except', []);
+                                foreach ($except as $class) {
+                                    if ($e instanceof $class) return;
+                                }
+                                app(\Innertia\Telemetry\Cases\CaseRecorder::class)
+                                    ->record($e, $collector->traceId());
                             } catch (\Throwable) {}
                         }
 
