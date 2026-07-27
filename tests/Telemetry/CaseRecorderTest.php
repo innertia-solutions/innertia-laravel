@@ -47,3 +47,17 @@ it('reopens a resolved case on recurrence', function () {
     expect($result['is_reopened'])->toBeTrue()
         ->and(TelemetryCase::first()->status)->toBe('open');
 });
+
+it('keeps sample_trace_ids capped at 5, newest first, deduplicated', function () {
+    $recorder = app(CaseRecorder::class);
+
+    foreach (['t1', 't2', 't3', 't4', 't5', 't6', 't6'] as $trace) {
+        $recorder->record(boom(), $trace);
+    }
+
+    $samples = TelemetryCase::first()->sample_trace_ids;
+
+    expect($samples)->toHaveCount(5)
+        ->and($samples[0])->toBe('t6')   // más reciente primero
+        ->and($samples)->not->toContain('t1'); // el más viejo cae fuera del cap
+});

@@ -19,7 +19,8 @@ class CaseFingerprinter
         // Reemplaza números, uuids y comillas por marcadores para agrupar mensajes equivalentes.
         $m = preg_replace('/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i', '{uuid}', $message);
         $m = preg_replace('/\d+/', '{n}', $m);
-        $m = preg_replace('/[\'"][^\'"]*[\'"]/', '{str}', $m);
+        // Comillas emparejadas por tipo (evita cruzar ' con ").
+        $m = preg_replace('/\'[^\']*\'|"[^"]*"/', '{str}', $m);
         return trim((string) $m);
     }
 }
