@@ -18,6 +18,9 @@ class BaseTestCase extends TestCase
     {
         return [
             \Laravel\Socialite\SocialiteServiceProvider::class,
+            // En apps reales laravel/mcp se auto-descubre; en Testbench hay que
+            // registrarlo a mano para que el Request de MCP reciba sus argumentos.
+            \Laravel\Mcp\Server\McpServiceProvider::class,
             \Innertia\InnertiaServiceProvider::class,
         ];
     }

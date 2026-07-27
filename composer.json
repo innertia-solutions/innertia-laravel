@@ -19,7 +19,8 @@
         "laravel/socialite": "^5.0",
         "socialiteproviders/microsoft-azure": "^5.0",
         "openspout/openspout": "^4.0",
-        "dompdf/dompdf": "^2.0"
+        "dompdf/dompdf": "^2.0",
+        "laravel/mcp": "^0.9.1"
     },
     "require-dev": {
         "orchestra/testbench": "^9.0",
