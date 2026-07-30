@@ -8,6 +8,7 @@ use Innertia\Auth\Http\Controllers\EmailVerificationController;
 use Innertia\Auth\Http\Controllers\OtpController;
 use Innertia\Auth\Http\Controllers\PasswordController;
 use Innertia\Auth\Http\Controllers\PlatformAuthController;
+use Innertia\Auth\Http\Controllers\PreferencesController;
 use Innertia\Auth\Http\Controllers\SocialAuthController;
 use Innertia\Auth\Http\Controllers\TwoFactorController;
 
@@ -78,11 +79,12 @@ class Routes
      * me, me/permissions, refresh, logout, 2fa enable/disable.
      */
     public static function sessionRoutes(
-        string $prefix              = 'auth',
-        string $authController      = AuthController::class,
-        string $twoFactorController = TwoFactorController::class,
+        string $prefix               = 'auth',
+        string $authController       = AuthController::class,
+        string $twoFactorController  = TwoFactorController::class,
+        string $preferencesController = PreferencesController::class,
     ): void {
-        Route::prefix($prefix)->group(function () use ($authController, $twoFactorController) {
+        Route::prefix($prefix)->group(function () use ($authController, $twoFactorController, $preferencesController) {
             Route::get ('me',             [$authController, 'me']);
             Route::get ('me/permissions', [$authController, 'mePermissions']);
             Route::post('refresh',        [$authController, 'refresh']);
@@ -90,6 +92,12 @@ class Routes
 
             Route::post('2fa/enable',     [$twoFactorController, 'enable']);
             Route::post('2fa/disable',    [$twoFactorController, 'disable']);
+
+            // Preferencias de usuario (el frontend persiste layout de tablas acá).
+            Route::get   ('me/preferences',       [$preferencesController, 'index']);
+            Route::get   ('me/preferences/{key}', [$preferencesController, 'show']);
+            Route::put   ('me/preferences/{key}', [$preferencesController, 'update']);
+            Route::delete('me/preferences/{key}', [$preferencesController, 'destroy']);
         });
     }
 

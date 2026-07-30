@@ -8,6 +8,7 @@ use Illuminate\Routing\Controller;
 
 /**
  * GET  /auth/me/preferences         — lista preferencias públicas del usuario
+ * GET  /auth/me/preferences/{key}   — una preferencia puntual { key, value }
  * PUT  /auth/me/preferences/{key}   — crea o actualiza una preferencia
  * DELETE /auth/me/preferences/{key} — elimina una preferencia
  */
@@ -24,6 +25,20 @@ class PreferencesController extends Controller
         return response()->json(
             $user->preferences()->onlyPublic()->toArray()
         );
+    }
+
+    public function show(Request $request, string $key): JsonResponse
+    {
+        $user = $request->user();
+
+        $value = method_exists($user, 'preference')
+            ? $user->preference($key)
+            : null;
+
+        return response()->json([
+            'key'   => $key,
+            'value' => $value,
+        ]);
     }
 
     public function update(Request $request, string $key): JsonResponse
