@@ -630,6 +630,13 @@ return [
         ],
     ],
 
+    'observability' => [
+        // Prefijo por defecto de las rutas del panel (el producto puede pasar otro a Routes::register()).
+        'prefix' => env('OBSERVABILITY_PREFIX', 'platform/observability'),
+        // Límite por defecto de filas en los tops de BD.
+        'top_limit' => (int) env('OBSERVABILITY_TOP_LIMIT', 20),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Devtools
