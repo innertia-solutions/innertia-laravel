@@ -7,11 +7,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Innertia\Payments\Enums\ChargeStatus;
+use Innertia\Platform\Traits\BroadcastsEntityChanges;
 use Innertia\Platform\Traits\HasTenant;
 
 class Charge extends Model
 {
-    use HasUuids, HasTenant;
+    use HasUuids, HasTenant, BroadcastsEntityChanges;
 
     protected $fillable = [
         'tenant_id', 'payer_type', 'payer_id', 'billable_type', 'billable_id',
