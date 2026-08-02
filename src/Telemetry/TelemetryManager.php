@@ -4,9 +4,12 @@ namespace Innertia\Telemetry;
 
 use Illuminate\Support\Facades\Schema;
 use Innertia\Telemetry\Models\TelemetryEvent as EventModel;
+use Innertia\Telemetry\Support\PayloadSanitizer;
 
 class TelemetryManager
 {
+    public function __construct(private readonly PayloadSanitizer $sanitizer) {}
+
     /**
      * Registra un log de dominio en un canal. Escritura directa (robusta en
      * jobs/webhooks fuera del ciclo request → no depende del flush del middleware).
@@ -25,7 +28,7 @@ class TelemetryManager
             'channel'     => $channel,
             'occurred_at' => now(),
             'duration_ms' => null,
-            'payload'     => ['level' => $level, 'message' => $message, 'context' => $context],
+            'payload'     => ['level' => $level, 'message' => $message, 'context' => $this->sanitizer->redact($context)],
             'context'     => ['source' => 'domain', 'env' => app()->environment()],
         ];
 

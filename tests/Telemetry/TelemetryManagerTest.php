@@ -18,6 +18,16 @@ it('graba un evento de log con el canal indicado', function () {
         ->and($event->payload['context']['charge_id'])->toBe(42);
 });
 
+it('redacta llaves sensibles del context', function () {
+    app(\Innertia\Telemetry\TelemetryManager::class)
+        ->log('payments', 'info', 'charge', ['card' => '4111', 'password' => 'x', 'amount' => 100]);
+
+    $event = \Innertia\Telemetry\Models\TelemetryEvent::query()->where('type', 'log')->latest('id')->first();
+
+    expect($event->payload['context']['password'])->toBe('[REDACTED]')
+        ->and($event->payload['context']['amount'])->toBe(100);
+});
+
 it('expone el facade Telemetry', function () {
     \Innertia\Facades\Telemetry::log('operational', 'warning', 'algo pasó');
 

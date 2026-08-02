@@ -10,7 +10,7 @@ return new class extends Migration
     {
         Schema::create('telemetry_events', function (Blueprint $table) {
             $table->id();
-            $table->string('tenant_id')->index();
+            $table->string('tenant_id')->nullable()->index();
             $table->string('app')->index();
             $table->string('session_id')->index();
             $table->string('trace_id')->nullable()->index();
