@@ -35,6 +35,13 @@ return [
         'enabled'  => env('INNERTIA_DEMO_ENABLED', false),
         'email'    => env('INNERTIA_DEMO_EMAIL'),
         'password' => env('INNERTIA_DEMO_PASSWORD'),
+
+        // Login de plataforma (identidad separada). El usuario debe ser is_platform_admin.
+        'platform' => [
+            'enabled'  => env('INNERTIA_PLATFORM_DEMO_ENABLED', false),
+            'email'    => env('INNERTIA_PLATFORM_DEMO_EMAIL'),
+            'password' => env('INNERTIA_PLATFORM_DEMO_PASSWORD'),
+        ],
     ],
 
     /*
@@ -580,6 +587,11 @@ return [
         'retention_days'      => env('TELEMETRY_RETENTION_DAYS', 7),
         'case_retention_days' => env('TELEMETRY_CASE_RETENTION_DAYS', 90),
         'support_email'       => env('TELEMETRY_SUPPORT_EMAIL'),
+
+        // Canales de log del panel de observabilidad. Cada producto puede añadir los suyos.
+        'channels' => [
+            ['key' => 'operational', 'label' => 'Logs operativos', 'icon' => 'IconFileText'],
+        ],
 
         'capture' => [
             'queries'    => true,

@@ -20,6 +20,12 @@ it('exposes the v2 telemetry config keys and drops olimpo keys', function () {
     expect($cfg['capture'])->toHaveKey('mail');
 });
 
+it('trae el canal operational por defecto', function () {
+    $channels = collect(config('innertia.telemetry.channels'));
+
+    expect($channels->pluck('key'))->toContain('operational');
+});
+
 it('does not activate telemetry when disabled, even in local/testing', function () {
     config()->set('innertia.telemetry.enabled', false);
 
