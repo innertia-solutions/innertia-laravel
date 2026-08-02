@@ -140,7 +140,7 @@ class MercadoPagoProvider implements PaymentGateway
         });
 
         if ($transitioned) {
-            event(new PaymentPaid($payment->fresh()->charge));
+            event(new PaymentPaid($payment->fresh()->charge, $payment->fresh()));
         }
     }
 
@@ -281,7 +281,7 @@ class MercadoPagoProvider implements PaymentGateway
                 ->where('provider', PaymentProvider::MercadoPago->value)
                 ->latest()->first();
             if ($payment) {
-                event(new PaymentFailed($payment->fresh()->charge));
+                event(new PaymentFailed($payment->fresh()->charge, $payment->fresh()));
             }
         }
 

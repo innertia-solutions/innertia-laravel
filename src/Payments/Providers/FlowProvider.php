@@ -75,7 +75,7 @@ class FlowProvider implements PaymentGateway
             }
         });
 
-        event(new PaymentPaid($payment->fresh()->charge));
+        event(new PaymentPaid($payment->fresh()->charge, $payment->fresh()));
     }
 
     public function handleWebhook(array $payload): ?Charge
@@ -98,7 +98,7 @@ class FlowProvider implements PaymentGateway
             $this->confirm($payment);
         } elseif ($flowStatus === 3 && $payment->charge?->status === ChargeStatus::Pending) {
             $payment->charge->transitionTo(ChargeStatus::Failed);
-            event(new PaymentFailed($payment->fresh()->charge));
+            event(new PaymentFailed($payment->fresh()->charge, $payment->fresh()));
         }
 
         return $payment->charge;

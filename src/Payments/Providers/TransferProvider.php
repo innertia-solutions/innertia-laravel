@@ -51,7 +51,7 @@ class TransferProvider implements PaymentGateway
         });
 
         if ($transitioned) {
-            event(new PaymentPaid($payment->fresh()->charge));
+            event(new PaymentPaid($payment->fresh()->charge, $payment->fresh()));
         }
     }
 
