@@ -5,7 +5,8 @@ namespace Innertia\Observability;
 use Illuminate\Support\Facades\Route;
 use Innertia\Observability\Http\Controllers\DatabaseController;
 use Innertia\Telemetry\Http\Controllers\ObservabilityChannelsController;
-use Innertia\Telemetry\Http\Controllers\ObservabilityErrorsController;
+use Innertia\Observability\Http\Controllers\ErrorsController;
+use Innertia\Observability\Http\Controllers\OverviewController;
 use Innertia\Telemetry\Http\Controllers\ObservabilityLogsController;
 
 /**
@@ -32,9 +33,13 @@ class Routes
             Route::get('database/indexes',     [DatabaseController::class, 'indexes']);
             Route::get('database/tables',      [DatabaseController::class, 'tables']);
 
-            // Errores / logs / canales (reutilizados de Telemetry; se upgradean en Fase 2/3)
-            Route::get ('errors',             [ObservabilityErrorsController::class, 'index']);
-            Route::post('errors/{id}/status', [ObservabilityErrorsController::class, 'status']);
+            // Overview (KPIs)
+            Route::get('overview', [OverviewController::class, 'index']);
+
+            // Errores (Sentry): index + detalle + status
+            Route::get ('errors',             [ErrorsController::class, 'index']);
+            Route::get ('errors/{id}',        [ErrorsController::class, 'show']);
+            Route::post('errors/{id}/status', [ErrorsController::class, 'status']);
             Route::get ('logs',               [ObservabilityLogsController::class, 'index']);
             Route::get ('channels',           [ObservabilityChannelsController::class, 'index']);
         });
