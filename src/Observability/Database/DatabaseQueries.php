@@ -18,6 +18,12 @@ class DatabaseQueries
                         round(total_exec_time::numeric, 2) AS total_ms,
                         round(mean_exec_time::numeric, 2) AS mean_ms, rows
                  FROM pg_stat_statements
+                 WHERE query NOT ILIKE '%pg_stat_%'
+                   AND query NOT ILIKE '%pg_database_size%'
+                   AND query NOT ILIKE '%pg_available_extensions%'
+                   AND query NOT ILIKE '%pg_settings%'
+                   AND query NOT ILIKE '%CREATE EXTENSION%'
+                   AND query NOT ILIKE '%information_schema%'
                  ORDER BY total_exec_time DESC LIMIT ?",
                 [$limit]
             );
