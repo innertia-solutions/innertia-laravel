@@ -15,6 +15,7 @@ return new class extends Migration
             $table->string('session_id')->index();
             $table->string('trace_id')->nullable()->index();
             $table->string('type')->index();
+            $table->string('channel')->nullable()->index();
             $table->timestamp('occurred_at')->index();
             $table->unsignedInteger('duration_ms')->nullable();
             $table->json('payload');
