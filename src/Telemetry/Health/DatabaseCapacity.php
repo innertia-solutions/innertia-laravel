@@ -11,19 +11,28 @@ class DatabaseCapacity
         $driver = DB::connection()->getDriverName();
 
         if ($driver !== 'pgsql') {
-            return [
-                'driver'         => $driver,
-                'database_bytes' => null,
-                'tables'         => [],
-                'connections'    => ['used' => null, 'max' => null],
-            ];
+            return $this->empty($driver);
         }
 
+        try {
+            return [
+                'driver'         => $driver,
+                'database_bytes' => $this->databaseBytes(),
+                'tables'         => $this->topTables($topTables),
+                'connections'    => $this->connections(),
+            ];
+        } catch (\Throwable) {
+            return $this->empty($driver);
+        }
+    }
+
+    private function empty(string $driver): array
+    {
         return [
             'driver'         => $driver,
-            'database_bytes' => $this->databaseBytes(),
-            'tables'         => $this->topTables($topTables),
-            'connections'    => $this->connections(),
+            'database_bytes' => null,
+            'tables'         => [],
+            'connections'    => ['used' => null, 'max' => null],
         ];
     }
 
@@ -54,7 +63,7 @@ class DatabaseCapacity
 
     private function connections(): array
     {
-        $used = DB::selectOne('SELECT count(*) AS used FROM pg_stat_activity');
+        $used = DB::selectOne("SELECT count(*) AS used FROM pg_stat_activity WHERE backend_type = 'client backend'");
         $max  = DB::selectOne("SELECT setting::int AS max FROM pg_settings WHERE name = 'max_connections'");
 
         return [
