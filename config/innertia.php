@@ -635,6 +635,8 @@ return [
         'prefix' => env('OBSERVABILITY_PREFIX', 'platform/observability'),
         // Límite por defecto de filas en los tops de BD.
         'top_limit' => (int) env('OBSERVABILITY_TOP_LIMIT', 20),
+        // Umbral de recurrencia para marcar un caso de error como "crítico".
+        'critical_threshold' => (int) env('OBSERVABILITY_CRITICAL_THRESHOLD', 10),
     ],
 
     /*
