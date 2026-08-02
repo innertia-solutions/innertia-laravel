@@ -3,7 +3,10 @@
 namespace Innertia\Telemetry\Cases;
 
 use Illuminate\Database\UniqueConstraintViolationException;
+use Illuminate\Support\Facades\DB;
+use Innertia\Telemetry\Events\CaseTouched;
 use Innertia\Telemetry\Models\TelemetryCase;
+use Innertia\Telemetry\Models\TelemetryCaseOccurrence;
 use Throwable;
 
 class CaseRecorder
@@ -39,6 +42,7 @@ class CaseRecorder
                 ]);
 
                 $this->notify($case, isNew: true, isReopened: false);
+                $this->signal($case, isNew: true, isReopened: false);
 
                 return ['case' => $case, 'is_new' => true, 'is_reopened' => false];
             } catch (UniqueConstraintViolationException) {
@@ -76,8 +80,24 @@ class CaseRecorder
 
         $fresh = $case->fresh();
         $this->notify($fresh, isNew: false, isReopened: $isReopened);
+        $this->signal($fresh, isNew: false, isReopened: $isReopened);
 
         return ['case' => $fresh, 'is_new' => false, 'is_reopened' => $isReopened];
+    }
+
+    /** Emite la señal realtime y suma la ocurrencia del día. Nunca lanza. */
+    private function signal(TelemetryCase $case, bool $isNew, bool $isReopened): void
+    {
+        try {
+            TelemetryCaseOccurrence::query()->upsert(
+                [['case_id' => (string) $case->getKey(), 'day' => now()->toDateString(), 'count' => 1]],
+                ['case_id', 'day'],
+                ['count' => DB::raw('"count" + 1')]
+            );
+            event(new CaseTouched($case, $isNew, $isReopened));
+        } catch (\Throwable) {
+            // best-effort: la telemetría no debe romper el request
+        }
     }
 
     private function notify(TelemetryCase $case, bool $isNew, bool $isReopened): void
