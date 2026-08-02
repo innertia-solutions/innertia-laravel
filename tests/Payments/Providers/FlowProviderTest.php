@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Http;
 use Innertia\Facades\Settings;
 use Innertia\Payments\Enums\ChargeStatus;
+use Innertia\Payments\Events\PaymentFailed;
 use Innertia\Payments\Events\PaymentPaid;
 use Innertia\Payments\Models\Charge;
 use Innertia\Payments\Providers\FlowProvider;
@@ -56,4 +57,21 @@ it('confirma el charge cuando Flow reporta status 2', function () {
     expect($result?->id)->toBe($charge->id)
         ->and($charge->fresh()->status)->toBe(ChargeStatus::Paid);
     Event::assertDispatched(PaymentPaid::class);
+});
+
+it('marca el charge como fallido cuando Flow reporta status 3', function () {
+    Event::fake([PaymentFailed::class]);
+    Http::fake([
+        '*/payment/create'    => Http::response(['url' => 'https://flow.cl/pay', 'token' => 'tok-fail'], 200),
+        '*/payment/getStatus' => Http::response(['status' => 3], 200),
+    ]);
+
+    $charge  = Charge::create(['amount' => 5000, 'currency' => 'CLP', 'status' => 'pending', 'metadata' => ['email' => 'x@y.cl']]);
+    $gateway = new FlowProvider;
+    $gateway->createPayment($charge);
+
+    $gateway->handleWebhook(['token' => 'tok-fail']);
+
+    expect($charge->fresh()->status)->toBe(ChargeStatus::Failed);
+    Event::assertDispatched(PaymentFailed::class);
 });

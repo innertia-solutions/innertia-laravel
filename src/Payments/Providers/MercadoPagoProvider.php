@@ -126,6 +126,10 @@ class MercadoPagoProvider implements PaymentGateway
 
     public function confirm(Payment $payment): void
     {
+        if ($payment->paid_at) {
+            return;
+        }
+
         $transitioned = DB::transaction(function () use ($payment) {
             $payment->update(['confirmed_via' => 'webhook', 'paid_at' => now()]);
             if ($payment->charge->status !== ChargeStatus::Paid) {

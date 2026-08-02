@@ -6,8 +6,10 @@ use Illuminate\Support\Facades\Http;
 use Innertia\Exceptions\ForbiddenException;
 use Innertia\Facades\Settings;
 use Innertia\Payments\Enums\ChargeStatus;
+use Innertia\Payments\Events\PaymentFailed;
 use Innertia\Payments\Events\PaymentPaid;
 use Innertia\Payments\Models\Charge;
+use Innertia\Payments\Models\Payment;
 use Innertia\Payments\Providers\MercadoPagoProvider;
 
 uses(RefreshDatabase::class);
@@ -62,4 +64,50 @@ it('el webhook approved confirma el charge y emite PaymentPaid', function () {
 
 it('verifySignature devuelve true fuera de producción', function () {
     expect((new MercadoPagoProvider)->verifySignature('ts=1,v1=abc', 'req', 'data'))->toBeTrue();
+});
+
+it('el webhook rejected marca el charge como fallido y emite PaymentFailed', function () {
+    Event::fake([PaymentFailed::class]);
+    $charge = Charge::create(['amount' => 6000, 'currency' => 'CLP', 'status' => 'pending']);
+    (new MercadoPagoProvider)->createPayment($charge);
+
+    (new MercadoPagoProvider)->handleWebhook([
+        'data' => ['status' => 'rejected', 'external_reference' => $charge->id],
+    ]);
+
+    expect($charge->fresh()->status)->toBe(ChargeStatus::Failed);
+    Event::assertDispatched(PaymentFailed::class);
+});
+
+it('reconcile en split confirma los charges approved (una sola vez)', function () {
+    Event::fake([PaymentPaid::class]);
+    Settings::set('payments.collection_mode', 'split');
+    Settings::set('payments.mercadopago.seller_access_token', 'TEST-seller');
+    Http::fake([
+        '*/v1/payments/search*' => Http::response(['results' => [['status' => 'approved']]], 200),
+    ]);
+
+    $charge = Charge::create(['amount' => 9000, 'currency' => 'CLP', 'status' => 'pending', 'application_fee' => 500]);
+    // create a pending MP payment WITHOUT hitting the preferences API (insert directly)
+    Payment::create([
+        'charge_id' => $charge->id,
+        'provider'  => 'mercadopago',
+        'amount'    => 9000,
+        'external_reference' => (string) $charge->id,
+        'collection_mode'    => 'split',
+    ]);
+
+    $confirmed = (new MercadoPagoProvider)->reconcile();
+
+    expect($confirmed)->toBe(1)
+        ->and($charge->fresh()->status)->toBe(ChargeStatus::Paid);
+    Event::assertDispatchedTimes(PaymentPaid::class, 1);
+});
+
+it('reconcile fuera de split devuelve 0 sin llamar a la API', function () {
+    Http::fake();
+    Settings::set('payments.collection_mode', 'direct');
+
+    expect((new MercadoPagoProvider)->reconcile())->toBe(0);
+    Http::assertNothingSent();
 });
