@@ -12,6 +12,7 @@ final class TelemetryEvent
         public readonly array  $context,
         public readonly ?float $durationMs = null,
         ?\DateTimeImmutable    $occurredAt = null,
+        public readonly ?string $channel = null,
     ) {
         $this->occurredAt = $occurredAt ?? new \DateTimeImmutable();
     }
@@ -24,6 +25,7 @@ final class TelemetryEvent
             'context'     => $this->context,
             'duration_ms' => $this->durationMs,
             'occurred_at' => $this->occurredAt->format(\DateTimeInterface::ATOM),
+            'channel'     => $this->channel,
         ];
     }
 }

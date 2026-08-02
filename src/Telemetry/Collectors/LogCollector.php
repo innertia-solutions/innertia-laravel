@@ -12,6 +12,7 @@ class LogCollector
         string $level,
         string $message,
         array  $context = [],
+        string $channel = 'operational',
     ): void {
         try {
             $route = request()?->method() . ' ' . request()?->path();
@@ -37,6 +38,7 @@ class LogCollector
                 'env'     => $env,
                 'source'  => $source,
             ],
+            channel: $channel,
         ));
     }
 }

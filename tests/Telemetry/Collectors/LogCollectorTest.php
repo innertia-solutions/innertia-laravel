@@ -15,3 +15,13 @@ it('creates a log event', function () {
         ->and($batch[0]->payload['message'])->toBe('Something failed')
         ->and($batch[0]->payload['context'])->toBe(['key' => 'val']);
 });
+
+it('etiqueta los logs capturados como canal operational', function () {
+    $collector = app(\Innertia\Telemetry\TelemetryCollector::class);
+    \Innertia\Telemetry\Collectors\LogCollector::handle($collector, 'error', 'boom', []);
+
+    $event = collect($collector->batch())->firstWhere('type', 'log');
+
+    expect($event)->not->toBeNull()
+        ->and($event->channel)->toBe('operational');
+});

@@ -60,6 +60,7 @@ class TelemetryStore
                 'duration_ms' => $event->durationMs !== null ? (int) round($event->durationMs) : null,
                 'payload'     => $this->sanitizer->redact($event->payload),
                 'context'     => $event->context,
+                'channel'     => $event->channel,
             ]);
         }
     }
