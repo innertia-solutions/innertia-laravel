@@ -39,6 +39,8 @@ class TelemetryServiceProvider extends ServiceProvider
                 env:       app()->environment(),
             );
         });
+
+        $this->app->singleton(TelemetryManager::class);
     }
 
     public function boot(): void
@@ -76,6 +78,11 @@ class TelemetryServiceProvider extends ServiceProvider
         $this->registerDataTableCapture();
         $this->registerExceptionCapture();
         $this->registerMailCapture();
+
+        \Illuminate\Foundation\AliasLoader::getInstance()->alias(
+            'Telemetry',
+            \Innertia\Facades\Telemetry::class
+        );
     }
 
     private function shouldActivate(): bool
