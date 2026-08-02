@@ -13,6 +13,11 @@ use Innertia\Telemetry\Health\SystemHealth;
 
 class DatabaseController extends Controller
 {
+    private function topLimit(): int
+    {
+        return (int) config('innertia.observability.top_limit', 20);
+    }
+
     public function overview(): JsonResponse
     {
         $health = (new SystemHealth())->collect();
@@ -28,16 +33,16 @@ class DatabaseController extends Controller
 
     public function queries(): JsonResponse
     {
-        return response()->json((new DatabaseQueries())->collect());
+        return response()->json((new DatabaseQueries())->collect($this->topLimit()));
     }
 
     public function indexes(): JsonResponse
     {
-        return response()->json((new DatabaseIndexes())->collect());
+        return response()->json((new DatabaseIndexes())->collect($this->topLimit()));
     }
 
     public function tables(): JsonResponse
     {
-        return response()->json((new DatabaseTables())->collect());
+        return response()->json((new DatabaseTables())->collect($this->topLimit()));
     }
 }

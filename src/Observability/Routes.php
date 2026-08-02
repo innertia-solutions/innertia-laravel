@@ -20,8 +20,10 @@ use Innertia\Telemetry\Http\Controllers\ObservabilityLogsController;
  */
 class Routes
 {
-    public static function register(string $prefix = 'platform/observability'): void
+    public static function register(?string $prefix = null): void
     {
+        $prefix ??= config('innertia.observability.prefix', 'platform/observability');
+
         Route::prefix($prefix)->group(function () {
             // Base de datos (Fase 1 — lazy por tab)
             Route::get('database/overview',    [DatabaseController::class, 'overview']);
