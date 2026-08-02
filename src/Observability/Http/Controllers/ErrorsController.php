@@ -24,6 +24,10 @@ class ErrorsController extends Controller
                 'times_seen', 'first_seen', 'last_seen', 'last_trace_id',
             ])
             ->addCalculatedColumn('is_critical', "(status = 'open' AND times_seen >= {$threshold})")
+            // Filtros programáticos (query params planos): la tabla del front pasa el filtro
+            // de la columna `status` como `filters[]` estructurado que el motor DataTable aplica
+            // por sí solo; estos reads cubren el uso vía la prop `:params` (status/exception_class/
+            // rango de fechas) y el atajo `only_critical` para clientes que lo invoquen directo.
             ->prepareQuery(function ($q) use ($request, $threshold) {
                 if ($status = $request->query('status')) {
                     $q->where('status', $status);
