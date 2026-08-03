@@ -40,6 +40,9 @@ class CaseRecorder
                     'last_trace_id'      => $traceId,
                     'sample_trace_ids'   => [$traceId],
                     'snapshot'           => CaseSnapshot::build($e),
+                    'origin'             => ErrorClassifier::origin($e),
+                    'category'           => ErrorClassifier::category($e),
+                    'tags'               => app(\Innertia\Telemetry\TelemetryTags::class)->all(),
                 ]);
 
                 $this->notify($case, isNew: true, isReopened: false);
@@ -78,6 +81,9 @@ class CaseRecorder
             // que la reclamación atómica de notify() pueda volver a disparar el correo.
             'notified_at'      => $isReopened ? null : $case->notified_at,
             'snapshot'         => CaseSnapshot::build($e),
+            'origin'           => ErrorClassifier::origin($e),
+            'category'         => ErrorClassifier::category($e),
+            'tags'             => app(\Innertia\Telemetry\TelemetryTags::class)->all(),
         ]);
 
         $fresh = $case->fresh();
