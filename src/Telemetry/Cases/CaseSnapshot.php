@@ -133,28 +133,44 @@ class CaseSnapshot
     private static function request(): ?array
     {
         try {
-            if (app()->runningInConsole() || ! app()->bound('request')) {
-                return null;
-            }
+            if (! app()->bound('request')) return null;
             $r = request();
-            if (! $r || ! $r->method()) {
-                return null;
-            }
+            // Solo capturamos si es un request HTTP real: el request vacío que
+            // Laravel tiene bindeado en consola/queue no trae header Host.
+            if (! $r instanceof \Illuminate\Http\Request || ! $r->headers->has('host')) return null;
+
+            $sanitizer = new \Innertia\Telemetry\Support\PayloadSanitizer((array) config('innertia.telemetry.redact', []));
+
             $userId = null;
-            try {
-                $userId = optional($r->user())->getAuthIdentifier();
-            } catch (\Throwable) {
-            }
+            try { $userId = optional($r->user())->getAuthIdentifier(); } catch (\Throwable) {}
+
+            $headers = [];
+            foreach ($r->headers->all() as $k => $v) { $headers[strtolower($k)] = $v; }
+            $headers = $sanitizer->redact($headers);
+
+            $body = $sanitizer->redact($r->all());
+
             return [
-                'method'  => $r->method(),
-                'url'     => $r->fullUrl(),
-                'route'   => optional($r->route())->getName(),
-                'ip'      => $r->ip(),
-                'user_id' => $userId,
+                'method'     => $r->getMethod(),
+                'url'        => $r->fullUrl(),
+                'route'      => optional($r->route())->getName(),
+                'ip'         => $r->ip(),
+                'user_id'    => $userId,
+                'user_agent' => substr((string) $r->userAgent(), 0, 512),
+                'referer'    => substr((string) $r->headers->get('referer', ''), 0, 512) ?: null,
+                'query'      => self::cap($sanitizer->redact($r->query())),
+                'body'       => self::cap($body),
+                'headers'    => self::cap($headers),
             ];
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private static function cap(array $data, int $maxBytes = 20000): array
+    {
+        if (strlen((string) json_encode($data)) <= $maxBytes) return $data;
+        return ['_truncated' => true];
     }
 
     // -------------------------------------------------------------------------
