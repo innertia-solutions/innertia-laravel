@@ -22,6 +22,7 @@ return new class extends Migration
             $table->timestamp('last_seen')->index();
             $table->string('last_trace_id')->nullable();
             $table->json('sample_trace_ids')->nullable();
+            $table->json('snapshot')->nullable();
             $table->timestamp('notified_at')->nullable();
             $table->timestamps();
         });
