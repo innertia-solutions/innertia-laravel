@@ -12,7 +12,7 @@ class TelemetryCase extends Model
         'fingerprint', 'title', 'exception_class', 'file', 'line',
         'message_normalized', 'status', 'times_seen', 'first_seen',
         'last_seen', 'last_trace_id', 'sample_trace_ids', 'notified_at',
-        'snapshot',
+        'snapshot', 'origin', 'category', 'tags',
     ];
 
     protected $casts = [
@@ -23,5 +23,6 @@ class TelemetryCase extends Model
         'notified_at'      => 'datetime',
         'sample_trace_ids' => 'array',
         'snapshot'         => 'array',
+        'tags'             => 'array',
     ];
 }

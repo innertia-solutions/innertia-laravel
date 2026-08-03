@@ -17,12 +17,15 @@ return new class extends Migration
             $table->unsignedInteger('line');
             $table->text('message_normalized');
             $table->string('status')->default('open')->index();
+            $table->string('origin', 20)->nullable()->index();
+            $table->string('category', 20)->nullable()->index();
             $table->unsignedInteger('times_seen')->default(1);
             $table->timestamp('first_seen');
             $table->timestamp('last_seen')->index();
             $table->string('last_trace_id')->nullable();
             $table->json('sample_trace_ids')->nullable();
             $table->json('snapshot')->nullable();
+            $table->json('tags')->nullable();
             $table->timestamp('notified_at')->nullable();
             $table->timestamps();
         });
