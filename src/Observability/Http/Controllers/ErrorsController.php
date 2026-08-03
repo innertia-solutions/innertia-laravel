@@ -22,6 +22,7 @@ class ErrorsController extends Controller
             ->columns([
                 'id', 'title', 'exception_class', 'status',
                 'times_seen', 'first_seen', 'last_seen', 'last_trace_id',
+                'origin', 'category',
             ])
             ->addCalculatedColumn('is_critical', "(status = 'open' AND times_seen >= {$threshold})")
             // Filtros programáticos (query params planos): la tabla del front pasa el filtro
@@ -43,6 +44,12 @@ class ErrorsController extends Controller
                 }
                 if ($request->query('only_critical')) {
                     $q->where('status', 'open')->where('times_seen', '>=', $threshold);
+                }
+                if ($origin = $request->query('origin')) {
+                    $q->where('origin', $origin);
+                }
+                if ($category = $request->query('category')) {
+                    $q->where('category', $category);
                 }
 
                 return $q;
