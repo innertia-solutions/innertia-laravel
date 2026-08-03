@@ -10,11 +10,9 @@ use Symfony\Component\HttpFoundation\Response;
 
 class TelemetryMiddleware
 {
-    private float $startTime;
-
     public function handle(Request $request, Closure $next): Response
     {
-        $this->startTime = microtime(true);
+        $request->attributes->set('innertia_telemetry_start', microtime(true));
         return $next($request);
     }
 
@@ -29,7 +27,8 @@ class TelemetryMiddleware
         /** @var TelemetryCollector $collector */
         $collector = app(TelemetryCollector::class);
 
-        $durationMs = round((microtime(true) - $this->startTime) * 1000, 2);
+        $start = (float) $request->attributes->get('innertia_telemetry_start', microtime(true));
+        $durationMs = round((microtime(true) - $start) * 1000, 2);
         RequestCollector::handle($collector, $request, $response, $durationMs);
 
         $store = app(\Innertia\Telemetry\Store\TelemetryStore::class);
