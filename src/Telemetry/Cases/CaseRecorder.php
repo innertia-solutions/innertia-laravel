@@ -39,6 +39,7 @@ class CaseRecorder
                     'last_seen'          => now(),
                     'last_trace_id'      => $traceId,
                     'sample_trace_ids'   => [$traceId],
+                    'snapshot'           => CaseSnapshot::build($e),
                 ]);
 
                 $this->notify($case, isNew: true, isReopened: false);
@@ -52,13 +53,13 @@ class CaseRecorder
             }
         }
 
-        return $this->recordRecurrence($case, $traceId);
+        return $this->recordRecurrence($case, $traceId, $e);
     }
 
     /**
      * @return array{case:TelemetryCase,is_new:bool,is_reopened:bool}
      */
-    private function recordRecurrence(TelemetryCase $case, string $traceId): array
+    private function recordRecurrence(TelemetryCase $case, string $traceId, Throwable $e): array
     {
         $isReopened = $case->status === 'resolved';
 
@@ -76,6 +77,7 @@ class CaseRecorder
             // Al reabrir, se abre un nuevo "episodio": se limpia notified_at para
             // que la reclamación atómica de notify() pueda volver a disparar el correo.
             'notified_at'      => $isReopened ? null : $case->notified_at,
+            'snapshot'         => CaseSnapshot::build($e),
         ]);
 
         $fresh = $case->fresh();
