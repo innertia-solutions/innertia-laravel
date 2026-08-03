@@ -22,6 +22,31 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Storage
+    |--------------------------------------------------------------------------
+    |
+    | Discos cuya config se hidrata desde Settings (integración) en runtime,
+    | en vez de env. Opt-in: si un disco no tiene todas sus keys en Settings se
+    | deja intacta su config env (no-breaking). Vacío = no-op.
+    |
+    */
+
+    'storage' => [
+        // Mapa: disco => [ settingsKey => configKey del disco ]. Vacío = no-op.
+        'from_settings' => [
+            'r2' => [
+                'integrations.r2.access_key_id'     => 'key',
+                'integrations.r2.secret_access_key' => 'secret',
+                'integrations.r2.bucket'            => 'bucket',
+                'integrations.r2.endpoint'          => 'endpoint',
+            ],
+        ],
+        'cloud_disk'    => 'r2',
+        'fallback_disk' => 'public',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Demo mode
     |--------------------------------------------------------------------------
     |

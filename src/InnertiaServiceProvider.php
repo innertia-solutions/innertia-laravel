@@ -104,6 +104,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->singleton(WebhookService::class);
         $this->app->singleton(\Innertia\Workflow\WorkflowEngine::class);
         $this->app->singleton(\Innertia\Platform\Events\EventBus::class);
+        $this->app->singleton(\Innertia\Storage\StorageManager::class);
     }
 
     public function boot(): void
@@ -136,6 +137,12 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->booted(function () {
             if (! $this->app->routesAreCached()) {
                 \Innertia\Files\Routes::registerFileServing();
+            }
+
+            // Hidratar discos desde Settings (integraciones). Guardado por filled()
+            // → no-op si el producto no configura innertia.storage.from_settings.
+            if (filled(config('innertia.storage.from_settings'))) {
+                app(\Innertia\Storage\StorageManager::class)->hydrate();
             }
         });
 
