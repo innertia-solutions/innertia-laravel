@@ -38,4 +38,9 @@ class TelemetryManager
 
         EventModel::create($row);
     }
+
+    public function tag(string $key, string|int|float|bool|null $value): void
+    {
+        app(TelemetryTags::class)->add($key, $value);
+    }
 }
