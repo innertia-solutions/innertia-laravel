@@ -74,6 +74,7 @@ class ErrorsController extends Controller
             'events'      => $events,
             'samples'     => $samples,
             'timeline'    => $timeline,
+            'snapshot'    => $case->snapshot,
         ]);
     }
 
