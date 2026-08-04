@@ -4,6 +4,7 @@ namespace Innertia\Observability;
 
 use Illuminate\Support\Facades\Route;
 use Innertia\Observability\Http\Controllers\DatabaseController;
+use Innertia\Observability\Http\Controllers\QueuesController;
 use Innertia\Telemetry\Http\Controllers\ObservabilityChannelsController;
 use Innertia\Observability\Http\Controllers\ErrorsController;
 use Innertia\Observability\Http\Controllers\OverviewController;
@@ -42,6 +43,14 @@ class Routes
             Route::post('errors/{id}/status', [ErrorsController::class, 'status']);
             Route::get ('logs',               [ObservabilityLogsController::class, 'index']);
             Route::get ('channels',           [ObservabilityChannelsController::class, 'index']);
+
+            // Colas & workers
+            Route::get   ('queues/overview',          [QueuesController::class, 'overview']);
+            Route::get   ('queues/failed',            [QueuesController::class, 'failed']);
+            Route::post  ('queues/failed/retry-all',  [QueuesController::class, 'retryAll']);
+            Route::post  ('queues/failed/flush',      [QueuesController::class, 'flush']);
+            Route::post  ('queues/failed/{id}/retry', [QueuesController::class, 'retry']);
+            Route::delete('queues/failed/{id}',       [QueuesController::class, 'destroy']);
         });
     }
 }
