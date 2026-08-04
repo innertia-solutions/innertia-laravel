@@ -47,6 +47,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Payments (motor de cobros a usuarios finales)
+    |--------------------------------------------------------------------------
+    | Opt-in como los demás features. Cuando está habilitado, se cargan las
+    | migraciones del módulo (tablas charges/payments). Default OFF para no
+    | imponer esas tablas a productos que no operan pagos reales.
+    */
+    'payments' => [
+        'enabled' => env('INNERTIA_PAYMENTS_ENABLED', false),
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Demo mode
     |--------------------------------------------------------------------------
     |
