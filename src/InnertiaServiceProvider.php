@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\ServiceProvider;
 use Innertia\Auth\AuthServiceProvider;
 use Innertia\Backups\BackupsServiceProvider;
+use Innertia\Ai\AiServiceProvider;
 use Innertia\Payments\PaymentsServiceProvider;
 use Innertia\Telemetry\TelemetryServiceProvider;
 use Innertia\Auth\Middleware\ContextMiddleware;
@@ -101,6 +102,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->register(BackupsServiceProvider::class);
         $this->app->register(TelemetryServiceProvider::class);
         $this->app->register(PaymentsServiceProvider::class);
+        $this->app->register(AiServiceProvider::class);
         $this->app->singleton(WebhookService::class);
         $this->app->singleton(\Innertia\Workflow\WorkflowEngine::class);
         $this->app->singleton(\Innertia\Platform\Events\EventBus::class);

@@ -35,6 +35,7 @@ class BaseTestCase extends TestCase
         // package providers boot — so PaymentsServiceProvider::boot() loads the
         // charges/payments migrations and the Payments test suite finds its tables.
         $app['config']->set('innertia.payments.enabled', true);
+        $app['config']->set('innertia.ai.enabled', true);
     }
 }
 
