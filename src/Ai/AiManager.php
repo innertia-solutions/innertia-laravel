@@ -13,8 +13,6 @@ use Innertia\Ai\Models\RagCollection;
  * Fachada de alto nivel del módulo de IA. Resuelve proveedor+modelo por uso desde
  * la BD (ai_assignments) y aplica la config del provider openai-compatible de
  * laravel/ai en runtime para ese uso.
- *
- * NOTA: usage() (Task 4) se agrega cuando existan sus clases.
  */
 class AiManager
 {
@@ -43,6 +41,11 @@ class AiManager
         ]);
 
         return $resolved['model'];
+    }
+
+    public function usage(): UsageLogger
+    {
+        return new UsageLogger;
     }
 
     /**
