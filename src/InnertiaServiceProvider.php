@@ -274,6 +274,9 @@ class InnertiaServiceProvider extends ServiceProvider
             // Providers install command — provider_connections + link columns on files.
             $commands[] = \Innertia\Files\Providers\Console\ProvidersInstallCommand::class;
 
+            // Ai install command — same pattern: registered always, guard runs at execution.
+            $commands[] = \Innertia\Ai\Console\AiInstallCommand::class;
+
             // Claude Code skills installer — instala skills del paquete en .claude/skills/innertia/
             $commands[] = \Innertia\Console\SkillsInstallCommand::class;
 
