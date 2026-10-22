@@ -293,6 +293,10 @@ return [
         'slug_generator' => null,
     ],
 
+    'ai' => [
+        'enabled' => env('INNERTIA_AI_ENABLED', false),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | SaaS / Tenancy Settings

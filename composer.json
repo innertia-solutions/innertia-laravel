@@ -21,7 +21,8 @@
         "openspout/openspout": "^4.0",
         "dompdf/dompdf": "^2.0",
         "laravel/mcp": "^0.9.1",
-        "mercadopago/dx-php": "^3.10"
+        "mercadopago/dx-php": "^3.10",
+        "laravel/ai": "^0.9.1"
     },
     "require-dev": {
         "orchestra/testbench": "^9.0",
