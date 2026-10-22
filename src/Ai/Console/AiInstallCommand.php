@@ -53,6 +53,7 @@ class AiInstallCommand extends Command
 
         $this->info('Created migration: ' . $path);
         $this->line('Run `php artisan migrate` to apply it.');
+        $this->line('Then seed defaults with: php artisan innertia:ai:seed');
 
         return self::SUCCESS;
     }

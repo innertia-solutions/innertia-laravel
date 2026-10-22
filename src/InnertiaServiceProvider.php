@@ -276,6 +276,7 @@ class InnertiaServiceProvider extends ServiceProvider
 
             // Ai install command — same pattern: registered always, guard runs at execution.
             $commands[] = \Innertia\Ai\Console\AiInstallCommand::class;
+            $commands[] = \Innertia\Ai\Console\AiSeedCommand::class;
 
             // Claude Code skills installer — instala skills del paquete en .claude/skills/innertia/
             $commands[] = \Innertia\Console\SkillsInstallCommand::class;
