@@ -26,7 +26,11 @@ beforeEach(function () {
     config()->set('innertia.mode', 'saas');
 
     // Reset the InnertiaManager singleton so isSaas() is re-evaluated from config.
+    // forgetInstance drops the container instance, but the Innertia facade keeps its
+    // own resolved-instance cache (Facade::$resolvedInstance) — clear it too so the
+    // next Innertia::tenancyEnabled() resolves a fresh manager with the new mode.
     app()->forgetInstance(InnertiaManager::class);
+    \Illuminate\Support\Facades\Facade::clearResolvedInstance(InnertiaManager::class);
 
     // Force Eloquent to re-boot Tag (and re-register HasTenant scopes/listeners)
     // using the updated config value set above.
@@ -73,6 +77,7 @@ it('does not scope when mode is app', function () {
 
     // Re-create the manager (no-op mode) and re-boot Tag without the global scope.
     app()->forgetInstance(InnertiaManager::class);
+    \Illuminate\Support\Facades\Facade::clearResolvedInstance(InnertiaManager::class);
     Model::clearBootedModels();
 
     Tag::create(['name' => 'Urgente', 'slug' => 'urgente']);

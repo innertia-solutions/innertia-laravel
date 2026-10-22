@@ -31,6 +31,10 @@ class BaseTestCase extends TestCase
         // Generate a 32-byte key for AES-256-CBC
         $app['config']->set('app.key', 'base64:' . base64_encode(str_repeat('a', 32)));
         $app['config']->set('app.cipher', 'AES-256-CBC');
+        // The Payments engine is opt-in (default OFF). Enable it here — before the
+        // package providers boot — so PaymentsServiceProvider::boot() loads the
+        // charges/payments migrations and the Payments test suite finds its tables.
+        $app['config']->set('innertia.payments.enabled', true);
     }
 }
 

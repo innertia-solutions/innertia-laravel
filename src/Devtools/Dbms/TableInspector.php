@@ -14,7 +14,10 @@ class TableInspector
     {
         $db     = DB::connection($connection);
         $schema = $db->getSchemaBuilder();
-        $tables = $schema->getTableListing();
+        // Laravel 13 defaults getTableListing() to schema-qualified names
+        // (e.g. "main.test_orders" / "public.charges"). We want bare table names,
+        // so disable schema qualification explicitly.
+        $tables = $schema->getTableListing(schemaQualified: false);
 
         return array_values(array_map(
             fn (string $table) => [
