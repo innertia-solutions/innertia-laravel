@@ -46,12 +46,14 @@ src/
 | Teams | `INNERTIA_TEAMS_ENABLED=true` | `php artisan innertia:teams:install [--force]` | Crea `teams`, `team_members` |
 | Tags | `INNERTIA_TAGS_ENABLED=true` | `php artisan innertia:tags:install [--force]` | Crea `tags`, `taggables` (polimórfica). Tenant-scoped. Trait `HasTags` para cualquier modelo. Cuando activo, `File` tiene `HasTags` disponible. |
 | Directories | `INNERTIA_DIRECTORIES_ENABLED=true` | `php artisan innertia:directories:install [--force]` | Crea `directories` (jerarquía con materialized path, trash con trash_group_id). Agrega `directory_id` a `files` (idempotente). Trait HasTags aplicable. Eventos vía DirectoryEvent enum. |
+| Ai | `INNERTIA_AI_ENABLED=true` | `php artisan innertia:ai:install [--force]` + `innertia:ai:seed` | Motor de IA genérico DB-backed (10 tablas `ai_*`): proveedores/modelos/asignación-por-uso (chat/visión/embedding/asistente), embeddings multi-adaptador (MiniMax/OpenAI/Fake), RAG multi-colección sobre pgvector (`RagIndexer`/`RagRetriever`, columna embedding driver-aware), asistente con `laravel/ai` (`AssistantRunner` + seam `AssistantModel`), registro+auth MCP (`McpRegistry` + middleware `ensure.mcp.key`). Keys cifradas. Requiere Laravel 12+/PHP 8.3. Facade `Innertia\Ai\Facades\Ai`. |
 
 Cada feature tiene un gate único:
 - `\Innertia\Platform\Organizations\OrganizationsFeature::isActive()`
 - `\Innertia\Platform\Teams\TeamsFeature::isActive()`
 - `\Innertia\Tags\TagsFeature::isActive()`
 - `\Innertia\Files\Directories\DirectoriesFeature::isActive()`
+- `\Innertia\Ai\AiFeature::isActive()`
 
 `--force` regenera la migration con timestamp fresco. La migration usa `Schema::hasColumn()` para saltar tablas ya scopeadas — segura de re-aplicar cuando agregás tablas a `config('innertia.organizations.tables')`.
 
@@ -120,6 +122,7 @@ El paquete trae skills versionados en `src/Skills/*.md`. Cada proyecto consumido
 - `innertia-storage` — File model con soft delete, HasTags, HasEntityPermissions, eventos, papelera, integración con Directorios
 - `innertia-extending` — patrón template method para extender el paquete
 - `innertia-directories` — árbol de carpetas con materialized path, trash agrupado, eventos tipados (DirectoryEvent)
+- `innertia-ai` — motor de IA DB-backed: proveedores/modelos/asignación-por-uso, embeddings, RAG pgvector, asistente laravel/ai, MCP, defaults
 
 Mantenerlos sincronizados con la realidad del código es responsabilidad del paquete — cualquier feature/refactor que cambia uso público debería actualizar el skill correspondiente.
 
