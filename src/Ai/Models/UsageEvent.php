@@ -30,6 +30,9 @@ class UsageEvent extends Model
     ];
 
     protected $casts = [
-        'created_at' => 'datetime',
+        'prompt_tokens'     => 'integer',
+        'completion_tokens' => 'integer',
+        'total_tokens'      => 'integer',
+        'created_at'        => 'datetime',
     ];
 }
