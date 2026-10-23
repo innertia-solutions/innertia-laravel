@@ -187,7 +187,7 @@ return new class extends Migration
             $table->timestamp('finished_at')->nullable();
             $table->unsignedInteger('chunks_count')->default(0);
             $table->text('error')->nullable();
-            $table->uuid('triggered_by')->nullable();
+            $table->string('triggered_by')->nullable(); // label (system / command / user id), no uuid-only
             $table->timestamps();
         });
     }
