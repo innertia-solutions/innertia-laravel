@@ -22,7 +22,13 @@ class RagRetriever
             throw new \RuntimeException('RagRetriever::search requiere pgsql (pgvector <->).');
         }
 
-        $vector  = Ai::embedder($collectionKey)->embedQuery($query);
+        $vector = Ai::embedder($collectionKey)->embedQuery($query);
+        if ($vector === []) {
+            // Sin embedding de la query no hay búsqueda posible; evitar `[]::vector`
+            // (pgvector exige ≥1 dimensión). El caller decide cómo degradar.
+            throw new \RuntimeException('No se pudo generar el embedding de la consulta.');
+        }
+
         $literal = '[' . implode(',', array_map(fn ($v) => (float) $v, $vector)) . ']';
 
         $sql      = 'SELECT content, metadata, (embedding <-> ?::vector) AS distance FROM ai_doc_chunks WHERE collection_id = ?';

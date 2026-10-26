@@ -41,6 +41,18 @@ class MiniMaxEmbeddingProvider implements EmbeddingProvider
             ->throw()
             ->json();
 
-        return $res['vectors'] ?? [];
+        // MiniMax envuelve errores lógicos en `base_resp` con HTTP 200 (rate limit,
+        // modelo inválido, etc.), así que ->throw() no los caza. Detectarlos acá para
+        // no devolver vectores vacíos que luego rompen pgvector (`[]::vector`).
+        $status = $res['base_resp']['status_code'] ?? 0;
+        if ($status !== 0) {
+            throw new \RuntimeException('MiniMax embeddings error ' . $status . ': ' . ($res['base_resp']['status_msg'] ?? 'desconocido'));
+        }
+
+        if (empty($res['vectors'])) {
+            throw new \RuntimeException('MiniMax embeddings devolvió una respuesta sin vectores.');
+        }
+
+        return $res['vectors'];
     }
 }
