@@ -51,8 +51,8 @@ it('seeds the minimax provider, models, assignments, default collection and mcp 
     // Models
     expect(AiModel::where('provider_id', $minimax->id)->count())->toBe(3);
     $modelKeys = AiModel::where('provider_id', $minimax->id)->pluck('key')->sort()->values()->all();
-    expect($modelKeys)->toContain('MiniMax-M2')
-        ->toContain('abab6.5v-chat')
+    expect($modelKeys)->toContain('MiniMax-M3.1-Flash')
+        ->toContain('MiniMax-M3')
         ->toContain('embo-01');
 
     // Assignments
@@ -60,17 +60,17 @@ it('seeds the minimax provider, models, assignments, default collection and mcp 
 
     $chatAssignment = AiAssignment::where('use', 'chat')->first();
     expect($chatAssignment)->not->toBeNull()
-        ->and($chatAssignment->model)->toBe('MiniMax-M2')
+        ->and($chatAssignment->model)->toBe('MiniMax-M3.1-Flash')
         ->and($chatAssignment->provider_id)->toBe($minimax->id);
 
     $assistantAssignment = AiAssignment::where('use', 'assistant')->first();
     expect($assistantAssignment)->not->toBeNull()
-        ->and($assistantAssignment->model)->toBe('MiniMax-M2')
+        ->and($assistantAssignment->model)->toBe('MiniMax-M3.1-Flash')
         ->and($assistantAssignment->provider_id)->toBe($minimax->id);
 
     $visionAssignment = AiAssignment::where('use', 'vision')->first();
     expect($visionAssignment)->not->toBeNull()
-        ->and($visionAssignment->model)->toBe('abab6.5v-chat')
+        ->and($visionAssignment->model)->toBe('MiniMax-M3.1-Flash')
         ->and($visionAssignment->provider_id)->toBe($minimax->id);
 
     $embeddingAssignment = AiAssignment::where('use', 'embedding')->first();

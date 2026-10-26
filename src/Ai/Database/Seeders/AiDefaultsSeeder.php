@@ -31,9 +31,9 @@ class AiDefaultsSeeder extends Seeder
         );
 
         $models = [
-            ['key' => 'MiniMax-M2',    'name' => 'MiniMax M2',          'capabilities' => ['chat']],
-            ['key' => 'abab6.5v-chat', 'name' => 'abab6.5v (visión)',   'capabilities' => ['vision', 'chat']],
-            ['key' => 'embo-01',       'name' => 'embo-01 (embedding)', 'capabilities' => ['embedding']],
+            ['key' => 'MiniMax-M3.1-Flash', 'name' => 'MiniMax M3.1 Flash', 'capabilities' => ['chat', 'vision']],
+            ['key' => 'MiniMax-M3',         'name' => 'MiniMax M3',          'capabilities' => ['chat', 'vision']],
+            ['key' => 'embo-01',            'name' => 'embo-01 (embedding)', 'capabilities' => ['embedding']],
         ];
         foreach ($models as $model) {
             AiModel::firstOrCreate(
@@ -42,10 +42,12 @@ class AiDefaultsSeeder extends Seeder
             );
         }
 
+        // MiniMax-M3.1-Flash es multimodal (texto + visión) vía el mismo endpoint
+        // OpenAI-compatible, así que cubre chat/assistant/vision.
         $assignments = [
-            'chat'      => 'MiniMax-M2',
-            'assistant' => 'MiniMax-M2',
-            'vision'    => 'abab6.5v-chat',
+            'chat'      => 'MiniMax-M3.1-Flash',
+            'assistant' => 'MiniMax-M3.1-Flash',
+            'vision'    => 'MiniMax-M3.1-Flash',
             'embedding' => 'embo-01',
         ];
         foreach ($assignments as $use => $model) {
