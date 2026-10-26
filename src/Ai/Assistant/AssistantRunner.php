@@ -191,6 +191,7 @@ class AssistantRunner
         ?string $conversationId = null,
         ?callable $onComplete = null,
         ?callable $onFailed = null,
+        string $queue = 'agents',
     ): BackgroundTurn {
         if ($imageDataUrls !== []) {
             $ocr = $this->vision->extract($imageDataUrls);
@@ -224,7 +225,13 @@ class AssistantRunner
         $conversationIdStr = (string) $conversation->id;
         $agent = new GenericAgent($systemPrompt ?? 'Eres un asistente útil.', $tools, $history);
 
-        $queued = $agent->broadcastOnQueue($text, [new Channel($channel)], [], provider: 'openai-compatible', model: $model)
+        $queued = $agent->broadcastOnQueue($text, [new Channel($channel)], [], provider: 'openai-compatible', model: $model);
+
+        // Cola dedicada para los jobs largos de IA (no bloquean las colas rápidas).
+        // onQueue se proxea al PendingDispatch (muta el job); then/catch quedan sobre el QueuedAgentResponse.
+        $queued->onQueue($queue);
+
+        $queued
             ->then(function ($final) use ($conversationIdStr, $userId, $model, $onComplete) {
                 Message::create([
                     'conversation_id' => $conversationIdStr,

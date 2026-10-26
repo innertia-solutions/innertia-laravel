@@ -46,6 +46,8 @@ class Routes
 
             // Colas & workers
             Route::get   ('queues/overview',          [QueuesController::class, 'overview']);
+            Route::get   ('queues/workers',           [QueuesController::class, 'workers']);
+            Route::post  ('queues/restart',           [QueuesController::class, 'restart']);
             Route::get   ('queues/failed',            [QueuesController::class, 'failed']);
             Route::post  ('queues/failed/retry-all',  [QueuesController::class, 'retryAll']);
             Route::post  ('queues/failed/flush',      [QueuesController::class, 'flush']);

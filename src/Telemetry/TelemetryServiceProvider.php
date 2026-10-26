@@ -79,6 +79,7 @@ class TelemetryServiceProvider extends ServiceProvider
         $this->registerDataTableCapture();
         $this->registerExceptionCapture();
         $this->registerMailCapture();
+        $this->registerWorkerHeartbeat();
 
         \Illuminate\Foundation\AliasLoader::getInstance()->alias(
             'Telemetry',
@@ -112,6 +113,24 @@ class TelemetryServiceProvider extends ServiceProvider
         } catch (\Throwable) {
             return null;
         }
+    }
+
+    private function registerWorkerHeartbeat(): void
+    {
+        // Cada loop del worker escribe su latido (throttleado a ~5s) para que el panel
+        // sepa qué workers están vivos. Solo corre dentro de un proceso worker.
+        \Illuminate\Support\Facades\Event::listen(\Illuminate\Queue\Events\Looping::class, function ($event) {
+            static $last = 0;
+            $now = time();
+            if ($now - $last < 5) return;
+            $last = $now;
+            try {
+                $this->app->make(\Innertia\Telemetry\Health\WorkerHeartbeat::class)
+                    ->ping($event->connectionName ?? null);
+            } catch (\Throwable) {
+                // best-effort: no romper el worker por el heartbeat
+            }
+        });
     }
 
     private function registerQueryCapture(): void

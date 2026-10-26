@@ -63,6 +63,16 @@ it('despacha BroadcastAgent, crea la conversación + mensaje del usuario y devue
         ->and($messages->first()->content)->toBe('generá 5 preguntas');
 
     Queue::assertPushed(BroadcastAgent::class);
+    // Por defecto los jobs largos de IA van a la cola dedicada 'agents'.
+    Queue::assertPushedOn('agents', BroadcastAgent::class);
+});
+
+it('respeta una cola distinta si se le pasa', function () {
+    Queue::fake();
+
+    (new AssistantRunner)->runInBackground(user: null, text: 'x', channel: 'agent-run.q', queue: 'default');
+
+    Queue::assertPushedOn('default', BroadcastAgent::class);
 });
 
 it('continúa una conversación existente', function () {

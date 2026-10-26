@@ -40,6 +40,29 @@ class QueuesController extends Controller
         return $this->run('queue:flush', []);
     }
 
+    /** Workers vivos (heartbeat) + tamaño de las colas. */
+    public function workers(): JsonResponse
+    {
+        $workers = app(\Innertia\Telemetry\Health\WorkerHeartbeat::class)->list();
+
+        $sizes = [];
+        foreach (['agents', 'default', 'telemetry'] as $queue) {
+            try {
+                $sizes[$queue] = \Illuminate\Support\Facades\Queue::size($queue);
+            } catch (\Throwable) {
+                $sizes[$queue] = null;
+            }
+        }
+
+        return response()->json(['workers' => $workers, 'queue_sizes' => $sizes]);
+    }
+
+    /** Reinicio graceful de los workers (señal; se reinician en el próximo loop). */
+    public function restart(): JsonResponse
+    {
+        return $this->run('queue:restart', []);
+    }
+
     private function run(string $command, array $args): JsonResponse
     {
         try {
