@@ -8,6 +8,7 @@ use Innertia\Observability\Http\Controllers\QueuesController;
 use Innertia\Telemetry\Http\Controllers\ObservabilityChannelsController;
 use Innertia\Observability\Http\Controllers\ErrorsController;
 use Innertia\Observability\Http\Controllers\OverviewController;
+use Innertia\Observability\Http\Controllers\TracesController;
 use Innertia\Telemetry\Http\Controllers\ObservabilityLogsController;
 
 /**
@@ -43,6 +44,9 @@ class Routes
             Route::post('errors/{id}/status', [ErrorsController::class, 'status']);
             Route::get ('logs',               [ObservabilityLogsController::class, 'index']);
             Route::get ('channels',           [ObservabilityChannelsController::class, 'index']);
+
+            // Trace (investigar por trace_id): request + eventos + logs + caso vinculado
+            Route::get('traces/{traceId}', [TracesController::class, 'show']);
 
             // Colas & workers
             Route::get   ('queues/overview',          [QueuesController::class, 'overview']);
