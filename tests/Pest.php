@@ -40,3 +40,25 @@ class BaseTestCase extends TestCase
 }
 
 uses(BaseTestCase::class)->in(__DIR__);
+
+/*
+|--------------------------------------------------------------------------
+| Helpers compartidos
+|--------------------------------------------------------------------------
+*/
+
+if (! function_exists('seedServiceAccount')) {
+    /** Siembra una service account de test con una RSA key real (para que JWT::encode RS256 funcione). */
+    function seedServiceAccount(): void
+    {
+        $res = openssl_pkey_new(['private_key_bits' => 2048, 'private_key_type' => OPENSSL_KEYTYPE_RSA]);
+        openssl_pkey_export($res, $priv);
+        $json = json_encode([
+            'client_email' => 'sa@proj.iam.gserviceaccount.com',
+            'private_key'  => $priv,
+            'token_uri'    => 'https://oauth2.googleapis.com/token',
+        ]);
+        \Innertia\Facades\Settings::set('workspace.google.service_account_json', $json, 'string', encrypted: true);
+        \Innertia\Facades\Settings::set('workspace.google.admin_email', 'admin@dominio.cl');
+    }
+}
