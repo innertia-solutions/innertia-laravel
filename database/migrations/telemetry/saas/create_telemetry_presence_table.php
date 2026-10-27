@@ -11,7 +11,7 @@ return new class extends Migration
         Schema::create('telemetry_presence', function (Blueprint $table) {
             $table->id();
             $table->string('session_id')->unique();
-            $table->unsignedBigInteger('user_id')->nullable()->index();
+            $table->string('user_id')->nullable()->index();
             $table->string('tenant')->nullable()->index();
             $table->string('view')->nullable();
             $table->timestamp('last_seen_at')->index();

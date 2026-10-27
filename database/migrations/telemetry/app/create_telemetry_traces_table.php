@@ -12,7 +12,7 @@ return new class extends Migration
             $table->id();
             $table->string('trace_id')->unique();
             $table->string('session_id')->nullable()->index();
-            $table->unsignedBigInteger('user_id')->nullable()->index();
+            $table->string('user_id')->nullable()->index();
             $table->string('tenant')->nullable()->index();
             $table->string('method', 10)->nullable();
             $table->string('route')->nullable();
