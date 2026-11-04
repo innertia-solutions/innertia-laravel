@@ -15,7 +15,9 @@ class UserContext extends Model
 {
     protected $table = 'user_contexts';
 
-    protected $fillable = ['user_id', 'context', 'tenant_id'];
+    protected $fillable = ['user_id', 'context', 'tenant_id', 'organization_id'];
+
+    protected $casts = ['organization_id' => 'integer'];
 
     public function user(): BelongsTo
     {
