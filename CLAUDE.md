@@ -214,6 +214,8 @@ Aplicables a modelos de negocio:
 |---|---|---|
 | `GET /status` | Público + X-Tenant | tenant info + features (organizations, teams, oauth, 2FA) + branding |
 | `GET /ping` | Público + X-Tenant | Alias deprecated de /status (shape antiguo) |
+| `GET /version` | Público (si el producto llama `\Innertia\Version\Routes::public()`) | app, version, commit corto, build_date, environment — nunca dependencias |
+| `GET platform/version` | Solo grupo platform (`Routes::platform('')`) | lo público + runtime (php/laravel/BD) + paquetes Composer curados |
 | `GET /auth/me` | Privado | user + permissions + contexts + organizations + current_organization + teams + preferences (los últimos 3 condicionales al feature) |
 | `GET /auth/me/permissions` | Privado | roles + permisos consolidados |
 | CRUD `/organizations` | Privado | Solo si la app llamó `\Innertia\Platform\Organizations\Routes::register()` |
