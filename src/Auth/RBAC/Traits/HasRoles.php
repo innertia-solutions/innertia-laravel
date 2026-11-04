@@ -76,31 +76,55 @@ trait HasRoles
     {
         $role = $this->resolveRole($role);
 
-        $pivot = [];
-        if (OrganizationsFeature::isActive()) {
-            $orgId = $organizationId;
-            if ($orgId === null) {
-                $ctx   = \Innertia\Facades\Innertia::organization();
-                $orgId = $ctx?->current();
-            }
-            $pivot['organization_id'] = $orgId;
+        if (! OrganizationsFeature::isActive()) {
+            $this->roles()->syncWithoutDetaching([$role->id]);
+            Permissions::flushUser($this);
+
+            return;
         }
 
-        $this->roles()->syncWithoutDetaching([$role->id => $pivot]);
+        $orgId = $organizationId ?? Innertia::organization()?->current();
+
+        // Con orgs, el mismo rol puede vivir en varias orgs: no usar sync (pisa el pivot).
+        $exists = $this->roles()->newPivotStatement()
+            ->where('model_type', $this->getMorphClass())
+            ->where('model_id', $this->getKey())
+            ->where('role_id', $role->id)
+            ->when($orgId === null,
+                fn ($q) => $q->whereNull('organization_id'),
+                fn ($q) => $q->where('organization_id', $orgId))
+            ->exists();
+
+        if (! $exists) {
+            $this->roles()->attach($role->id, ['organization_id' => $orgId]);
+        }
+
         Permissions::flushUser($this);
     }
 
     /**
-     * Remove a role by name or Role model.
+     * Remove a role. With $organizationId (and organizations active) only that org's
+     * assignment is removed; without it, every assignment of the role is removed.
      */
-    public function removeRole(string|Role $role): void
+    public function removeRole(string|Role $role, ?int $organizationId = null): void
     {
         $role = $this->resolveRole($role, throwIfMissing: false);
-
-        if ($role) {
-            $this->roles()->detach($role->id);
-            Permissions::flushUser($this);
+        if (! $role) {
+            return;
         }
+
+        if ($organizationId !== null && OrganizationsFeature::isActive()) {
+            $this->roles()->newPivotStatement()
+                ->where('model_type', $this->getMorphClass())
+                ->where('model_id', $this->getKey())
+                ->where('role_id', $role->id)
+                ->where('organization_id', $organizationId)
+                ->delete();
+        } else {
+            $this->roles()->detach($role->id);
+        }
+
+        Permissions::flushUser($this);
     }
 
     /**
