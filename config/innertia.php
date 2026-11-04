@@ -465,6 +465,19 @@ return [
         'handler' => null,
     ],
 
+    // ── Versiones (Innertia\Version) ─────────────────────────────────────────
+    // GET /version (público: app/version/commit/build_date/environment) y
+    // GET platform/version (detalle con runtime + paquetes; solo grupo platform).
+    // Sin env, commit/fecha salen de build-info.json (escrito en el build Docker).
+    'version' => [
+        'app'        => env('APP_VERSION'),
+        'commit'     => env('APP_COMMIT'),
+        'build_date' => env('APP_BUILD_DATE'),
+        'file'       => env('APP_BUILD_INFO_FILE'),   // null → base_path('build-info.json')
+        'git'        => true,                         // fallback git rev-parse (dev local)
+        'packages'   => \Innertia\Version\VersionInfo::DEFAULT_PACKAGES,
+    ],
+
     'backups' => [
         // Driver mode-aware: 'app' (dump de BD completa) | 'saas' | 'open' (diferidos).
         'mode' => env('BACKUP_MODE', 'app'),
