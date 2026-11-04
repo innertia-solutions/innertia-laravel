@@ -103,6 +103,49 @@ trait HasContexts
             ->all();
     }
 
+    /**
+     * Ids de las orgs (activas, del tenant activo) donde el usuario tiene algún contexto.
+     * Una fila con organization_id NULL otorga acceso a todas las orgs del tenant.
+     *
+     * @return array<int>
+     */
+    public function accessibleOrganizationIds(): array
+    {
+        if (! \Innertia\Platform\Organizations\OrganizationsFeature::isActive()) {
+            return [];
+        }
+
+        // Con tenancy, sin tenant activo no hay orgs que resolver (el scope de
+        // HasTenant no filtraría y se filtrarían orgs de otros tenants).
+        if (Innertia::tenancyEnabled() && Innertia::tenant() === null) {
+            return [];
+        }
+
+        $rows = UserContext::where('user_id', (string) $this->getKey())
+            ->when(Innertia::tenancyEnabled(), fn ($q) => $q->where('tenant_id', $this->currentContextTenantId()))
+            ->whereIn('context', array_keys(config('innertia.contexts', [])))
+            ->pluck('organization_id');
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $orgModel = config('innertia.organizations.model', \Innertia\Platform\Organizations\Models\Organization::class);
+        // HasTenant del modelo limita al tenant activo.
+        $query = $orgModel::query()->where('active', true);
+
+        if (! $rows->contains(fn ($id) => $id === null)) {
+            $query->whereIn('id', $rows->filter()->unique()->values()->all());
+        }
+
+        return $query->orderBy('id')->pluck('id')->map(fn ($id) => (int) $id)->values()->all();
+    }
+
+    public function canAccessOrganization(int $organizationId): bool
+    {
+        return in_array($organizationId, $this->accessibleOrganizationIds(), true);
+    }
+
     public function hasContext(string $key): bool
     {
         if (! array_key_exists($key, config('innertia.contexts', []))) {
