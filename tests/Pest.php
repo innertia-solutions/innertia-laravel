@@ -62,3 +62,23 @@ if (! function_exists('seedServiceAccount')) {
         \Innertia\Facades\Settings::set('workspace.google.admin_email', 'admin@dominio.cl');
     }
 }
+
+if (! function_exists('bootOrgOpenMode')) {
+    /** Modo open + organizations ON + schema post-install + tenant 'rancagua' activo. */
+    function bootOrgOpenMode(\Illuminate\Foundation\Application $app): void
+    {
+        config()->set('innertia.mode', 'open');
+        config()->set('innertia.organizations.enabled', true);
+        config()->set('innertia.contexts', ['backoffice' => 'Administración']);
+        config()->set('innertia.saas.tenant_model', \Innertia\Saas\Models\Tenant::class);
+        config()->set('auth.providers.users.model', \Innertia\Tests\Organizations\Support\OrgTestUser::class);
+        config()->set('database.default', 'testbench');
+        config()->set('database.connections.testbench', ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '']);
+        $app->singleton(\Innertia\Platform\Organizations\OrganizationContext::class);
+        $app->forgetInstance(\Innertia\InnertiaManager::class);
+        \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
+        \Innertia\Tests\Organizations\Support\OrgSchema::create();
+        \Innertia\Saas\Models\Tenant::create(['key' => 'rancagua', 'name' => 'Rancagua', 'status' => 'active']);
+        \Innertia\Facades\Innertia::activate('rancagua');
+    }
+}
