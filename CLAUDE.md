@@ -42,7 +42,7 @@ src/
 
 | Feature | Flag | Install | Schema |
 |---|---|---|---|
-| Organizations | `INNERTIA_ORGANIZATIONS_ENABLED=true` | `php artisan innertia:organization:install [--force]` | Crea `organizations`, agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_contexts`, y tablas declaradas |
+| Organizations | `INNERTIA_ORGANIZATIONS_ENABLED=true` | `php artisan innertia:organization:install [--force]` | Crea `organizations`, agrega `organization_id` a `roles`, `model_roles`, `model_permissions`, `user_contexts`, y tablas declaradas; rehace unicidades multi-org (`model_roles_scoped_unique`, `user_contexts_scoped_unique`). Modos app/saas/open. Acceso a una org = fila `user_contexts` con la org o NULL (todas); 403 `organization_forbidden`/`organization_inactive` en `ResolveOrganizationFromHeader` (también en `/auth/*`). Helpers `accessibleOrganizationIds()`/`canAccessOrganization()` en `HasContexts`; `assignRole/removeRole($role, $orgId)` multi-org |
 | Teams | `INNERTIA_TEAMS_ENABLED=true` | `php artisan innertia:teams:install [--force]` | Crea `teams`, `team_members` |
 | Tags | `INNERTIA_TAGS_ENABLED=true` | `php artisan innertia:tags:install [--force]` | Crea `tags`, `taggables` (polimórfica). Tenant-scoped. Trait `HasTags` para cualquier modelo. Cuando activo, `File` tiene `HasTags` disponible. |
 | Directories | `INNERTIA_DIRECTORIES_ENABLED=true` | `php artisan innertia:directories:install [--force]` | Crea `directories` (jerarquía con materialized path, trash con trash_group_id). Agrega `directory_id` a `files` (idempotente). Trait HasTags aplicable. Eventos vía DirectoryEvent enum. |
@@ -163,7 +163,7 @@ Capa independiente del RBAC: define qué áreas del sistema puede entrar el user
 user_contexts (user_id, context, tenant_id, organization_id?)
 ```
 
-Con orgs activo, un user puede tener acceso a contextos distintos según la org:
+Con orgs activo, un user puede tener acceso a contextos distintos según la org (fila con `organization_id` NULL = todas las orgs del tenant; esa misma fila define a qué orgs puede entrar vía `X-Organization`):
 - `(pepe, technician, tenant_1, org_a)` — técnico en org A
 - `(pepe, backoffice, tenant_1, org_b)` — backoffice en org B
 

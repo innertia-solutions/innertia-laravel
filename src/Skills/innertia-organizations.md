@@ -39,12 +39,31 @@ El install agrega `organization_id` (nullable bigint) a:
 
 NULL = "global al tenant" (visible desde cualquier org scope).
 
+Además rehace las unicidades: `model_roles` pierde la PK de 3 columnas → `model_roles_scoped_unique` (con `organization_id`) y `user_contexts` → `user_contexts_scoped_unique`, para que el mismo rol/contexto viva en varias orgs.
+
+Modos: `app`, `saas` y `open` (en `api` siempre inactivo). En `open`, sin tenant activo el header `X-Organization` se ignora.
+
+## Acceso a una org (regla única)
+
+- **Entra a la org X** quien tenga fila en `user_contexts` (tenant activo) con `organization_id = X` o `NULL` (NULL = todas las orgs del tenant).
+- **Qué puede hacer**: roles en `model_roles` con `organization_id = X` o `NULL` (global).
+- `ResolveOrganizationFromHeader` responde 403 `organization_inactive` (org desactivada) u 403 `organization_forbidden` (sin membresía); `is_platform_admin` se salta la membresía. Está montado también en `/auth/*` autenticado.
+- `/auth/me` devuelve `current_organization` y `permissions` filtrados a roles globales + de la org activa.
+
+```php
+$user->grantContext('backoffice', $orgId);  // miembro de una sede (null = todas)
+$user->assignRole('operator', $orgId);      // mismo rol en varias orgs (no pisa)
+$user->removeRole('operator', $orgId);      // solo esa org; sin $orgId quita todas
+$user->accessibleOrganizationIds();         // int[] orgs activas accesibles (viene en HasContexts)
+$user->canAccessOrganization($orgId);       // bool
+```
+
 ## Headers HTTP
 
 ```
 X-Tenant: acme              # tenant activo
 X-Organization: north-cl    # org activa (slug del campo 'key')
-X-Consolidated: true        # opcional: scope expandido a todas las orgs accesibles
+X-Consolidated: true        # opcional: scope = $user->accessibleOrganizationIds()
 ```
 
 ## Contexto en runtime
@@ -84,7 +103,7 @@ Cuando el feature está OFF o el contexto está vacío (CLI/jobs), el trait es n
 ## Middlewares disponibles
 
 ```php
-'organization.resolve'   // lee X-Organization y popula OrganizationContext
+'organization.resolve'   // lee X-Organization, valida org activa + membresía y popula OrganizationContext
 'organization.require'   // 401 si no hay org activa (estricto)
 ```
 
