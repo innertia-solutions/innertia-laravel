@@ -198,7 +198,7 @@ abstract class Importer
     {
         $this->ensureReady();
 
-        $path      = \Illuminate\Support\Facades\Storage::disk($this->file->disk)->path($this->file->path);
+        $path      = app(\Innertia\Storage\StorageManager::class)->localPath($this->file->disk, $this->file->path);
         $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
 
         return match ($extension) {

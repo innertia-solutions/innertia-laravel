@@ -412,3 +412,22 @@ Response for grant endpoints: `EntityPermissionResource` — `{id, entity_type, 
 ### Exception
 
 `Innertia\Files\Exceptions\AccessDeniedException` — thrown when access is denied. Extend HTTP layer to catch and return 403 as needed.
+
+## Disco cloud multi-proveedor (R2 / S3 / GCS desde la UI)
+
+Opt-in con `INNERTIA_STORAGE_CLOUD=true` (`config('innertia.storage.cloud')`). Las credenciales viven
+en Settings bajo `integrations.storage.*` (`provider` r2|s3|gcs, `bucket`, `region`, `endpoint`,
+`access_key_id`, `secret_access_key` **encriptado**, `public_url`) y se cargan desde la UI del producto
+(hub de integraciones), no desde env.
+
+- Los tres proveedores usan el driver `s3` de Laravel: R2 (endpoint `https://<account>.r2.cloudflarestorage.com`,
+  región `auto`), S3 (región obligatoria; endpoint solo para compatibles) y GCS (API XML interoperable,
+  claves **HMAC**, endpoint `https://storage.googleapis.com`). Requiere `league/flysystem-aws-s3-v3` en el producto.
+- Completo → `StorageManager::hydrateCloud()` registra `filesystems.disks.cloud` y (con `as_default`) lo deja
+  como `filesystems.default`: todo upload nuevo va al bucket; lo antiguo se sigue leyendo de su disco (`files.disk`).
+  Los workers re-hidratan antes de cada job (cambios en la UI sin reiniciar).
+- `Storage::probe($settings?)` → escribe/lee/borra un objeto de prueba (para el botón "Validar").
+- `Storage::localPath($disk, $path)` → ruta local legible para cualquier disco (remotos se copian a un temporal).
+  Usarlo en vez de `Storage::disk()->path()` (que no existe en s3).
+- `php artisan innertia:storage:migrate-files [--from=local,public] [--dry-run] [--delete-source]` copia los
+  archivos locales existentes al cloud y actualiza su `disk` (idempotente; conserva el origen por defecto).

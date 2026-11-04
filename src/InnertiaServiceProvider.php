@@ -143,8 +143,17 @@ class InnertiaServiceProvider extends ServiceProvider
 
             // Hidratar discos desde Settings (integraciones). Guardado por filled()
             // → no-op si el producto no configura innertia.storage.from_settings.
-            if (filled(config('innertia.storage.from_settings'))) {
+            if (filled(config('innertia.storage.from_settings')) || config('innertia.storage.cloud.enabled')) {
                 app(\Innertia\Storage\StorageManager::class)->hydrate();
+            }
+
+            // Workers (procesos largos): re-hidratar el disco cloud antes de cada job
+            // para tomar cambios hechos desde la UI sin reiniciar el worker.
+            if (config('innertia.storage.cloud.enabled')) {
+                \Illuminate\Support\Facades\Event::listen(
+                    \Illuminate\Queue\Events\JobProcessing::class,
+                    fn () => app(\Innertia\Storage\StorageManager::class)->hydrateCloud(),
+                );
             }
         });
 
@@ -237,6 +246,7 @@ class InnertiaServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $commands = [
                 SyncPermissionsCommand::class,
+                \Innertia\Storage\Console\MigrateFilesToCloudCommand::class,
                 MakeModelCommand::class,
                 MakeUseCaseCommand::class,
                 MakeControllerCommand::class,

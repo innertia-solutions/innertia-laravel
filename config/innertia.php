@@ -43,6 +43,18 @@ return [
         ],
         'cloud_disk'    => 'r2',
         'fallback_disk' => 'public',
+
+        // Disco "cloud" multi-proveedor configurable desde la UI (integraciones):
+        // proveedor r2 | s3 | gcs + bucket + credenciales en Settings bajo
+        // `settings_prefix` (provider, bucket, region, endpoint, access_key_id,
+        // secret_access_key [encriptado], public_url). Completo → se registra el
+        // disco y, con as_default, pasa a ser filesystems.default.
+        'cloud' => [
+            'enabled'         => env('INNERTIA_STORAGE_CLOUD', false),
+            'disk'            => 'cloud',
+            'settings_prefix' => 'integrations.storage',
+            'as_default'      => true,
+        ],
     ],
 
     /*
