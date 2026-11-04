@@ -47,7 +47,7 @@ class PlatformAccount
         $model = static::model();
         $email = static::defaultEmail();
 
-        if ($model::where('email', $email)->exists()) {
+        if (static::find($email)) {
             return null;
         }
 
@@ -69,7 +69,7 @@ class PlatformAccount
     {
         $model = static::model();
         $email = strtolower(trim($email ?: static::defaultEmail()));
-        $user  = $model::where('email', $email)->first();
+        $user  = static::find($email);
 
         if ($user && ! $user->is_platform_admin) {
             throw new \InvalidArgumentException("{$email} existe pero no es una cuenta de plataforma.");
@@ -82,8 +82,23 @@ class PlatformAccount
         return $password;
     }
 
+    /** Busca por email incluyendo soft-deleted (el email sigue ocupando el unique). */
+    private static function find(string $email)
+    {
+        $model = static::model();
+        $query = in_array(\Illuminate\Database\Eloquent\SoftDeletes::class, class_uses_recursive($model), true)
+            ? $model::withTrashed()
+            : $model::query();
+
+        return $query->where('email', $email)->first();
+    }
+
     private static function write($user, string $password): void
     {
+        if (method_exists($user, 'trashed') && $user->trashed()) {
+            $user->restore();
+        }
+
         $attrs = [
             'password'              => Hash::make($password),
             'email_verified_at'     => $user->email_verified_at ?? now(),
