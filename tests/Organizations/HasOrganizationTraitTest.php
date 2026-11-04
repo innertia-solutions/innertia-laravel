@@ -41,6 +41,7 @@ it('injects organization_id on creating when feature enabled and current() is se
     config()->set('innertia.organizations.enabled', true);
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
     Innertia::organization()->set(7);
 
     $row = TestOrgScopedModel::create(['name' => 'a']);
@@ -51,6 +52,7 @@ it('does NOT inject organization_id when current() is null (CLI/job mode)', func
     config()->set('innertia.organizations.enabled', true);
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
 
     $row = TestOrgScopedModel::create(['name' => 'a']);
     expect($row->organization_id)->toBeNull();
@@ -60,6 +62,7 @@ it('scopes queries by WHERE organization_id IN scope()', function () {
     config()->set('innertia.organizations.enabled', true);
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
 
     Innertia::organization()->set(1);
     TestOrgScopedModel::create(['name' => 'one']);
@@ -79,6 +82,7 @@ it('does NOT apply the global scope when scope() is empty (CLI/job)', function (
     config()->set('innertia.organizations.enabled', true);
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
 
     Innertia::organization()->set(1);
     TestOrgScopedModel::create(['name' => 'one']);

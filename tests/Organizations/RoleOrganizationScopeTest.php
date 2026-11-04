@@ -16,6 +16,7 @@ beforeEach(function () {
     ]);
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
 
     Schema::create('roles', function ($t) {
         $t->uuid('id')->primary();

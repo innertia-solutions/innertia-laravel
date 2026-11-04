@@ -9,6 +9,7 @@ pest()->group('org-enabled');
 beforeEach(function () {
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
 });
 
 it('cacheKey includes organization id when feature enabled', function () {

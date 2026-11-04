@@ -27,11 +27,13 @@ beforeEach(function () {
     config()->set('innertia.organizations.model', FakeOrganization::class);
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
 });
 
 it('is a no-op when feature is disabled', function () {
     config()->set('innertia.organizations.enabled', false);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
 
     $req = Request::create('/foo', 'GET', server: ['HTTP_X_ORGANIZATION' => 'acme']);
     $mw  = new ResolveOrganizationFromHeader();

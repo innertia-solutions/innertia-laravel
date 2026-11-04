@@ -37,6 +37,7 @@ beforeEach(function () {
     ]);
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
 });
 
 it('OrganizationsFeature::isActive returns false in api mode even when enabled', function () {

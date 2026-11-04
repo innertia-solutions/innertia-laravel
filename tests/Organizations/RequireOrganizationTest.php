@@ -11,6 +11,7 @@ beforeEach(function () {
     config()->set('innertia.organizations.enabled', true);
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
 });
 
 it('returns 400 when no organization is active', function () {
@@ -30,6 +31,7 @@ it('passes through when an organization is active', function () {
 it('is a no-op when feature disabled', function () {
     config()->set('innertia.organizations.enabled', false);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
     $req  = Request::create('/foo', 'GET');
     $resp = (new RequireOrganization())->handle($req, fn () => new \Illuminate\Http\Response('ok'));
     expect($resp)->toBeInstanceOf(\Illuminate\Http\Response::class);

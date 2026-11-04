@@ -9,6 +9,7 @@ beforeEach(function () {
     config()->set('innertia.organizations.enabled', true);
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
 });
 
 it('Innertia::organization() returns the singleton', function () {

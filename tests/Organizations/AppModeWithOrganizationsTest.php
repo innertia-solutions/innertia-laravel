@@ -44,6 +44,7 @@ beforeEach(function () {
     // Re-bind singletons so InnertiaManager picks up mode=app
     $this->app->singleton(OrganizationContext::class);
     $this->app->forgetInstance(\Innertia\InnertiaManager::class);
+    \Innertia\Facades\Innertia::clearResolvedInstance(\Innertia\InnertiaManager::class);
 
     Schema::create('app_mode_org_things', function ($t) {
         $t->bigIncrements('id');
