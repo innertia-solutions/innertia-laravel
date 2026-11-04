@@ -92,6 +92,8 @@ beforeEach(function () {
         $t->bigIncrements('id');
         $t->string('user_id');
         $t->string('context');
+        // organization:install siempre agrega organization_id a user_contexts.
+        $t->unsignedBigInteger('organization_id')->nullable();
         $t->timestamps();
         $t->unique(['user_id', 'context']);
     });
