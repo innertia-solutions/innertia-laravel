@@ -16,6 +16,9 @@ use Symfony\Component\HttpFoundation\Response;
  *   feature disabled       → pass through, no side effects.
  *   no header              → pass through, context remains empty.
  *   header + unknown slug  → 401 JSON.
+ *   org inactiva           → 403 organization_inactive.
+ *   user sin membresía     → 403 organization_forbidden (user_contexts con la org o NULL;
+ *                            is_platform_admin la saltea; sin user autenticado no valida).
  *   header + known slug    → current() = id, scope() = [id].
  *   + X-Consolidated:true  → current() = id, scope() = user->accessibleOrganizationIds().
  *
@@ -64,14 +67,32 @@ class ResolveOrganizationFromHeader
             return response()->json(['message' => 'Organization not found.'], 401);
         }
 
+        // FakeOrganization de los tests viejos no es Model → method_exists lo salta.
+        // Sin cast boolean, sqlite/pgsql pueden devolver 0/'0'/false.
+        if (method_exists($org, 'getAttribute') && in_array($org->getAttribute('active'), [false, 0, '0'], true)) {
+            return response()->json([
+                'message' => 'Esta organización está desactivada.',
+                'error'   => 'organization_inactive',
+            ], 403);
+        }
+
+        // Membresía: fila en user_contexts con esta org o NULL (= todas las del tenant).
+        $user = $request->user() ?? auth()->user();
+        if ($user && method_exists($user, 'canAccessOrganization')
+            && ! ($user->is_platform_admin ?? false)
+            && ! $user->canAccessOrganization((int) $org->getKey())) {
+            return response()->json([
+                'message' => 'No tienes acceso a esta organización.',
+                'error'   => 'organization_forbidden',
+            ], 403);
+        }
+
         $ctx = Innertia::organization();
         $ctx->set((int) $org->getKey());
 
-        if (filter_var($request->header('X-Consolidated'), FILTER_VALIDATE_BOOL)) {
-            $user = $request->user() ?? auth()->user();
-            if ($user && method_exists($user, 'accessibleOrganizationIds')) {
-                $ctx->setScope($user->accessibleOrganizationIds());
-            }
+        if (filter_var($request->header('X-Consolidated'), FILTER_VALIDATE_BOOL)
+            && $user && method_exists($user, 'accessibleOrganizationIds')) {
+            $ctx->setScope($user->accessibleOrganizationIds());
         }
 
         return $next($request);
