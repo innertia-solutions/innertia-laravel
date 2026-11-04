@@ -11,7 +11,11 @@ use Illuminate\Support\Facades\Password;
 use Innertia\Auth\RBAC\UseCases\CreateRole;
 use Innertia\Auth\RBAC\UseCases\AssignRole;
 use Innertia\Auth\RBAC\UseCases\RemoveRole;
+use Illuminate\Validation\Rule;
+use Innertia\Exceptions\ForbiddenException;
 use Innertia\Facades\DataTable;
+use Innertia\Facades\Innertia;
+use Innertia\Platform\Organizations\OrganizationsFeature;
 
 class UsersController extends Controller
 {
@@ -35,6 +39,7 @@ class UsersController extends Controller
                 if (!empty($statuses)) {
                     $query->whereRaw("({$statusExpr}) IN (" . implode(',', array_fill(0, count($statuses), '?')) . ")", $statuses);
                 }
+                $this->applyManageableScope($query);
                 $this->applyIndexScope($query);
 
                 return $query;
@@ -58,7 +63,7 @@ class UsersController extends Controller
     public function show(string $id): JsonResponse
     {
         $model = config('innertia.auth.user_model');
-        $user  = $model::findOrFail($id);
+        $user  = $this->findUser($id);
 
         $data = $user->toArray();
 
@@ -99,13 +104,17 @@ class UsersController extends Controller
     public function update(Request $request, string $id): JsonResponse
     {
         $model = config('innertia.auth.user_model');
-        $user  = $model::findOrFail($id);
+        $user  = $this->findUser($id);
 
         $data = $request->validate([
             'name'     => 'sometimes|string|max:255',
-            'email'    => "sometimes|email|unique:users,email,{$id}",
+            'email'    => ['sometimes', 'email', Rule::unique((new $model)->getTable(), 'email')->ignore($id)],
             'password' => 'sometimes|string|min:8',
         ]);
+
+        if (array_key_exists('email', $data) || array_key_exists('password', $data)) {
+            $this->ensureIdentityEditable($user);
+        }
 
         if (isset($data['password'])) {
             $data['password']             = Hash::make($data['password']);
@@ -123,8 +132,7 @@ class UsersController extends Controller
     {
         abort_unless(config('innertia.backoffice.users.allow_delete', false), 403, 'User deletion is disabled.');
 
-        $model = config('innertia.auth.user_model');
-        $user  = $model::findOrFail($id);
+        $user = $this->findUser($id);
         $user->delete();
 
         return response()->json(['deleted' => true]);
@@ -135,7 +143,7 @@ class UsersController extends Controller
     public function roles(string $id): JsonResponse
     {
         $model = config('innertia.auth.user_model');
-        $user  = $model::findOrFail($id);
+        $user  = $this->findUser($id);
 
         abort_unless($this->modelHasRoles($model), 501, 'User model does not use HasRoles.');
 
@@ -144,6 +152,7 @@ class UsersController extends Controller
 
     public function assignRole(Request $request, string $id): JsonResponse
     {
+        $this->findUser($id);
         $request->validate(['role' => 'required|string']);
 
         (new AssignRole($id, $request->role))->execute();
@@ -153,6 +162,8 @@ class UsersController extends Controller
 
     public function removeRole(string $id, string $role): JsonResponse
     {
+        $this->findUser($id);
+
         (new RemoveRole($id, $role))->execute();
 
         return response()->json(['removed' => true]);
@@ -203,8 +214,7 @@ class UsersController extends Controller
 
     public function sessions(string $id): JsonResponse
     {
-        $model = config('innertia.auth.user_model');
-        $model::withTrashed()->findOrFail($id);
+        $this->findUser($id, withTrashed: true);
 
         $sessions = DB::table('user_tokens')
             ->where('user_id', $id)
@@ -219,8 +229,7 @@ class UsersController extends Controller
 
     public function revokeSession(string $id, string $sessionId): JsonResponse
     {
-        $model = config('innertia.auth.user_model');
-        $model::withTrashed()->findOrFail($id);
+        $this->findUser($id, withTrashed: true);
 
         DB::table('user_tokens')
             ->where('id', $sessionId)
@@ -232,8 +241,7 @@ class UsersController extends Controller
 
     public function revokeAllSessions(string $id): JsonResponse
     {
-        $model = config('innertia.auth.user_model');
-        $model::withTrashed()->findOrFail($id);
+        $this->findUser($id, withTrashed: true);
 
         DB::table('user_tokens')
             ->where('user_id', $id)
@@ -246,8 +254,7 @@ class UsersController extends Controller
 
     public function reactivate(string $id): JsonResponse
     {
-        $model = config('innertia.auth.user_model');
-        $user  = $model::withTrashed()->findOrFail($id);
+        $user = $this->findUser($id, withTrashed: true);
 
         $user->restore();
 
@@ -258,8 +265,7 @@ class UsersController extends Controller
 
     public function resetPassword(Request $request, string $id): JsonResponse
     {
-        $model = config('innertia.auth.user_model');
-        $user  = $model::withTrashed()->findOrFail($id);
+        $user = $this->findUser($id, withTrashed: true);
 
         $data = $request->validate([
             'mode'     => 'required|in:email,manual',
@@ -271,6 +277,8 @@ class UsersController extends Controller
 
             return response()->json(['sent' => true]);
         }
+
+        $this->ensureIdentityEditable($user);
 
         $user->update([
             'password'              => Hash::make($data['password']),
@@ -284,8 +292,7 @@ class UsersController extends Controller
 
     public function activity(Request $request, string $id): JsonResponse
     {
-        $model = config('innertia.auth.user_model');
-        $model::withTrashed()->findOrFail($id);
+        $this->findUser($id, withTrashed: true);
 
         $perPage = $request->integer('per_page', 15);
 
@@ -298,10 +305,115 @@ class UsersController extends Controller
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    private function findUser(string $id): mixed
+    /**
+     * Resuelve un usuario que el actor puede administrar (ver
+     * applyManageableScope). Fuera de alcance → 404, sin revelar existencia.
+     */
+    protected function findUser(string $id, bool $withTrashed = false): mixed
     {
         $model = config('innertia.auth.user_model');
-        return $model::findOrFail($id);
+        $query = $model::query();
+
+        if ($withTrashed && method_exists($model, 'bootSoftDeletes')) {
+            $query->withTrashed();
+        }
+
+        $this->applyManageableScope($query);
+
+        return $query->findOrFail($id);
+    }
+
+    /**
+     * Aislamiento base de la administración de usuarios (genérico, no de negocio):
+     *
+     *  - Tenant: con tenancy y tenant activo, solo usuarios con alguna fila en
+     *    user_contexts de ese tenant. Un usuario de varios tenants se ve desde
+     *    cada uno de ellos.
+     *  - Organization (OrganizationsFeature activo): si el actor está limitado a
+     *    ciertas orgs, solo usuarios con contexto en alguna de esas orgs. El
+     *    acceso "todas las orgs" (organization_id NULL) solo lo administra otro
+     *    actor con acceso a todas. is_platform_admin no se limita por org.
+     *
+     * Qué acciones puede hacer cada perfil es lógica del producto (permisos,
+     * middleware); esto solo define a QUIÉN puede alcanzar.
+     */
+    protected function applyManageableScope($query): void
+    {
+        if (! Innertia::tenancyEnabled() || Innertia::tenant() === null) {
+            return;
+        }
+
+        $tenantId = (string) Innertia::tenant()->getKey();
+        $userKey  = 'CAST(' . $query->getModel()->getQualifiedKeyName() . ' AS TEXT)';
+
+        $query->whereExists(function ($q) use ($tenantId, $userKey) {
+            $q->select(DB::raw(1))
+                ->from('user_contexts')
+                ->whereRaw("user_contexts.user_id = {$userKey}")
+                ->where('user_contexts.tenant_id', $tenantId);
+        });
+
+        $actor = auth()->user();
+        if (! OrganizationsFeature::isActive() || ! $actor || ($actor->is_platform_admin ?? false)) {
+            return;
+        }
+
+        if ($this->actorHasAllOrganizations($actor, $tenantId)) {
+            return;
+        }
+
+        $orgIds = method_exists($actor, 'accessibleOrganizationIds') ? $actor->accessibleOrganizationIds() : [];
+
+        if ($orgIds === []) {
+            $query->whereRaw('1 = 0');
+
+            return;
+        }
+
+        $query->whereExists(function ($q) use ($tenantId, $userKey, $orgIds) {
+            $q->select(DB::raw(1))
+                ->from('user_contexts')
+                ->whereRaw("user_contexts.user_id = {$userKey}")
+                ->where('user_contexts.tenant_id', $tenantId)
+                ->whereIn('user_contexts.organization_id', $orgIds);
+        });
+        $query->whereNotExists(function ($q) use ($tenantId, $userKey) {
+            $q->select(DB::raw(1))
+                ->from('user_contexts')
+                ->whereRaw("user_contexts.user_id = {$userKey}")
+                ->where('user_contexts.tenant_id', $tenantId)
+                ->whereNull('user_contexts.organization_id');
+        });
+    }
+
+    private function actorHasAllOrganizations($actor, string $tenantId): bool
+    {
+        return DB::table('user_contexts')
+            ->where('user_id', (string) $actor->getKey())
+            ->where('tenant_id', $tenantId)
+            ->whereNull('organization_id')
+            ->exists();
+    }
+
+    /**
+     * Email y contraseña son identidad global: si el usuario también pertenece
+     * a otro tenant, un admin de este tenant no puede cambiarlos (afectaría su
+     * cuenta en el otro). Se usa reset-password por correo.
+     */
+    protected function ensureIdentityEditable($user): void
+    {
+        if (! Innertia::tenancyEnabled() || Innertia::tenant() === null) {
+            return;
+        }
+
+        $sharedElsewhere = DB::table('user_contexts')
+            ->where('user_id', (string) $user->getKey())
+            ->where('tenant_id', '!=', (string) Innertia::tenant()->getKey())
+            ->exists();
+
+        if ($sharedElsewhere) {
+            throw new ForbiddenException('El usuario pertenece también a otra cuenta: su email y contraseña solo se cambian vía restablecimiento por correo.');
+        }
     }
 
     private function modelHasRoles(string $model): bool

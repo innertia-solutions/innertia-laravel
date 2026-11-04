@@ -167,6 +167,14 @@ Con orgs activo, un user puede tener acceso a contextos distintos según la org 
 - `(pepe, technician, tenant_1, org_a)` — técnico en org A
 - `(pepe, backoffice, tenant_1, org_b)` — backoffice en org B
 
+### Aislamiento del CRUD de usuarios (`Backoffice\Routes`)
+
+`UsersController::applyManageableScope()` (listado y todas las rutas `users/{id}`, fuera de alcance → 404):
+- **Tenant** (tenancy + tenant activo): solo usuarios con alguna fila `user_contexts` en el tenant activo.
+- **Organization** (feature activo): actor con fila `organization_id NULL` ve a todos; actor limitado a orgs solo ve usuarios con contexto en esas orgs y nunca a uno con acceso a todas. `is_platform_admin` no se limita por org.
+- Email/contraseña de un usuario que también pertenece a otro tenant → 403 (`ensureIdentityEditable`); usar reset por correo.
+Perfiles y qué acción puede hacer cada uno son del producto (permisos/middleware). Un producto que sobrescribe `index()` debe llamar `applyManageableScope($query)`.
+
 ## Tablas RBAC
 
 ```
