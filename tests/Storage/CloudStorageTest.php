@@ -82,6 +82,19 @@ it('no hace nada si el feature está apagado o incompleto', function () {
     expect(config('filesystems.default'))->toBe('local');
 });
 
+it('re-hidratar sin cambios no descarta el disco ya resuelto', function () {
+    config(['innertia.storage.cloud.enabled' => true]);
+    saveCloudSettings(cloudSettings());
+    $m = app(StorageManager::class);
+    $m->hydrateCloud();
+    Storage::fake('cloud');
+    Storage::disk('cloud')->put('x.txt', 'ok');
+
+    $m->hydrateCloud(); // p. ej. JobProcessing de un job síncrono
+
+    expect(Storage::disk('cloud')->get('x.txt'))->toBe('ok');
+});
+
 it('localPath devuelve la ruta real en discos locales', function () {
     Storage::fake('local');
     Storage::disk('local')->put('a/b.csv', 'x');

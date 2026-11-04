@@ -149,8 +149,12 @@ class StorageManager
         }
 
         $disk = $this->cloudDisk();
-        config(['filesystems.disks.'.$disk => $config]);
-        LaravelStorage::forgetDisk($disk); // procesos largos (worker): no reusar el cliente viejo
+        // Solo si cambió: los workers re-hidratan antes de cada job y no deben
+        // reconstruir el cliente (ni descartar un disco ya resuelto) sin motivo.
+        if (config('filesystems.disks.'.$disk) !== $config) {
+            config(['filesystems.disks.'.$disk => $config]);
+            LaravelStorage::forgetDisk($disk); // credenciales nuevas → cliente nuevo
+        }
 
         if (config('innertia.storage.cloud.as_default', true)) {
             config(['filesystems.default' => $disk]);
