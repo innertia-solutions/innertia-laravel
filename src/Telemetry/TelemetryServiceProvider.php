@@ -205,36 +205,28 @@ class TelemetryServiceProvider extends ServiceProvider
             $this->app->extend(
                 \Illuminate\Contracts\Debug\ExceptionHandler::class,
                 function ($handler) {
-                    return new class($handler, $this->app) extends \Illuminate\Foundation\Exceptions\Handler {
-                        public function __construct(
-                            private $inner,
-                            $container,
-                        ) {
-                            parent::__construct($container);
-                        }
+                    if ($handler instanceof TelemetryExceptionHandler) {
+                        return $handler;
+                    }
 
-                        public function report(\Throwable $e): void
-                        {
-                            $this->inner->report($e);
+                    // Handler estándar de Laravel (el que configura withExceptions()):
+                    // se reemplaza por la subclase con captura, conservando su estado.
+                    if (get_class($handler) === \Illuminate\Foundation\Exceptions\Handler::class) {
+                        return TelemetryExceptionHandler::from($handler, $this->app);
+                    }
+
+                    // Handler propio de la app: no se envuelve (envolver rompe su render).
+                    // Se engancha la captura como reportable cuando es posible.
+                    if ($handler instanceof \Illuminate\Foundation\Exceptions\Handler) {
+                        $handler->reportable(function (\Throwable $e) {
                             try {
                                 $collector = app(TelemetryCollector::class);
                                 ExceptionCollector::handle($collector, $e);
-                                // 'except' solo excluye la PROMOCIÓN a caso (no la captura del
-                                // evento crudo del trace, que ya ocurrió arriba a propósito).
-                                $except = config('innertia.telemetry.except', []);
-                                foreach ($except as $class) {
-                                    if ($e instanceof $class) return;
-                                }
-                                app(\Innertia\Telemetry\Cases\CaseRecorder::class)
-                                    ->record($e, $collector->traceId());
                             } catch (\Throwable) {}
-                        }
+                        });
+                    }
 
-                        public function render($request, \Throwable $e)
-                        {
-                            return $this->inner->render($request, $e);
-                        }
-                    };
+                    return $handler;
                 }
             );
         } catch (\Throwable) {
