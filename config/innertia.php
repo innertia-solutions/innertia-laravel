@@ -522,6 +522,13 @@ return [
     */
     'platform' => [
         'separate_identity' => env('INNERTIA_PLATFORM_SEPARATE', false),
+
+        // Cuenta owner por defecto de /platform. Se crea sola tras `migrate` (si no
+        // existe) con cambio de clave obligatorio al primer ingreso. Sin
+        // default_password: 'Innertia1234!' en local, aleatoria fuera de local
+        // (entrar con `php artisan platform:password`, que genera una temporal).
+        'default_email'    => env('INNERTIA_PLATFORM_EMAIL', 'platform@innertia.cl'),
+        'default_password' => env('INNERTIA_PLATFORM_DEFAULT_PASSWORD'),
     ],
 
     'auth' => [

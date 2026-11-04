@@ -251,6 +251,7 @@ class InnertiaServiceProvider extends ServiceProvider
                 MakeUseCaseCommand::class,
                 MakeControllerCommand::class,
                 \Innertia\Auth\Console\Commands\JwtSecretCommand::class,
+                \Innertia\Auth\Console\Commands\PlatformPasswordCommand::class,
             ];
 
             if ($isSaas) {
@@ -295,6 +296,22 @@ class InnertiaServiceProvider extends ServiceProvider
 
             $this->commands($commands);
         }
+
+        // ── Cuenta owner de /platform ─────────────────────────────────────────
+        // Tras cada `migrate` (deploys incluidos) asegura platform@innertia.cl con
+        // clave temporal y cambio obligatorio. Nunca pisa una cuenta existente.
+        Event::listen(\Illuminate\Database\Events\MigrationsEnded::class, function () {
+            if (! config('innertia.platform.separate_identity')) {
+                return;
+            }
+            try {
+                if (\Innertia\Auth\Platform\PlatformAccount::supported()) {
+                    \Innertia\Auth\Platform\PlatformAccount::ensureDefault();
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        });
 
         // ── Events ────────────────────────────────────────────────────────────
         // IsDomainEvent is a marker interface on DomainEvent. Laravel's dispatcher

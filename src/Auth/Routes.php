@@ -110,5 +110,11 @@ class Routes
         Route::post($prefix.'/auth/login', [
             PlatformAuthController::class, 'login',
         ])->middleware('throttle:10,1');
+
+        // Cambio de contraseña de la propia cuenta de plataforma. Es la única ruta
+        // que Authenticate deja pasar mientras force_password_change esté pendiente.
+        Route::post($prefix.'/auth/password', [
+            \Innertia\Auth\Http\Controllers\PlatformPasswordController::class, 'update',
+        ])->middleware([\Innertia\Auth\Middleware\Authenticate::class, 'throttle:10,1']);
     }
 }
