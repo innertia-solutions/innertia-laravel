@@ -30,7 +30,15 @@ class ChangePassword extends UseCase
         }
 
         $model = config('auth.providers.users.model');
-        $user  = $model::findOrFail($this->userId);
+        $user  = $model::find($this->userId);
+
+        // Endpoint pre-auth (sin sesión): solo vale para el cambio FORZADO que
+        // exige el login. Sin este guard, cualquiera con un user_id podía fijar
+        // la contraseña de otra cuenta y recibir su JWT (toma de cuenta).
+        // Mismo error para "no existe" y "no aplica" (sin enumeración).
+        if (! $user || ! $user->force_password_change) {
+            throw new UnprocessableException(errors: ['user_id' => ['No hay un cambio de contraseña pendiente para esta cuenta.']]);
+        }
 
         $user->update([
             'password'              => Hash::make($this->password),

@@ -29,7 +29,14 @@ class SetPassword extends UseCase
         }
 
         $model = config('auth.providers.users.model');
-        $user  = $model::findOrFail($this->userId);
+        $user  = $model::find($this->userId);
+
+        // Endpoint pre-auth (sin sesión): solo para cuentas que nunca se
+        // activaron. Una cuenta activa no puede re-fijar su contraseña por aquí
+        // (antes: toma de cuenta con solo conocer el user_id).
+        if (! $user || $user->email_verified_at !== null) {
+            throw new UnprocessableException(errors: ['user_id' => ['Esta cuenta ya fue activada. Usa "¿Olvidaste tu contraseña?".']]);
+        }
 
         $user->update([
             'password'          => Hash::make($this->password),

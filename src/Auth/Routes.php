@@ -56,18 +56,18 @@ class Routes
         ) {
             Route::post('login',             [$authController, 'login'])->middleware('throttle:10,1');
 
-            Route::post('otp/send',          [$otpController, 'send']);
-            Route::post('otp/verify',        [$otpController, 'verify']);
+            Route::post('otp/send',          [$otpController, 'send'])->middleware('throttle:5,1');
+            Route::post('otp/verify',        [$otpController, 'verify'])->middleware('throttle:5,1');
 
-            Route::post('2fa/verify',        [$twoFactorController, 'verify']);
+            Route::post('2fa/verify',        [$twoFactorController, 'verify'])->middleware('throttle:5,1');
 
             Route::post('email/verify/send', [$emailController, 'send']);
             Route::get ('email/verify',      [$emailController, 'verify'])->name('auth.email.verify');
 
-            Route::post('password/forgot',   [$passwordController, 'forgot']);
+            Route::post('password/forgot',   [$passwordController, 'forgot'])->middleware('throttle:5,1');
             Route::post('password/reset',    [$passwordController, 'reset']);
-            Route::post('password/change',   [$passwordController, 'change']);
-            Route::post('password/set',      [$passwordController, 'set']);
+            Route::post('password/change',   [$passwordController, 'change'])->middleware('throttle:5,1');
+            Route::post('password/set',      [$passwordController, 'set'])->middleware('throttle:5,1');
 
             Route::get('{provider}/redirect', [$socialController, 'redirect'])->where('provider', $oauthProviders);
             Route::get('{provider}/callback', [$socialController, 'callback'])->where('provider', $oauthProviders);
