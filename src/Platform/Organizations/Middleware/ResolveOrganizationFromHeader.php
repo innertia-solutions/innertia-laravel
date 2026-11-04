@@ -15,6 +15,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Behaviour matrix:
  *   feature disabled       → pass through, no side effects.
  *   no header              → pass through, context remains empty.
+ *   tenancy sin tenant     → pass through (open pre-selección de tenant).
  *   header + unknown slug  → 401 JSON.
  *   org inactiva           → 403 organization_inactive.
  *   user sin membresía     → 403 organization_forbidden (user_contexts con la org o NULL;
@@ -35,6 +36,13 @@ class ResolveOrganizationFromHeader
         $slug = trim((string) $request->header('X-Organization', ''));
 
         if ($slug === '') {
+            return $next($request);
+        }
+
+        // Las orgs viven dentro de un tenant: con tenancy y sin tenant activo
+        // (modo open antes de elegir tenant: /auth/me, /auth/my-gyms) no hay org
+        // que resolver — se ignora el header en vez de responder 403/401.
+        if (Innertia::tenancyEnabled() && Innertia::tenant() === null) {
             return $next($request);
         }
 

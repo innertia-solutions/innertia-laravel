@@ -18,7 +18,7 @@ class Routes
         AuthRoutes::publicRoutes($prefix);
 
         // Autenticado
-        Route::middleware(Authenticate::class)->group(function () use ($prefix) {
+        Route::middleware([Authenticate::class, \Innertia\Platform\Organizations\Middleware\ResolveOrganizationFromHeader::class])->group(function () use ($prefix) {
             AuthRoutes::sessionRoutes($prefix);
         });
     }

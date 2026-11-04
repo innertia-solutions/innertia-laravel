@@ -51,7 +51,7 @@ class AuthController extends Controller
         // Permissions consolidadas — direct + via roles + via teams (si feature activo)
         $permissions = [];
         if (method_exists($user, 'roles')) {
-            $viaRoles = $user->roles()
+            $viaRoles = $this->rolesInActiveOrganization($user)
                 ->with('permissions')
                 ->get()
                 ->flatMap(fn ($role) => $role->permissions->pluck('name'));
@@ -122,6 +122,28 @@ class AuthController extends Controller
     }
 
     /**
+     * Roles del usuario que aplican en la org activa: asignaciones globales
+     * (model_roles.organization_id NULL) + las de la org de X-Organization.
+     * Sin el feature de organizations es la relación roles() tal cual.
+     */
+    private function rolesInActiveOrganization($user)
+    {
+        $query = $user->roles();
+
+        if (\Innertia\Platform\Organizations\OrganizationsFeature::isActive()) {
+            $orgId = \Innertia\Facades\Innertia::organization()?->current();
+            $query->where(function ($q) use ($orgId) {
+                $q->whereNull('model_roles.organization_id');
+                if ($orgId !== null) {
+                    $q->orWhere('model_roles.organization_id', $orgId);
+                }
+            });
+        }
+
+        return $query;
+    }
+
+    /**
      * Transforma `accessibleOrganizationsByContext(): array<context, array<orgId|null>>` en
      * shape para el frontend: `{ context: [{ id, key, name }, ...] }`.
      */
@@ -173,13 +195,11 @@ class AuthController extends Controller
         $permissions = [];
 
         if (method_exists($user, 'roles')) {
-            $roles = $user->getRoleNames()->values()->all();
+            $userRoles = $this->rolesInActiveOrganization($user)->with('permissions')->get();
+            $roles     = $userRoles->pluck('name')->unique()->values()->all();
 
             // Collect all named permissions via roles + direct grants
-            $viaRoles = $user->roles()
-                ->with('permissions')
-                ->get()
-                ->flatMap(fn ($role) => $role->permissions->pluck('name'));
+            $viaRoles = $userRoles->flatMap(fn ($role) => $role->permissions->pluck('name'));
 
             $direct = $user->directPermissions()->pluck('name');
 
