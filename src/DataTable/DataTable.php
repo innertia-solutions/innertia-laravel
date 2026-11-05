@@ -929,7 +929,37 @@ class DataTable
             }
         }
 
+        $this->applyStableTiebreak($query);
+
         return $query;
+    }
+
+    /**
+     * Desempate final por la PK: con LIMIT/OFFSET y valores repetidos en la columna de orden
+     * (p. ej. muchas citas a la misma hora) Postgres no garantiza el orden entre empates y las
+     * páginas repiten/pierden filas. No aplica con GROUP BY/DISTINCT (la PK no está agrupada).
+     */
+    private function applyStableTiebreak(Builder $query): void
+    {
+        $base = $query->getQuery();
+        if (! empty($base->groups) || $base->distinct || ! empty($base->unions)) {
+            return;
+        }
+
+        $model = $query->getModel();
+        $key = $model->getKeyName();
+        if (! is_string($key) || $key === '') {
+            return;
+        }
+
+        $qualified = $model->qualifyColumn($key);
+        foreach ($base->orders ?? [] as $order) {
+            if (in_array($order['column'] ?? null, [$key, $qualified], true)) {
+                return;
+            }
+        }
+
+        $query->orderBy($qualified);
     }
 
     /**

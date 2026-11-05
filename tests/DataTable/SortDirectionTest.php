@@ -44,3 +44,14 @@ it('respeta asc/desc válidos en columnas calculadas y normales (sin distinguir 
     expect($names(['column' => 'name', 'direction' => 'desc']))->toBe(['c', 'b', 'a']);
     expect($names(['column' => 'name', 'direction' => 'cualquier-cosa']))->toBe(['a', 'b', 'c']);
 });
+
+it('agrega desempate estable por la PK al final del orden', function () {
+    $sql = sdTable()->getQuery(SdItem::class, '', [['column' => 'name', 'direction' => 'asc']])->toSql();
+    expect($sql)->toEndWith('order by "name" asc, "sd_items"."id" asc');
+});
+
+it('no duplica el desempate si ya se ordena por la PK', function () {
+    $orders = sdTable()->getQuery(SdItem::class, '', [['column' => 'id', 'direction' => 'desc']])->getQuery()->orders;
+    expect($orders)->toHaveCount(1);
+    expect($orders[0])->toMatchArray(['column' => 'id', 'direction' => 'desc']);
+});
