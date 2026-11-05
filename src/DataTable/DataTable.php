@@ -916,7 +916,9 @@ class DataTable
 
         foreach ($sortColumns as $sort) {
             $column = $sort['column'] ?? null;
-            $direction = $sort['direction'] ?? 'asc';
+            // Viene del cliente: solo asc|desc. En columnas calculadas va a orderByRaw
+            // (interpolado), así que sin esto es inyección SQL; en normales evita el 500.
+            $direction = strtolower((string) ($sort['direction'] ?? 'asc')) === 'desc' ? 'desc' : 'asc';
 
             if ($column) {
                 if (isset($this->calculatedColumns[$column])) {
