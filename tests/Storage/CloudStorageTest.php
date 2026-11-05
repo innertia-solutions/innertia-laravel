@@ -40,6 +40,9 @@ it('arma la config por proveedor', function () {
 
     $gcs = $m->buildCloudConfig(cloudSettings(['provider' => 'gcs', 'endpoint' => null]));
     expect($gcs)->toMatchArray(['endpoint' => StorageManager::GCS_ENDPOINT, 'region' => 'auto']);
+    // GCS no acepta el x-amz-checksum-crc32 que el SDK manda por defecto → InvalidArgument.
+    expect($gcs)->toMatchArray(['request_checksum_calculation' => 'when_required', 'response_checksum_validation' => 'when_required'])
+        ->and($r2)->not->toHaveKey('request_checksum_calculation');
 });
 
 it('devuelve null si falta algo obligatorio', function () {
@@ -143,4 +146,28 @@ describe('migración de archivos', function () {
         Settings::forget('integrations.storage.bucket');
         $this->artisan('innertia:storage:migrate-files')->assertFailed();
     });
+});
+
+it('el disco gcs no envía checksums CRC32 en PutObject (GCS los rechaza)', function () {
+    if (! class_exists(\Aws\S3\S3Client::class)) {
+        $this->markTestSkipped('aws/aws-sdk-php no está instalado en la lib (sí en los productos).');
+    }
+    $sent = null;
+    $c = app(StorageManager::class)->buildCloudConfig(cloudSettings(['provider' => 'gcs', 'endpoint' => null]));
+    $client = new \Aws\S3\S3Client([
+        'version' => 'latest', 'region' => $c['region'], 'endpoint' => $c['endpoint'],
+        'use_path_style_endpoint' => $c['use_path_style_endpoint'],
+        'credentials' => ['key' => $c['key'], 'secret' => $c['secret']],
+        'request_checksum_calculation' => $c['request_checksum_calculation'],
+        'response_checksum_validation' => $c['response_checksum_validation'],
+        'http_handler' => function ($req) use (&$sent) {
+            $sent = $req;
+
+            return \GuzzleHttp\Promise\Create::promiseFor(new \GuzzleHttp\Psr7\Response(200));
+        },
+    ]);
+
+    $client->putObject(['Bucket' => $c['bucket'], 'Key' => 'k.txt', 'Body' => 'ok']);
+
+    expect($sent->hasHeader('x-amz-checksum-crc32'))->toBeFalse();
 });

@@ -119,7 +119,13 @@ class StorageManager
             return null;
         }
 
+        // GCS (API XML) rechaza con InvalidArgument los checksums CRC32 que el SDK de
+        // AWS agrega por defecto desde 3.337 (x-amz-checksum-crc32): solo cuando se exijan.
+        $checksums = $provider === 'gcs' ? 'when_required' : null;
+
         return array_filter([
+            'request_checksum_calculation' => $checksums,
+            'response_checksum_validation' => $checksums,
             'driver'                  => 's3',
             'key'                     => (string) $s['access_key_id'],
             'secret'                  => (string) $s['secret_access_key'],
