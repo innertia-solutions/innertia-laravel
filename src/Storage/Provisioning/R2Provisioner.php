@@ -65,6 +65,12 @@ class R2Provisioner extends StorageProvisioner
         }
         $details[] = "Token con lectura/escritura solo sobre {$bucket} creado (innertia-storage-{$bucket}).";
 
+        // Re-ejecutar sobre el mismo bucket deja obsoletos los tokens anteriores con ese nombre.
+        $deleted = $this->deleteOldTokens($base, "innertia-storage-{$bucket}", $id);
+        if ($deleted > 0) {
+            $details[] = "{$deleted} token(s) anteriores de {$bucket} eliminados.";
+        }
+
         return [
             'settings' => [
                 'provider'          => 'r2',
@@ -94,6 +100,27 @@ class R2Provisioner extends StorageProvisioner
         }
 
         throw new ProvisioningException('El token no puede crear tokens nuevos: agrégale el permiso "API Tokens: Edit" (o "Account API Tokens: Edit").');
+    }
+
+    /** Borra los tokens con ese nombre salvo el recién creado. Best-effort: devuelve cuántos borró. */
+    private function deleteOldTokens(string $base, string $name, string $keepId): int
+    {
+        $res = $this->http()->get(self::API.$base, ['per_page' => 50]);
+        if (! $res->successful()) {
+            return 0;
+        }
+
+        $deleted = 0;
+        foreach ($res->json('result') ?? [] as $token) {
+            if (($token['name'] ?? null) !== $name || ($token['id'] ?? null) === $keepId || empty($token['id'])) {
+                continue;
+            }
+            if ($this->http()->delete(self::API.$base.'/'.$token['id'])->successful()) {
+                $deleted++;
+            }
+        }
+
+        return $deleted;
     }
 
     private function onlyAccount(): string

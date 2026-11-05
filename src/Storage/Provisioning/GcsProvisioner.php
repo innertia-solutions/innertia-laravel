@@ -26,6 +26,9 @@ class GcsProvisioner extends StorageProvisioner
 
     private const IAM = 'https://iam.googleapis.com/v1';
 
+    /** Máximo de claves HMAC por cuenta de servicio en GCS. */
+    private const HMAC_LIMIT = 10;
+
     private string $token;
 
     public function provision(array $input): array
@@ -73,8 +76,19 @@ class GcsProvisioner extends StorageProvisioner
             $details[] = "Rol Storage Object Admin sobre el bucket para {$email}.";
         }
 
-        // 4. HMAC
-        $res = $this->http()->post(self::STORAGE.'/projects/'.urlencode($project).'/hmacKeys?serviceAccountEmail='.urlencode($email));
+        // 4. HMAC. Al reusar la cuenta dedicada, sus claves anteriores quedan obsoletas:
+        //    se borran (GCS admite máx. 10 por cuenta; si el límite ya está lleno se
+        //    limpian antes y se reintenta). Nunca se tocan las claves de la cuenta admin.
+        $hmac = self::STORAGE.'/projects/'.urlencode($project).'/hmacKeys';
+        $dedicated = $email !== $sa['client_email'];
+        $old = $dedicated ? $this->hmacKeys($hmac, $email) : [];
+
+        $res = $this->http()->post($hmac.'?serviceAccountEmail='.urlencode($email));
+        if ($res->failed() && $old && count($old) >= self::HMAC_LIMIT) {
+            $this->deleteHmacKeys($hmac, $old);
+            $old = [];
+            $res = $this->http()->post($hmac.'?serviceAccountEmail='.urlencode($email));
+        }
         $this->ok($res, 'crear la clave HMAC');
         $accessId = $res->json('metadata.accessId');
         $secret = $res->json('secret');
@@ -82,6 +96,12 @@ class GcsProvisioner extends StorageProvisioner
             throw new ProvisioningException('Google no devolvió la clave HMAC.');
         }
         $details[] = "Clave HMAC emitida ({$accessId}).";
+
+        $old = array_values(array_filter($old, fn ($k) => ($k['accessId'] ?? null) !== $accessId));
+        if ($old) {
+            $deleted = $this->deleteHmacKeys($hmac, $old);
+            $details[] = "{$deleted} clave(s) HMAC anteriores de {$email} eliminadas.";
+        }
 
         return [
             'settings' => [
@@ -125,6 +145,34 @@ class GcsProvisioner extends StorageProvisioner
         $details[] = "Cuenta de servicio dedicada creada: {$email}.";
 
         return $res->json('email') ?: $email;
+    }
+
+    /** Claves HMAC (no borradas) de la cuenta; [] si no se pueden listar. */
+    private function hmacKeys(string $base, string $email): array
+    {
+        $res = $this->http()->get($base.'?serviceAccountEmail='.urlencode($email));
+
+        return $res->successful() ? array_values($res->json('items') ?? []) : [];
+    }
+
+    /** Desactiva (si está activa) y borra cada clave. Best-effort: devuelve cuántas borró. */
+    private function deleteHmacKeys(string $base, array $keys): int
+    {
+        $deleted = 0;
+        foreach ($keys as $key) {
+            $id = $key['accessId'] ?? null;
+            if (! $id) {
+                continue;
+            }
+            if (($key['state'] ?? null) === 'ACTIVE') {
+                $this->http()->put($base.'/'.urlencode($id), ['state' => 'INACTIVE']);
+            }
+            if ($this->http()->delete($base.'/'.urlencode($id))->successful()) {
+                $deleted++;
+            }
+        }
+
+        return $deleted;
     }
 
     private function grantBucketRole(string $bucket, string $email): void
