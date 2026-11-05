@@ -8,10 +8,11 @@ use Innertia\Ai\Models\AiModel;
 use Innertia\Ai\Models\AiProvider;
 use Innertia\Ai\Models\McpServer;
 use Innertia\Ai\Models\RagCollection;
+use Innertia\Ai\ProviderPresets;
 
 /**
- * Defaults del módulo de IA: proveedor MiniMax (openai-compatible, sin key),
- * modelos chat/visión/embedding, asignaciones por uso, colección RAG `default`
+ * Defaults del módulo de IA: proveedores MiniMax (chat/visión) y OpenAI (embedding
+ * text-embedding-3-small por defecto), sin keys; asignaciones por uso, colección RAG `default`
  * y el server MCP `question-bank`. Idempotente — se puede correr varias veces.
  * Las credenciales (api_key) se cargan luego por UI/seed del producto.
  */
@@ -30,17 +31,24 @@ class AiDefaultsSeeder extends Seeder
             ],
         );
 
-        $models = [
-            ['key' => 'MiniMax-M3.1-Flash', 'name' => 'MiniMax M3.1 Flash', 'capabilities' => ['chat', 'vision']],
-            ['key' => 'MiniMax-M3',         'name' => 'MiniMax M3',          'capabilities' => ['chat', 'vision']],
-            ['key' => 'embo-01',            'name' => 'embo-01 (embedding)', 'capabilities' => ['embedding']],
-        ];
-        foreach ($models as $model) {
-            AiModel::firstOrCreate(
-                ['provider_id' => $minimax->id, 'key' => $model['key']],
-                ['name' => $model['name'], 'capabilities' => $model['capabilities'], 'active' => true],
-            );
-        }
+        // embo-01 queda disponible en MiniMax, pero el embedding por defecto es OpenAI.
+        AiModel::firstOrCreate(
+            ['provider_id' => $minimax->id, 'key' => 'embo-01'],
+            ['name' => 'embo-01 (embedding)', 'capabilities' => ['embedding'], 'active' => true],
+        );
+        ProviderPresets::ensureDefaultModels($minimax);
+
+        $openai = AiProvider::firstOrCreate(
+            ['key' => 'openai'],
+            [
+                'name'     => 'OpenAI',
+                'type'     => 'openai',
+                'base_url' => 'https://api.openai.com/v1',
+                'api_key'  => null,
+                'active'   => true,
+            ],
+        );
+        ProviderPresets::ensureDefaultModels($openai);
 
         // MiniMax-M3.1-Flash es multimodal (texto + visión) vía el mismo endpoint
         // OpenAI-compatible, así que cubre chat/assistant/vision.
@@ -48,12 +56,12 @@ class AiDefaultsSeeder extends Seeder
             'chat'      => 'MiniMax-M3.1-Flash',
             'assistant' => 'MiniMax-M3.1-Flash',
             'vision'    => 'MiniMax-M3.1-Flash',
-            'embedding' => 'embo-01',
+            'embedding' => ProviderPresets::OPENAI_EMBEDDING,
         ];
         foreach ($assignments as $use => $model) {
             AiAssignment::firstOrCreate(
                 ['use' => $use],
-                ['provider_id' => $minimax->id, 'model' => $model, 'active' => true],
+                ['provider_id' => $use === 'embedding' ? $openai->id : $minimax->id, 'model' => $model, 'active' => true],
             );
         }
 
@@ -61,8 +69,8 @@ class AiDefaultsSeeder extends Seeder
             ['key' => 'default'],
             [
                 'name'                  => 'Colección por defecto',
-                'embedding_provider_id' => $minimax->id,
-                'embedding_model'       => 'embo-01',
+                'embedding_provider_id' => $openai->id,
+                'embedding_model'       => ProviderPresets::OPENAI_EMBEDDING,
                 'dimension'             => 1536,
                 'active'                => true,
             ],

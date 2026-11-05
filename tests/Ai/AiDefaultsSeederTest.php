@@ -38,11 +38,14 @@ afterEach(function () {
 
 // ─── Tests ─────────────────────────────────────────────────────────────────
 
-it('seeds the minimax provider, models, assignments, default collection and mcp server', function () {
+it('seeds minimax (chat/vision) + openai (embedding default), assignments, default collection and mcp server', function () {
     (new AiDefaultsSeeder)->run();
 
     // Provider
-    expect(AiProvider::count())->toBe(1);
+    expect(AiProvider::count())->toBe(2);
+    $openai = AiProvider::where('key', 'openai')->first();
+    expect($openai->type)->toBe('openai')
+        ->and(AiModel::where('provider_id', $openai->id)->pluck('key')->all())->toBe(['text-embedding-3-small']);
     $minimax = AiProvider::where('key', 'minimax')->first();
     expect($minimax)->not->toBeNull()
         ->and($minimax->type)->toBe('openai-compatible')
@@ -75,16 +78,16 @@ it('seeds the minimax provider, models, assignments, default collection and mcp 
 
     $embeddingAssignment = AiAssignment::where('use', 'embedding')->first();
     expect($embeddingAssignment)->not->toBeNull()
-        ->and($embeddingAssignment->model)->toBe('embo-01')
-        ->and($embeddingAssignment->provider_id)->toBe($minimax->id);
+        ->and($embeddingAssignment->model)->toBe('text-embedding-3-small')
+        ->and($embeddingAssignment->provider_id)->toBe($openai->id);
 
     // RAG Collection
     expect(RagCollection::count())->toBe(1);
     $collection = RagCollection::where('key', 'default')->first();
     expect($collection)->not->toBeNull()
-        ->and($collection->embedding_model)->toBe('embo-01')
+        ->and($collection->embedding_model)->toBe('text-embedding-3-small')
         ->and($collection->dimension)->toBe(1536)
-        ->and($collection->embedding_provider_id)->toBe($minimax->id);
+        ->and($collection->embedding_provider_id)->toBe($openai->id);
 
     // MCP Server
     expect(McpServer::count())->toBe(1);
@@ -97,9 +100,24 @@ it('is idempotent', function () {
     (new AiDefaultsSeeder)->run();
     (new AiDefaultsSeeder)->run();
 
-    expect(AiProvider::count())->toBe(1);
-    expect(AiModel::count())->toBe(3);
+    expect(AiProvider::count())->toBe(2);
+    expect(AiModel::count())->toBe(4);
     expect(AiAssignment::count())->toBe(4);
     expect(RagCollection::count())->toBe(1);
     expect(McpServer::count())->toBe(1);
+});
+
+it('un proveedor openai nuevo recibe su modelo de embedding por defecto (idempotente)', function () {
+    $p = AiProvider::create(['key' => 'openai-x', 'name' => 'OpenAI', 'type' => 'openai', 'base_url' => 'https://api.openai.com/v1', 'active' => true]);
+
+    expect(\Innertia\Ai\ProviderPresets::ensureDefaultModels($p))->toBe(1)
+        ->and(\Innertia\Ai\ProviderPresets::ensureDefaultModels($p))->toBe(0);
+    $m = AiModel::where('provider_id', $p->id)->sole();
+    expect($m->key)->toBe('text-embedding-3-small')->and($m->capabilities)->toBe(['embedding']);
+});
+
+it('un tipo sin presets no recibe modelos', function () {
+    $p = AiProvider::create(['key' => 'otro', 'name' => 'Otro', 'type' => 'openai-compatible', 'active' => true]);
+
+    expect(\Innertia\Ai\ProviderPresets::ensureDefaultModels($p))->toBe(0);
 });

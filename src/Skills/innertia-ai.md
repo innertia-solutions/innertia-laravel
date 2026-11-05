@@ -12,7 +12,7 @@ Toda la configuración vive en **base de datos** (keys cifradas), no en `Setting
 ## Cuándo usar
 
 - El producto necesita IA: chat/asistente, OCR de imágenes (visión), embeddings, RAG (búsqueda semántica), y/o exponer tools por MCP.
-- Querés distinto proveedor/modelo por uso (ej. chat con MiniMax-M2, visión con abab6.5v, embeddings con embo-01) sin hardcodear.
+- Querés distinto proveedor/modelo por uso (ej. chat con MiniMax-M2, visión con abab6.5v, embeddings con text-embedding-3-small de OpenAI, el default) sin hardcodear.
 - Querés estadísticas de consumo (tokens por uso/proveedor).
 
 NO uses este módulo para lógica de dominio del producto — las **tools** MCP y la **UI/consola** las aporta el producto; la librería da el motor.
@@ -125,3 +125,7 @@ Route::post('/mcp/question-bank', QuestionBankServer::class)
 innertia:ai:install [--path=] [--force]   # genera la migración (guard: AiFeature::isActive())
 innertia:ai:seed                          # siembra defaults (idempotente)
 ```
+
+## Modelos por defecto por proveedor (`ProviderPresets`)
+
+`Innertia\Ai\ProviderPresets::ensureDefaultModels($provider)` registra los modelos que trae cada tipo (idempotente): `openai` → `text-embedding-3-small` (embedding, 1536 dim = columna del RAG); `minimax` → MiniMax-M3.1-Flash / M3 (chat+visión). Llamarlo al crear un proveedor desde la UI. El seeder deja **OpenAI como embedding por defecto** (asignación + colección `default`); MiniMax para chat/asistente/visión.

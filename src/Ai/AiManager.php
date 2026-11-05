@@ -66,7 +66,7 @@ class AiManager
             : ($embeddingUse['provider'] ?? null);
 
         $model = $collection?->embedding_model
-            ?: ($embeddingUse['model'] ?? 'embo-01');
+            ?: ($embeddingUse['model'] ?? \Innertia\Ai\ProviderPresets::OPENAI_EMBEDDING);
 
         $dim = (int) ($collection?->dimension ?: 1536);
 
