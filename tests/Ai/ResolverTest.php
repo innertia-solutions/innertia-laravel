@@ -87,6 +87,16 @@ it('configureFor applies the laravel/ai openai-compatible config and returns the
         ->and(config('ai.providers.openai-compatible.key'))->toBe('secret-key');
 });
 
+it('configureFor purga la instancia memoizada de laravel/ai (workers/Octane ven el proveedor nuevo)', function () {
+    makeChatSetup();
+
+    $spy = Mockery::mock(\Laravel\Ai\AiManager::class);
+    $spy->shouldReceive('purge')->once()->with('openai-compatible');
+    app()->instance(\Laravel\Ai\AiManager::class, $spy);
+
+    Ai::configureFor('chat');
+});
+
 it('enabled() is true only when the chat provider has an api key', function () {
     // (a) provider WITH api_key → enabled() true
     [$provider] = makeChatSetup();

@@ -40,7 +40,24 @@ class AiManager
             'ai.providers.openai-compatible.key' => (string) $resolved['provider']->api_key,
         ]);
 
+        // laravel/ai memoiza la instancia del proveedor: en workers de cola u Octane (procesos que viven
+        // entre jobs/requests) un cambio de proveedor/key en BD no se vería. Se purga tras reconfigurar.
+        $this->purgeLaravelAiInstance('openai-compatible');
+
         return $resolved['model'];
+    }
+
+    private function purgeLaravelAiInstance(string $provider): void
+    {
+        if (! class_exists(\Laravel\Ai\AiManager::class)) {
+            return;
+        }
+
+        try {
+            app(\Laravel\Ai\AiManager::class)->purge($provider);
+        } catch (\Throwable) {
+            // Sin instancia memoizada: nada que purgar.
+        }
     }
 
     public function usage(): UsageLogger
