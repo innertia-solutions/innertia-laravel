@@ -275,3 +275,15 @@ it('el share-link rechaza hours fuera de rango', function () {
 
     $this->getJson("/files/{$file->id}/share-link?hours=0")->assertStatus(422);
 });
+
+// ── disk ──────────────────────────────────────────────────────────────────────
+
+it('exposes the storage disk in the file resource', function () {
+    $file = (new UploadFile(TestFile::create('disk.pdf', 10, 'application/pdf')))->execute();
+
+    $this->getJson("/files/{$file->id}")
+        ->assertOk()
+        ->assertJsonPath('data.disk', $file->disk);
+
+    expect($file->disk)->not->toBeEmpty();
+});

@@ -15,6 +15,7 @@ class FileResource extends JsonResource
             'extension'      => $this->extension,
             'size'           => $this->size,
             'visibility'     => $this->visibility,
+            'disk'           => $this->disk,
             'directory_id'   => $this->directory_id ?? null,
             'owner_type'     => $this->owner_type,
             'owner_id'       => $this->owner_id,
