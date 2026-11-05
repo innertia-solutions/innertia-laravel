@@ -553,6 +553,9 @@ return [
         'otp' => [
             'enabled' => false,
             'ttl'     => 10,        // minutes
+            // Exigir el código OTP (enviado por el login) en password/change del
+            // cambio forzado. Recomendado; opt-in para no romper fronts antiguos.
+            'require_on_password_change' => false,
         ],
 
         '2fa' => [

@@ -107,3 +107,24 @@ it('set activa una cuenta nunca activada una sola vez', function () {
     expect(fn () => (new SetPassword((string) $user->id, 'Otra123456', 'Otra123456', 'backoffice'))->execute())
         ->toThrow(UnprocessableException::class);
 });
+
+it('con require_on_password_change exige el código OTP del login', function () {
+    config()->set('innertia.auth.otp.require_on_password_change', true);
+    $user = pwUser(['force_password_change' => true]);
+
+    $otp = Mockery::mock(\Innertia\Auth\Services\OtpService::class);
+    $otp->shouldReceive('verify')->with(Mockery::any(), '000000', 'login')->andReturn(false);
+    $otp->shouldReceive('verify')->with(Mockery::any(), '123456', 'login')->andReturn(true);
+    app()->instance(\Innertia\Auth\Services\OtpService::class, $otp);
+
+    // Sin código o con código malo: no cambia.
+    expect(fn () => (new ChangePassword((string) $user->id, 'Nueva12345', 'Nueva12345', 'backoffice'))->execute())
+        ->toThrow(UnprocessableException::class);
+    expect(fn () => (new ChangePassword((string) $user->id, 'Nueva12345', 'Nueva12345', 'backoffice', '000000'))->execute())
+        ->toThrow(UnprocessableException::class);
+    expect(Hash::check('Original123', $user->fresh()->password))->toBeTrue();
+
+    $result = (new ChangePassword((string) $user->id, 'Nueva12345', 'Nueva12345', 'backoffice', '123456'))->execute();
+    expect($result['token'])->toBe('fake-token')
+        ->and($user->fresh()->force_password_change)->toBeFalse();
+});

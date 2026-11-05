@@ -71,6 +71,7 @@ class PasswordController extends Controller
             'password'              => 'required|string|min:8',
             'password_confirmation' => 'required|string',
             'context'               => 'required|string',
+            'code'                  => 'nullable|string|size:6',
         ]);
 
         $result = (new ChangePassword(
@@ -78,6 +79,7 @@ class PasswordController extends Controller
             password:             $data['password'],
             passwordConfirmation: $data['password_confirmation'],
             context:              $data['context'],
+            code:                 $data['code'] ?? null,
         ))->execute();
 
         return response()->json($result);

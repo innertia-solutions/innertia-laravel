@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
 use Innertia\Auth\Mailables\PasswordChangedMail;
 use Innertia\Auth\Services\JwtService;
+use Innertia\Auth\Services\OtpService;
 use Innertia\Exceptions\UnprocessableException;
 use Innertia\Platform\Contracts\UseCase;
 
@@ -19,6 +20,7 @@ class ChangePassword extends UseCase
         public readonly string $password,
         public readonly string $passwordConfirmation,
         public readonly string $context,
+        public readonly ?string $code = null,
     ) {
 
     }
@@ -38,6 +40,14 @@ class ChangePassword extends UseCase
         // Mismo error para "no existe" y "no aplica" (sin enumeración).
         if (! $user || ! $user->force_password_change) {
             throw new UnprocessableException(errors: ['user_id' => ['No hay un cambio de contraseña pendiente para esta cuenta.']]);
+        }
+
+        // Código OTP (action 'login') que el login envió al exigir el cambio. Opt-in
+        // por config para no romper productos cuyo front aún no lo pide.
+        if (config('innertia.auth.otp.require_on_password_change', false)) {
+            if (! $this->code || ! app(OtpService::class)->verify($user, $this->code, 'login')) {
+                throw new UnprocessableException(errors: ['code' => ['El código es inválido o venció. Pide uno nuevo.']]);
+            }
         }
 
         $user->update([
