@@ -32,6 +32,9 @@ class StorageManager
 
     public const GCS_ENDPOINT = 'https://storage.googleapis.com';
 
+    /** Driver de disco: s3 de Laravel + middleware que quita las ACL (ver registerGcsDriver). */
+    public const GCS_DRIVER = 'innertia-gcs';
+
     /** Campos del disco cloud en Settings (relativos al prefijo). */
     public const CLOUD_FIELDS = ['provider', 'bucket', 'region', 'endpoint', 'access_key_id', 'secret_access_key', 'public_url'];
 
@@ -119,14 +122,20 @@ class StorageManager
             return null;
         }
 
-        // GCS (API XML) rechaza con InvalidArgument los checksums CRC32 que el SDK de
-        // AWS agrega por defecto desde 3.337 (x-amz-checksum-crc32): solo cuando se exijan.
-        $checksums = $provider === 'gcs' ? 'when_required' : null;
+        // GCS (API XML) con acceso uniforme (como lo crea el aprovisionador) responde
+        // InvalidArgument a dos cosas que el driver s3 manda por defecto:
+        //  - el checksum CRC32 que el SDK de AWS agrega desde 3.337 → solo cuando se exija;
+        //  - el header x-amz-acl (sale del `visibility` del disco) → sin visibility: los
+        //    objetos heredan el acceso privado del bucket. retain_visibility=false para que
+        //    copy() no lea ACLs (GetObjectAcl tampoco existe con acceso uniforme).
+        //  Las ACL las quita el driver `innertia-gcs` (Flysystem siempre manda una).
+        $gcs = $provider === 'gcs';
+        $checksums = $gcs ? 'when_required' : null;
 
         return array_filter([
             'request_checksum_calculation' => $checksums,
             'response_checksum_validation' => $checksums,
-            'driver'                  => 's3',
+            'driver'                  => $gcs ? self::GCS_DRIVER : 's3',
             'key'                     => (string) $s['access_key_id'],
             'secret'                  => (string) $s['secret_access_key'],
             'region'                  => $region,
@@ -134,7 +143,8 @@ class StorageManager
             'endpoint'                => $endpoint,
             'url'                     => filled($s['public_url'] ?? null) ? rtrim((string) $s['public_url'], '/') : null,
             'use_path_style_endpoint' => $pathStyle,
-            'visibility'              => 'private',
+            'visibility'              => $gcs ? null : 'private',
+            'retain_visibility'       => $gcs ? false : null,
             // Fallar fuerte: con throw=false un put fallido devuelve false y el
             // archivo quedaba registrado sin contenido.
             'throw'                   => true,
@@ -282,6 +292,30 @@ class StorageManager
                 usleep($delay * 1000);
             }
         }
+    }
+
+    /**
+     * Registra el driver `innertia-gcs`: el disco s3 de Laravel con un middleware en el
+     * cliente del SDK que elimina el parámetro ACL de cada comando. Flysystem SIEMPRE
+     * manda `x-amz-acl` al subir (por defecto "private") y un bucket GCS con acceso
+     * uniforme responde InvalidArgument; sin ACL los objetos heredan el acceso del bucket.
+     */
+    public static function registerGcsDriver(): void
+    {
+        LaravelStorage::extend(self::GCS_DRIVER, function ($app, array $config) {
+            $config['driver'] = 's3';
+            $disk = $app['filesystem']->createS3Driver($config);
+            $disk->getClient()->getHandlerList()->appendInit(
+                \Aws\Middleware::mapCommand(function (\Aws\CommandInterface $command) {
+                    unset($command['ACL']);
+
+                    return $command;
+                }),
+                'innertia-gcs-no-acl',
+            );
+
+            return $disk;
+        });
     }
 
     // ── Utilidades ──────────────────────────────────────────────────────────────

@@ -136,6 +136,9 @@ class InnertiaServiceProvider extends ServiceProvider
         // Files: rutas de acceso/descarga de archivos (plataforma interna).
         // Use booted() to ensure these load after all providers, matching how
         // loadRoutesFrom() works but without requiring a procedural include file.
+        // Driver de disco para Google Cloud Storage vía API XML (driver s3 sin ACL).
+        \Innertia\Storage\StorageManager::registerGcsDriver();
+
         $this->booted(function () {
             if (! $this->app->routesAreCached()) {
                 \Innertia\Files\Routes::registerFileServing();

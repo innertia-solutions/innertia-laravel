@@ -42,7 +42,13 @@ it('arma la config por proveedor', function () {
     expect($gcs)->toMatchArray(['endpoint' => StorageManager::GCS_ENDPOINT, 'region' => 'auto']);
     // GCS no acepta el x-amz-checksum-crc32 que el SDK manda por defecto → InvalidArgument.
     expect($gcs)->toMatchArray(['request_checksum_calculation' => 'when_required', 'response_checksum_validation' => 'when_required'])
-        ->and($r2)->not->toHaveKey('request_checksum_calculation');
+        ->and($r2)->not->toHaveKey('request_checksum_calculation')
+        // Ni ACL (x-amz-acl sale de visibility): GCS con acceso uniforme la rechaza.
+        ->and($gcs)->not->toHaveKey('visibility')
+        ->and($gcs['driver'])->toBe(StorageManager::GCS_DRIVER)
+        ->and($r2['driver'])->toBe('s3')
+        ->and($gcs['retain_visibility'])->toBeFalse()
+        ->and($r2['visibility'])->toBe('private');
 });
 
 it('devuelve null si falta algo obligatorio', function () {
@@ -170,4 +176,21 @@ it('el disco gcs no envía checksums CRC32 en PutObject (GCS los rechaza)', func
     $client->putObject(['Bucket' => $c['bucket'], 'Key' => 'k.txt', 'Body' => 'ok']);
 
     expect($sent->hasHeader('x-amz-checksum-crc32'))->toBeFalse();
+});
+
+it('el driver innertia-gcs quita la ACL de cada comando (GCS con acceso uniforme la rechaza)', function () {
+    if (! class_exists(\League\Flysystem\AwsS3V3\AwsS3V3Adapter::class)) {
+        $this->markTestSkipped('league/flysystem-aws-s3-v3 no está en la lib (sí en los productos).');
+    }
+    $sent = [];
+    $config = app(StorageManager::class)->buildCloudConfig(cloudSettings(['provider' => 'gcs', 'endpoint' => null]));
+    $config['http_handler'] = function ($req) use (&$sent) {
+        $sent[] = $req;
+
+        return \GuzzleHttp\Promise\Create::promiseFor(new \GuzzleHttp\Psr7\Response(200));
+    };
+
+    \Illuminate\Support\Facades\Storage::build($config)->put('k.txt', 'ok');
+
+    expect($sent[0]->hasHeader('x-amz-acl'))->toBeFalse();
 });
