@@ -16,6 +16,8 @@ use Innertia\Storage\StorageManager;
  * @method static array cloudSettings()
  * @method static array|null buildCloudConfig(array $settings)
  * @method static array probe(?array $settings = null)
+ * @method static array probeWithRetry(?array $settings = null, int $attempts = 6)
+ * @method static array provision(string $provider, array $input)
  * @method static string localPath(string $disk, string $path)
  *
  * @see StorageManager

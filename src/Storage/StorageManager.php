@@ -235,6 +235,49 @@ class StorageManager
         return Str::limit(strtok($prev->getMessage(), "\n") ?: $e->getMessage(), 200);
     }
 
+    // ── Aprovisionamiento automático ────────────────────────────────────────────
+
+    /** Proveedores que pueden crear bucket + credencial solos desde una credencial admin. */
+    public const PROVISIONERS = [
+        'gcs' => Provisioning\GcsProvisioner::class,
+        'r2'  => Provisioning\R2Provisioner::class,
+    ];
+
+    /**
+     * Crea bucket + credencial de mínimo privilegio con una credencial ADMIN de un solo
+     * uso (no se persiste). Devuelve los settings del disco cloud para que el producto
+     * los guarde por su vía (secretos encriptados) y luego valide con probe().
+     *
+     * @return array{settings: array<string, ?string>, details: string[]}
+     *
+     * @throws Provisioning\ProvisioningException
+     */
+    public function provision(string $provider, array $input): array
+    {
+        $class = self::PROVISIONERS[$provider]
+            ?? throw new Provisioning\ProvisioningException('El proveedor "'.$provider.'" no admite configuración automática.');
+
+        return app($class)->provision($input);
+    }
+
+    /**
+     * probe() con reintentos: las credenciales recién emitidas (HMAC de GCS, tokens de
+     * R2) tardan unos segundos en propagarse.
+     */
+    public function probeWithRetry(?array $settings = null, int $attempts = 6): array
+    {
+        $delay = Provisioning\StorageProvisioner::$retryDelayMs;
+        for ($i = 1; ; $i++) {
+            $result = $this->probe($settings);
+            if ($result['ok'] || $i >= $attempts) {
+                return $result;
+            }
+            if ($delay > 0) {
+                usleep($delay * 1000);
+            }
+        }
+    }
+
     // ── Utilidades ──────────────────────────────────────────────────────────────
 
     public function configured(string $disk): bool

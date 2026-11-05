@@ -431,3 +431,14 @@ en Settings bajo `integrations.storage.*` (`provider` r2|s3|gcs, `bucket`, `regi
   Usarlo en vez de `Storage::disk()->path()` (que no existe en s3).
 - `php artisan innertia:storage:migrate-files [--from=local,public] [--dry-run] [--delete-source]` copia los
   archivos locales existentes al cloud y actualiza su `disk` (idempotente; conserva el origen por defecto).
+
+## Aprovisionamiento automático (GCS / R2)
+
+`Storage::provision($provider, $input)` crea bucket + credencial S3 de **mínimo privilegio** a partir de una credencial ADMIN de un solo uso (no se persiste). Devuelve `['settings' => [...CLOUD_FIELDS], 'details' => [...]]`; el producto guarda `settings` por su vía (secretos encriptados) y valida con `Storage::probeWithRetry()` (las credenciales nuevas tardan segundos en propagarse).
+
+| Proveedor | `$input` | Permisos de la credencial admin | Qué crea |
+|---|---|---|---|
+| `gcs` | `service_account_json`, `bucket`, `location?` (def. `US`), `project_id?` | Storage Admin + Storage HMAC Key Admin + Service Account Admin | bucket privado uniforme, SA `storage-<bucket>` con `roles/storage.objectAdmin` solo en el bucket, HMAC de esa SA. Sin Service Account Admin → HMAC de la propia admin (aviso en `details`). |
+| `r2` | `api_token`, `bucket`, `account_id?` (si el token ve una sola cuenta), `location?` | Workers R2 Storage: Edit + API Tokens: Edit (o Account API Tokens: Edit) | bucket + token "Workers R2 Storage Bucket Item Write" solo sobre el bucket; access key = id del token, secret = sha256(valor). |
+
+S3 no se aprovisiona (exigiría una credencial IAM con permisos de crear usuarios). Errores → `Innertia\Storage\Provisioning\ProvisioningException` con mensaje para la UI.
