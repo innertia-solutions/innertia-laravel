@@ -66,8 +66,12 @@ class Login extends UseCase
             return ['requires_email_verification' => true, 'user_id' => $user->getAuthIdentifier()];
         }
 
-        // 6 — OTP enabled
-        if (Settings::get('auth.otp.enabled', config('innertia.auth.otp.enabled', false))) {
+        // 6 — OTP enabled (la cuenta demo de QA/dev entra directo: sus credenciales
+        // ya vienen precargadas en el login y su casilla no recibe correo)
+        if (
+            Settings::get('auth.otp.enabled', config('innertia.auth.otp.enabled', false))
+            && ! $this->isDemoAccount($user)
+        ) {
             app(OtpService::class)->send($user, 'login');
 
             return ['requires_otp' => true, 'user_id' => $user->getAuthIdentifier()];
@@ -85,5 +89,20 @@ class Login extends UseCase
         $token = app(JwtService::class)->generateToken($user, ['context' => $this->context]);
 
         return ['token' => $token, 'user' => $user];
+    }
+
+    /**
+     * Cuenta demo del modo demo (innertia.demo.*: credenciales precargadas en el
+     * login de QA/dev). Nunca en producción.
+     */
+    private function isDemoAccount($user): bool
+    {
+        if (app()->environment('production') || ! config('innertia.demo.enabled')) {
+            return false;
+        }
+
+        $demoEmail = (string) config('innertia.demo.email', '');
+
+        return $demoEmail !== '' && strcasecmp($demoEmail, (string) $user->email) === 0;
     }
 }
