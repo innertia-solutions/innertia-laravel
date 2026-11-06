@@ -7,7 +7,11 @@ use Innertia\Ai\Embeddings\FakeEmbeddingProvider;
 use Innertia\Ai\Embeddings\MiniMaxEmbeddingProvider;
 use Innertia\Ai\Embeddings\OpenAiEmbeddingProvider;
 use Innertia\Ai\Models\AiProvider;
+use Innertia\Ai\Models\AiAssignment;
 use Innertia\Ai\Models\RagCollection;
+use Innertia\Ai\Transcription\MiniMaxTranscriptionProvider;
+use Innertia\Ai\Transcription\OpenAiTranscriptionProvider;
+use Innertia\Ai\Transcription\TranscriptionProvider;
 
 /**
  * Fachada de alto nivel del módulo de IA. Resuelve proveedor+modelo por uso desde
@@ -63,6 +67,45 @@ class AiManager
     public function usage(): UsageLogger
     {
         return new UsageLogger;
+    }
+
+    /**
+     * Adaptador de transcripción (audio → texto).
+     *  - Sin `$providerKey`: el de la asignación de uso `transcription` (proveedor + modelo).
+     *  - Con `$providerKey` (`minimax`, `openai`…): ese proveedor; modelo = el de la asignación si apunta a él, si no
+     *    su primer modelo con capacidad `transcription`, si no el preset (`asr-1.0` / `whisper-1`).
+     * Devuelve null si el proveedor no existe, está inactivo o no tiene API key.
+     * El adaptador se elige por el proveedor: MiniMax (key `minimax` o base_url de minimax) usa su API propia
+     * (`/speech_to_text`); el resto, la de OpenAI (`/audio/transcriptions`).
+     */
+    public function transcriber(?string $providerKey = null): ?TranscriptionProvider
+    {
+        $assignment = AiAssignment::query()->where('use', 'transcription')->where('active', true)->first();
+
+        if ($providerKey === null) {
+            $resolved = (new ProviderResolver)->for('transcription');
+            $provider = $resolved['provider'] ?? null;
+            $model = $resolved['model'] ?? null;
+        } else {
+            $provider = AiProvider::query()->where('key', $providerKey)->where('active', true)->first();
+            $model = $provider && $assignment && (string) $assignment->provider_id === (string) $provider->id
+                ? $assignment->model
+                : null;
+            $model ??= $provider?->models()->get()
+                ->first(fn ($m) => in_array('transcription', (array) $m->capabilities, true) && ($m->active ?? true))?->key;
+        }
+
+        if (! $provider || ! $provider->active || blank($provider->api_key)) {
+            return null;
+        }
+
+        $isMiniMax = $provider->key === 'minimax' || str_contains((string) $provider->base_url, 'minimax');
+        $baseUrl = (string) ($provider->base_url ?: ($isMiniMax ? 'https://api.minimax.io/v1' : 'https://api.openai.com/v1'));
+        $timeout = (int) config('innertia.ai.transcription_timeout', 180);
+
+        return $isMiniMax
+            ? new MiniMaxTranscriptionProvider((string) $provider->api_key, $model ?: ProviderPresets::MINIMAX_TRANSCRIPTION, $baseUrl, (string) $provider->key, $timeout)
+            : new OpenAiTranscriptionProvider((string) $provider->api_key, $model ?: ProviderPresets::OPENAI_TRANSCRIPTION, $baseUrl, (string) $provider->key, $timeout);
     }
 
     /**

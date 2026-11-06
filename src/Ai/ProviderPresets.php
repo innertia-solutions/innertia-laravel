@@ -15,13 +15,21 @@ class ProviderPresets
     /** Modelo de embedding por defecto: 1536 dimensiones (= columna pgvector del RAG). */
     public const OPENAI_EMBEDDING = 'text-embedding-3-small';
 
+    /** Modelos de transcripción por defecto (audio → texto). */
+    public const OPENAI_TRANSCRIPTION = 'whisper-1';
+
+    public const MINIMAX_TRANSCRIPTION = 'asr-1.0';
+
     public const MODELS = [
         'openai' => [
             ['key' => self::OPENAI_EMBEDDING, 'name' => 'text-embedding-3-small (embedding)', 'capabilities' => ['embedding']],
+            ['key' => self::OPENAI_TRANSCRIPTION, 'name' => 'Whisper (transcripción)', 'capabilities' => ['transcription']],
+            ['key' => 'gpt-4o-transcribe', 'name' => 'GPT-4o Transcribe (transcripción)', 'capabilities' => ['transcription']],
         ],
         'minimax' => [
             ['key' => 'MiniMax-M3.1-Flash', 'name' => 'MiniMax M3.1 Flash', 'capabilities' => ['chat', 'vision']],
             ['key' => 'MiniMax-M3',         'name' => 'MiniMax M3',          'capabilities' => ['chat', 'vision']],
+            ['key' => self::MINIMAX_TRANSCRIPTION, 'name' => 'MiniMax ASR (transcripción)', 'capabilities' => ['transcription']],
         ],
     ];
 

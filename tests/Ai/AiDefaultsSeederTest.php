@@ -45,18 +45,19 @@ it('seeds minimax (chat/vision) + openai (embedding default), assignments, defau
     expect(AiProvider::count())->toBe(2);
     $openai = AiProvider::where('key', 'openai')->first();
     expect($openai->type)->toBe('openai')
-        ->and(AiModel::where('provider_id', $openai->id)->pluck('key')->all())->toBe(['text-embedding-3-small']);
+        ->and(AiModel::where('provider_id', $openai->id)->pluck('key')->all())->toBe(['text-embedding-3-small', 'whisper-1', 'gpt-4o-transcribe']);
     $minimax = AiProvider::where('key', 'minimax')->first();
     expect($minimax)->not->toBeNull()
         ->and($minimax->type)->toBe('openai-compatible')
         ->and($minimax->base_url)->toBe('https://api.minimax.io/v1');
 
     // Models
-    expect(AiModel::where('provider_id', $minimax->id)->count())->toBe(3);
+    expect(AiModel::where('provider_id', $minimax->id)->count())->toBe(4);
     $modelKeys = AiModel::where('provider_id', $minimax->id)->pluck('key')->sort()->values()->all();
     expect($modelKeys)->toContain('MiniMax-M3.1-Flash')
         ->toContain('MiniMax-M3')
-        ->toContain('embo-01');
+        ->toContain('embo-01')
+        ->toContain('asr-1.0');
 
     // Assignments
     expect(AiAssignment::count())->toBe(4);
@@ -101,7 +102,7 @@ it('is idempotent', function () {
     (new AiDefaultsSeeder)->run();
 
     expect(AiProvider::count())->toBe(2);
-    expect(AiModel::count())->toBe(4);
+    expect(AiModel::count())->toBe(7);
     expect(AiAssignment::count())->toBe(4);
     expect(RagCollection::count())->toBe(1);
     expect(McpServer::count())->toBe(1);
@@ -110,9 +111,9 @@ it('is idempotent', function () {
 it('un proveedor openai nuevo recibe su modelo de embedding por defecto (idempotente)', function () {
     $p = AiProvider::create(['key' => 'openai-x', 'name' => 'OpenAI', 'type' => 'openai', 'base_url' => 'https://api.openai.com/v1', 'active' => true]);
 
-    expect(\Innertia\Ai\ProviderPresets::ensureDefaultModels($p))->toBe(1)
+    expect(\Innertia\Ai\ProviderPresets::ensureDefaultModels($p))->toBe(3)
         ->and(\Innertia\Ai\ProviderPresets::ensureDefaultModels($p))->toBe(0);
-    $m = AiModel::where('provider_id', $p->id)->sole();
+    $m = AiModel::where('provider_id', $p->id)->where('key', 'text-embedding-3-small')->sole();
     expect($m->key)->toBe('text-embedding-3-small')->and($m->capabilities)->toBe(['embedding']);
 });
 

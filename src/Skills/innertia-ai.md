@@ -45,6 +45,8 @@ $model = Ai::configureFor('chat');   // resuelve la asignación del uso, carga l
                                      // ai.providers.openai-compatible.{url,key} de laravel/ai
                                      // en runtime y devuelve el modelo (o null si no hay asignación)
 Ai::embedder('default');       // EmbeddingProvider para la colección (o el uso 'embedding' global)
+Ai::transcriber();             // TranscriptionProvider del uso 'transcription' (o null)
+Ai::transcriber('minimax');    // el de un proveedor concreto (modelo: asignación si apunta a él / capacidad / preset)
 Ai::usage()->record('chat', $providerId, $model, $promptTokens, $completionTokens, $userId);
 Ai::usage()->totalTokens('chat');    // agregado de tokens por uso (o todos)
 ```
@@ -59,6 +61,14 @@ Contrato `Innertia\Ai\Embeddings\EmbeddingProvider` (`embedDocuments`, `embedQue
 - `fake` → `FakeEmbeddingProvider` (determinista, sin red — dev/tests)
 
 `Ai::embedder($collectionKey)` elige el adaptador por el proveedor de la colección (o el uso `embedding`) y lo dimensiona según la colección.
+
+## Transcripción (audio → texto)
+
+Contrato `Innertia\Ai\Transcription\TranscriptionProvider` (`transcribe($streamOBytes, $filename, $mime, ['language','prompt','duration_seconds'])` → `TranscriptionResult {text, segments[{start,end,text,speaker?}], duration, model, provider, speakers}`, `maxSeconds()`, `providerKey()`, `model()`). Adaptador por proveedor:
+- MiniMax (key `minimax` o base_url de minimax) → `MiniMaxTranscriptionProvider`: `POST {base}/speech_to_text` multipart (`file`, `model=asr-1.0`, `response_format=verbose_json`), idioma en el **header** `language`. **Límites: 500 s y 50 MB** (si se pasa `duration_seconds` > 500 rechaza sin subir, `type=too_long`). **No acepta vocabulario** (`prompt` se ignora). Diarización: `segments[].speaker` + `n_speakers`.
+- Resto → `OpenAiTranscriptionProvider`: `POST {base}/audio/transcriptions` (`language`, `prompt`, `verbose_json`; los `gpt-4o-*-transcribe` piden `json`). Límite OpenAI: 25 MB.
+
+Errores: `TranscriptionException {status, type}`; `transient()` = red caída, 429 o 5xx (vale reintentar). 402 `insufficient_balance_error`, 401, 400 `too_long` no son transitorios → el producto decide si cae a otro proveedor. La cadena de respaldo (MiniMax → OpenAI → local) es política del **producto**, no de la lib.
 
 ## RAG (multi-colección, pgvector)
 
@@ -128,4 +138,4 @@ innertia:ai:seed                          # siembra defaults (idempotente)
 
 ## Modelos por defecto por proveedor (`ProviderPresets`)
 
-`Innertia\Ai\ProviderPresets::ensureDefaultModels($provider)` registra los modelos que trae cada tipo (idempotente): `openai` → `text-embedding-3-small` (embedding, 1536 dim = columna del RAG); `minimax` → MiniMax-M3.1-Flash / M3 (chat+visión). Llamarlo al crear un proveedor desde la UI. El seeder deja **OpenAI como embedding por defecto** (asignación + colección `default`); MiniMax para chat/asistente/visión.
+`Innertia\Ai\ProviderPresets::ensureDefaultModels($provider)` registra los modelos que trae cada tipo (idempotente): `openai` → `text-embedding-3-small` (embedding, 1536 dim = columna del RAG) + `whisper-1` / `gpt-4o-transcribe` (transcripción); `minimax` → MiniMax-M3.1-Flash / M3 (chat+visión) + `asr-1.0` (transcripción). Llamarlo al crear un proveedor desde la UI. El seeder deja **OpenAI como embedding por defecto** (asignación + colección `default`); MiniMax para chat/asistente/visión.
