@@ -34,6 +34,9 @@ return new class extends Migration
             $table->text('two_factor_secret')->nullable();
             $table->boolean('two_factor_enabled')->default(false);
 
+            // Código por correo por usuario: 'always' | 'never' | null (= switch global auth.otp.enabled)
+            $table->string('otp_mode', 10)->nullable();
+
             $table->string('created_by')->nullable()->index();
 
             $table->rememberToken();

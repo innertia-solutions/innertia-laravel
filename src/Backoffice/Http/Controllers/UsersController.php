@@ -8,6 +8,8 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\Schema;
+use Innertia\Auth\UseCases\Login;
 use Innertia\Auth\RBAC\UseCases\CreateRole;
 use Innertia\Auth\RBAC\UseCases\AssignRole;
 use Innertia\Auth\RBAC\UseCases\RemoveRole;
@@ -110,7 +112,14 @@ class UsersController extends Controller
             'name'     => 'sometimes|string|max:255',
             'email'    => ['sometimes', 'email', Rule::unique((new $model)->getTable(), 'email')->ignore($id)],
             'password' => 'sometimes|string|min:8',
+            // Código por correo por usuario (null = según la configuración general)
+            'otp_mode' => ['sometimes', 'nullable', Rule::in([Login::OTP_ALWAYS, Login::OTP_NEVER])],
         ]);
+
+        // Productos sin la columna users.otp_mode: se ignora el campo.
+        if (array_key_exists('otp_mode', $data) && ! Schema::hasColumn($user->getTable(), 'otp_mode')) {
+            unset($data['otp_mode']);
+        }
 
         if (array_key_exists('email', $data) || array_key_exists('password', $data)) {
             $this->ensureIdentityEditable($user);

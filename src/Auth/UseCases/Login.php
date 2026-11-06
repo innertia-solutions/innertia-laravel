@@ -13,6 +13,10 @@ use Innertia\Platform\Contracts\UseCase;
 
 class Login extends UseCase
 {
+    /** Valores de users.otp_mode (null = según la configuración general). */
+    public const OTP_ALWAYS = 'always';
+    public const OTP_NEVER  = 'never';
+
     public function __construct(
         public readonly string $email,
         public readonly string $password,
@@ -66,12 +70,8 @@ class Login extends UseCase
             return ['requires_email_verification' => true, 'user_id' => $user->getAuthIdentifier()];
         }
 
-        // 6 — OTP enabled (la cuenta demo de QA/dev entra directo: sus credenciales
-        // ya vienen precargadas en el login y su casilla no recibe correo)
-        if (
-            Settings::get('auth.otp.enabled', config('innertia.auth.otp.enabled', false))
-            && ! $this->isDemoAccount($user)
-        ) {
+        // 6 — OTP por correo (global con ajuste por usuario; ver otpRequired())
+        if ($this->otpRequired($user)) {
             app(OtpService::class)->send($user, 'login');
 
             return ['requires_otp' => true, 'user_id' => $user->getAuthIdentifier()];
@@ -92,10 +92,34 @@ class Login extends UseCase
     }
 
     /**
+     * ¿Exige código por correo en este ingreso?
+     *
+     *  - La cuenta demo de QA/dev entra directo (credenciales precargadas, su
+     *    casilla no recibe correo).
+     *  - users.otp_mode por usuario: 'always' (exige aunque el switch global esté
+     *    apagado) / 'never' (eximido) / null (sigue el switch global).
+     *  - Switch global: Settings auth.otp.enabled (fallback config).
+     *
+     * Productos sin la columna otp_mode leen null → solo el switch global.
+     */
+    public static function otpRequired($user): bool
+    {
+        if (self::isDemoAccount($user)) {
+            return false;
+        }
+
+        return match ($user->otp_mode ?? null) {
+            self::OTP_ALWAYS => true,
+            self::OTP_NEVER  => false,
+            default          => (bool) Settings::get('auth.otp.enabled', config('innertia.auth.otp.enabled', false)),
+        };
+    }
+
+    /**
      * Cuenta demo del modo demo (innertia.demo.*: credenciales precargadas en el
      * login de QA/dev). Nunca en producción.
      */
-    private function isDemoAccount($user): bool
+    private static function isDemoAccount($user): bool
     {
         if (app()->environment('production') || ! config('innertia.demo.enabled')) {
             return false;

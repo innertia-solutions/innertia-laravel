@@ -40,6 +40,7 @@ abstract class User extends Authenticatable
         'force_password_change',
         'two_factor_secret',
         'two_factor_enabled',
+        'otp_mode',
         'created_by',
     ];
 
