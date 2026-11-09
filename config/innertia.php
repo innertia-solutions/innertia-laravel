@@ -307,6 +307,13 @@ return [
 
     'ai' => [
         'enabled' => env('INNERTIA_AI_ENABLED', false),
+
+        // Presupuesto de pasos (rondas de tools) del asistente. El default de
+        // laravel/ai (1.5 × nº de tools) se queda corto para tareas como copiar
+        // y clasificar varias preguntas: el loop se corta sin respuesta.
+        'assistant' => [
+            'max_steps' => 30,
+        ],
     ],
 
     /*

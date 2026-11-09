@@ -151,7 +151,7 @@ class AssistantRunner
                 Message::create([
                     'conversation_id' => $conversation->id,
                     'role' => 'assistant',
-                    'content' => $final->text ?? '',
+                    'content' => LaravelAiModel::textOrStepLimitNotice($final),
                     'created_at' => now(),
                 ]);
 
@@ -236,7 +236,7 @@ class AssistantRunner
                 Message::create([
                     'conversation_id' => $conversationIdStr,
                     'role' => 'assistant',
-                    'content' => $final->text ?? '',
+                    'content' => LaravelAiModel::textOrStepLimitNotice($final),
                     'created_at' => now(),
                 ]);
 
@@ -250,7 +250,7 @@ class AssistantRunner
                 );
 
                 if ($onComplete) {
-                    $onComplete($final->text ?? '');
+                    $onComplete(LaravelAiModel::textOrStepLimitNotice($final));
                 }
             });
 

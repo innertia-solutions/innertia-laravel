@@ -24,7 +24,21 @@ class GenericAgent implements Agent, Conversational, HasTools
         private string $agentInstructions,
         private iterable $agentTools = [],
         private array $history = [],
+        private ?int $agentMaxSteps = null,
     ) {}
+
+    /**
+     * Presupuesto de pasos (llamadas a tools) del loop de laravel/ai. null = su
+     * default (1.5 × cantidad de tools), que se queda corto para tareas largas
+     * como copiar y clasificar varias preguntas. Configurable por producto en
+     * innertia.ai.assistant.max_steps.
+     */
+    public function maxSteps(): ?int
+    {
+        $steps = $this->agentMaxSteps ?? config('innertia.ai.assistant.max_steps');
+
+        return $steps !== null ? (int) $steps : null;
+    }
 
     public function instructions(): Stringable|string
     {
