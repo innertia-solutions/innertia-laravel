@@ -48,3 +48,15 @@ it('marks the backup failed and records the error', function () {
     expect($backup->error)->toBe('boom');
     expect($backup->status)->not->toBe('running');
 });
+
+it('reports the failure to the exception handler (case + support email)', function () {
+    \Illuminate\Support\Facades\Exceptions::fake();
+    bindBackupDriver(function (Backup $b) {
+        throw new RuntimeException('pg_dump failed');
+    });
+    $backup = Backup::create(['disk' => 'backups', 'driver' => 'app', 'mode' => 'app']);
+
+    (new RunBackup($backup))->execute();
+
+    \Illuminate\Support\Facades\Exceptions::assertReported(RuntimeException::class);
+});

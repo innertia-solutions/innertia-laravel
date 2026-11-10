@@ -25,17 +25,62 @@ Bloque en `config/innertia.php`:
 'backups' => [
     'mode'           => env('BACKUP_MODE', 'app'),
     'disk'           => env('BACKUP_DISK', 'backups'),
-    'retention_days' => env('BACKUP_RETENTION_DAYS', 30),
+    'retention_days' => (int) env('BACKUP_RETENTION_DAYS', 30),
+    'keep'           => (int) env('BACKUP_KEEP', 21),
+    'schedule' => [
+        'enabled'  => (bool) env('BACKUP_SCHEDULE_ENABLED', true),
+        'times'    => ['03:00', '11:00', '19:00'],
+        'timezone' => env('BACKUP_SCHEDULE_TIMEZONE', 'America/Santiago'),
+    ],
 ],
 ```
 
 | Key | Default | Descripción |
 |-----|---------|-------------|
 | `innertia.backups.mode` | `app` | Modo de operación: `app`, `saas` u `open` |
-| `innertia.backups.disk` | `backups` | Disk de Laravel Storage donde se guardan los artefactos (dedicado, no el Drive de usuarios) |
-| `innertia.backups.retention_days` | `30` | Días de retención (config only; el sweep por cron está diferido) |
+| `innertia.backups.disk` | `backups` | Disk de Laravel Storage donde se guardan los artefactos (dedicado, no el Drive de usuarios). Si el producto no lo declara, la lib registra uno local en `storage/app/backups` |
+| `innertia.backups.retention_days` | `30` | Antigüedad máxima de un respaldo (0 = sin límite por días) |
+| `innertia.backups.keep` | `21` | Máximo de respaldos completados a conservar (0 = sin tope). 21 = 7 días × 3 |
+| `innertia.backups.schedule.enabled` | `true` | Respaldo automático en el scheduler del producto |
+| `innertia.backups.schedule.times` | `03:00, 11:00, 19:00` | Horarios diarios (una entrada de schedule por horario) |
+| `innertia.backups.schedule.timezone` | `America/Santiago` | Zona horaria de los horarios |
 
-Variables de entorno: `BACKUP_MODE`, `BACKUP_DISK`, `BACKUP_RETENTION_DAYS`.
+Variables de entorno: `BACKUP_MODE`, `BACKUP_DISK`, `BACKUP_RETENTION_DAYS`, `BACKUP_KEEP`,
+`BACKUP_SCHEDULE_ENABLED`, `BACKUP_SCHEDULE_TIMEZONE`.
+
+Cada key se lee con default en código (`Support\BackupSettings`), así un bloque `backups` parcial
+en el `config/innertia.php` del producto (merge shallow) no desactiva el schedule ni la retención.
+
+---
+
+## Respaldo automático
+
+`BackupsServiceProvider` registra `innertia:backups:run` en el scheduler del producto, una entrada
+por horario, con `withoutOverlapping()`, `onOneServer()` y `runInBackground()`. El producto solo
+necesita un proceso `php artisan schedule:work` (o cron `schedule:run`) con `postgresql-client`.
+
+```bash
+php artisan schedule:list             # muestra las 3 entradas innertia:backups:run
+php artisan innertia:backups:run      # respaldo síncrono + poda (--no-prune para omitirla)
+php artisan innertia:backups:prune    # solo poda (--days= --keep= --dry-run)
+```
+
+El comando corre síncrono (un dump grande no cabe en el `$timeout=60` de un UseCase encolado),
+se omite si ya hay un respaldo `pending`/`running` de menos de 6 h, y sale con FAILURE si el
+dump falla.
+
+### Retención
+
+- Completados (no safety): se borra el que supere `retention_days` **o** quede fuera de los `keep`
+  más recientes. El completado más reciente nunca se borra.
+- Safety y fallidos: se borran al superar `retention_days`.
+- `pending` / `running`: nunca se tocan.
+
+### Trazabilidad
+
+`RunBackup` escribe inicio/fin/error con `Telemetry::log('operational', …)` (trace_id del proceso,
+contexto `module=backups`, `backup_id`). Si falla hace `report($e)`: la telemetría lo promueve a
+caso por fingerprint y avisa a soporte por correo.
 
 ---
 
@@ -124,7 +169,8 @@ Route::prefix('platform/backups')->group(function () {
 
 | Clase | Descripción |
 |-------|-------------|
-| `RunBackup` | Ejecuta `BackupDriver::create()`, actualiza status a `completed`/`failed` |
+| `RunBackup` | Ejecuta `BackupDriver::create()`, actualiza status a `completed`/`failed`, loguea en telemetría y reporta el fallo |
+| `PruneBackups` | Aplica la retención (`retention_days` / `keep`); devuelve cuántos eliminó |
 | `RestoreBackup` | Crea safety backup → verifica que completó → ejecuta `BackupDriver::restore()` |
 | `DeleteBackup` | Elimina el artefacto del disk (si existe) y borra el registro |
 

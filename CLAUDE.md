@@ -104,7 +104,16 @@ innertia:organization:check          # coherencia trait ↔ config ↔ schema
 innertia:team:create {tenant} {name} [--description=] [--parent=] [--org=]
 innertia:team:list [--tenant=]
 innertia:skills:install [--force]    # copia skills del paquete a .claude/skills/innertia/
+innertia:backups:run [--no-prune]    # respaldo pg_dump + poda (agendado 03/11/19 h Chile por defecto)
+innertia:backups:prune [--days=] [--keep=] [--dry-run]
 ```
+
+### Respaldos automáticos (`Innertia\Backups`)
+
+Todo producto respalda la BD 3 veces al día sin configurar nada: la lib registra `innertia:backups:run`
+en el scheduler (03:00/11:00/19:00 America/Santiago, `withoutOverlapping` + `onOneServer`) con poda por
+retención (`retention_days` 30 / `keep` 21). Requiere un proceso `schedule:work` con `postgresql-client`.
+Desactivar con `BACKUP_SCHEDULE_ENABLED=false`. Ver skill `innertia-backups`.
 
 ### Claude Code skills
 
@@ -122,6 +131,7 @@ El paquete trae skills versionados en `src/Skills/*.md`. Cada proyecto consumido
 - `innertia-storage` — File model con soft delete, HasTags, HasEntityPermissions, eventos, papelera, integración con Directorios
 - `innertia-extending` — patrón template method para extender el paquete
 - `innertia-directories` — árbol de carpetas con materialized path, trash agrupado, eventos tipados (DirectoryEvent)
+- `innertia-backups` — respaldos de BD: schedule automático 3×día, retención/poda, restore con safety-backup
 - `innertia-ai` — motor de IA DB-backed: proveedores/modelos/asignación-por-uso, embeddings, RAG pgvector, asistente laravel/ai, MCP, defaults
 
 Mantenerlos sincronizados con la realidad del código es responsabilidad del paquete — cualquier feature/refactor que cambia uso público debería actualizar el skill correspondiente.

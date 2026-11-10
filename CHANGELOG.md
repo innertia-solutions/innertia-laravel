@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Respaldos automáticos (`Innertia\Backups`)
+
+- Schedule por defecto de `innertia:backups:run` a las 03:00, 11:00 y 19:00 (America/Santiago),
+  con `withoutOverlapping()`, `onOneServer()` y `runInBackground()`. Desactivable con
+  `innertia.backups.schedule.enabled` / `BACKUP_SCHEDULE_ENABLED=false`.
+- Retención real: `PruneBackups` + `innertia:backups:prune` (`retention_days`, nuevo `keep`);
+  nunca borra el último respaldo completado.
+- `RunBackup` loguea en telemetría (canal operational) y reporta los fallos (caso + correo a soporte).
+- Disk `backups` local por defecto si el producto no lo declara.
+
 ### Fixed — API mode no longer wires user auth
 
 - **`InnertiaServiceProvider::isApi()` is now config-driven** (`config('innertia.mode') === 'api'`),

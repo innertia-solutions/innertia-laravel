@@ -504,8 +504,19 @@ return [
         // Disk dedicado para los artefactos de respaldo. SEPARADO del Drive/Files de usuario.
         'disk' => env('BACKUP_DISK', 'backups'),
 
-        // Días de retención (config lista; el barrido por cron queda diferido).
-        'retention_days' => (int) env('BACKUP_RETENTION_DAYS', 30),
+        // Retención (la aplica `innertia:backups:prune`, que corre al final de cada
+        // respaldo programado). Se borra un respaldo si supera CUALQUIERA de los dos
+        // límites; el respaldo completado más reciente nunca se borra.
+        'retention_days' => (int) env('BACKUP_RETENTION_DAYS', 30),  // antigüedad máxima
+        'keep'           => (int) env('BACKUP_KEEP', 21),            // máx. completados (0 = sin tope)
+
+        // Respaldo automático (scheduler del producto: `schedule:run` / `schedule:work`).
+        // On por defecto en todos los productos; horarios en hora de Chile.
+        'schedule' => [
+            'enabled'  => (bool) env('BACKUP_SCHEDULE_ENABLED', true),
+            'times'    => ['03:00', '11:00', '19:00'],
+            'timezone' => env('BACKUP_SCHEDULE_TIMEZONE', 'America/Santiago'),
+        ],
     ],
 
     'mail' => [
