@@ -12,7 +12,8 @@ class NotificationsController extends Controller
     /**
      * GET /notifications
      * GET /notifications?all=1   — include read notifications
-     * GET /notifications?page=2  — paginated (15 per page)
+     * GET /notifications?page=2  — paginated
+     * GET /notifications?per_page=N — page size (1..100, default 15)
      */
     public function index(Request $request): JsonResponse
     {
@@ -25,7 +26,9 @@ class NotificationsController extends Controller
             $query->whereNull('read_at');
         }
 
-        $notifications = $query->paginate(15);
+        $perPage = min(100, max(1, (int) $request->input('per_page', 15)));
+
+        $notifications = $query->paginate($perPage);
 
         return response()->json([
             'data'        => $notifications->items(),
@@ -33,6 +36,7 @@ class NotificationsController extends Controller
             'unread'      => Notification::where('user_id', $userId)->whereNull('read_at')->count(),
             'current_page'=> $notifications->currentPage(),
             'last_page'   => $notifications->lastPage(),
+            'per_page'    => $notifications->perPage(),
         ]);
     }
 
