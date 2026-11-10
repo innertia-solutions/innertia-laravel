@@ -110,10 +110,11 @@ innertia:backups:prune [--days=] [--keep=] [--dry-run]
 
 ### Respaldos automáticos (`Innertia\Backups`)
 
-Todo producto respalda la BD 3 veces al día sin configurar nada: la lib registra `innertia:backups:run`
-en el scheduler (03:00/11:00/19:00 America/Santiago, `withoutOverlapping` + `onOneServer`) con poda por
-retención (`retention_days` 30 / `keep` 21). Requiere un proceso `schedule:work` con `postgresql-client`.
-Desactivar con `BACKUP_SCHEDULE_ENABLED=false`. Ver skill `innertia-backups`.
+Todo producto respalda la BD sin configurar nada y **siempre** (no hay switch ni env): la lib registra
+`innertia:backups:run` en el scheduler (default 03:00/11:00/19:00 America/Santiago, `withoutOverlapping` +
+`onOneServer`) con poda por retención (default 30 días / 21 respaldos). Horarios y retención se editan
+desde /platform (tabla `settings`, endpoints `GET/PUT platform/backups/settings`). Requiere un proceso
+`schedule:work` con `postgresql-client`. Ver skill `innertia-backups`.
 
 ### Claude Code skills
 

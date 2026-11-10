@@ -78,10 +78,9 @@ it('does not delete anything on dry run', function () {
     expect(Backup::count())->toBe(2);
 });
 
-it('uses the configured retention by default', function () {
-    config(['innertia.backups.retention_days' => 10, 'innertia.backups.keep' => 0]);
+it('uses the default retention (30 days / 21) when nothing is saved', function () {
     makeBackup(1);
-    makeBackup(11);
+    makeBackup(31);
 
     expect((new PruneBackups())->execute())->toBe(1);
 });

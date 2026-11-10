@@ -19,44 +19,43 @@ completamente separado del módulo de Files/Drive para usuarios.
 
 ## Configuración
 
-Bloque en `config/innertia.php`:
+Hay dos niveles:
 
-```php
-'backups' => [
-    'mode'           => env('BACKUP_MODE', 'app'),
-    'disk'           => env('BACKUP_DISK', 'backups'),
-    'retention_days' => (int) env('BACKUP_RETENTION_DAYS', 30),
-    'keep'           => (int) env('BACKUP_KEEP', 21),
-    'schedule' => [
-        'enabled'  => (bool) env('BACKUP_SCHEDULE_ENABLED', true),
-        'times'    => ['03:00', '11:00', '19:00'],
-        'timezone' => env('BACKUP_SCHEDULE_TIMEZONE', 'America/Santiago'),
-    ],
-],
-```
+**Infraestructura** (`config/innertia.php`, bloque `backups`):
 
 | Key | Default | Descripción |
 |-----|---------|-------------|
 | `innertia.backups.mode` | `app` | Modo de operación: `app`, `saas` u `open` |
-| `innertia.backups.disk` | `backups` | Disk de Laravel Storage donde se guardan los artefactos (dedicado, no el Drive de usuarios). Si el producto no lo declara, la lib registra uno local en `storage/app/backups` |
-| `innertia.backups.retention_days` | `30` | Antigüedad máxima de un respaldo (0 = sin límite por días) |
-| `innertia.backups.keep` | `21` | Máximo de respaldos completados a conservar (0 = sin tope). 21 = 7 días × 3 |
-| `innertia.backups.schedule.enabled` | `true` | Respaldo automático en el scheduler del producto |
-| `innertia.backups.schedule.times` | `03:00, 11:00, 19:00` | Horarios diarios (una entrada de schedule por horario) |
-| `innertia.backups.schedule.timezone` | `America/Santiago` | Zona horaria de los horarios |
+| `innertia.backups.disk` | `backups` | Disk de Storage para los artefactos (dedicado, no el Drive de usuarios). Si el producto no lo declara, la lib registra uno local en `storage/app/backups` |
 
-Variables de entorno: `BACKUP_MODE`, `BACKUP_DISK`, `BACKUP_RETENTION_DAYS`, `BACKUP_KEEP`,
-`BACKUP_SCHEDULE_ENABLED`, `BACKUP_SCHEDULE_TIMEZONE`.
+**Política** (horarios + retención): se edita desde **/platform** y se guarda en la tabla
+`settings` a nivel plataforma (`Support\BackupSettings`). No hay env ni config de archivo para
+esto, y no hay switch de apagado: el respaldo automático corre siempre.
 
-Cada key se lee con default en código (`Support\BackupSettings`), así un bloque `backups` parcial
-en el `config/innertia.php` del producto (merge shallow) no desactiva el schedule ni la retención.
+| Setting | Default | Descripción |
+|---------|---------|-------------|
+| `backups.schedule.times` | `03:00, 11:00, 19:00` | Horarios diarios HH:MM (1–24) |
+| `backups.schedule.timezone` | `America/Santiago` | Zona horaria de los horarios |
+| `backups.retention.days` | `30` | Antigüedad máxima de un respaldo |
+| `backups.retention.keep` | `21` | Máximo de respaldos completados a conservar (7 días × 3) |
+
+Si la BD no responde o no hay valor guardado, rigen los defaults (el schedule se registra igual).
+
+### Endpoints de la política
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| `GET` | `/platform/backups/settings` | Política vigente + `defaults`, `next_runs` (ISO), `last_completed`, `enabled: true` |
+| `PUT` | `/platform/backups/settings` | Guarda `times[]`, `timezone`, `retention_days` (1–3650), `keep` (1–1000) |
+
+`schedule:run` reconstruye el schedule cada minuto, así que un cambio rige desde el minuto siguiente.
 
 ---
 
 ## Respaldo automático
 
-`BackupsServiceProvider` registra `innertia:backups:run` en el scheduler del producto, una entrada
-por horario, con `withoutOverlapping()`, `onOneServer()` y `runInBackground()`. El producto solo
+`BackupsServiceProvider` registra `innertia:backups:run` en el scheduler del producto (siempre),
+una entrada por horario de la política, con `withoutOverlapping()`, `onOneServer()` y `runInBackground()`. El producto solo
 necesita un proceso `php artisan schedule:work` (o cron `schedule:run`) con `postgresql-client`.
 
 ```bash
@@ -71,9 +70,9 @@ dump falla.
 
 ### Retención
 
-- Completados (no safety): se borra el que supere `retention_days` **o** quede fuera de los `keep`
+- Completados (no safety): se borra el que supere `retention.days` **o** quede fuera de los `keep`
   más recientes. El completado más reciente nunca se borra.
-- Safety y fallidos: se borran al superar `retention_days`.
+- Safety y fallidos: se borran al superar `retention.days`.
 - `pending` / `running`: nunca se tocan.
 
 ### Trazabilidad
@@ -145,6 +144,8 @@ use Innertia\Backups\Http\Controllers\BackupsController;
 
 // En las rutas del producto, bajo su middleware/gate de platform-admin:
 Route::prefix('platform/backups')->group(function () {
+    Route::get('settings', [BackupsController::class, 'settings']);
+    Route::put('settings', [BackupsController::class, 'updateSettings']);
     Route::get('/', [BackupsController::class, 'index']);
     Route::post('/', [BackupsController::class, 'store']);
     Route::get('{id}/download', [BackupsController::class, 'download']);
@@ -170,7 +171,7 @@ Route::prefix('platform/backups')->group(function () {
 | Clase | Descripción |
 |-------|-------------|
 | `RunBackup` | Ejecuta `BackupDriver::create()`, actualiza status a `completed`/`failed`, loguea en telemetría y reporta el fallo |
-| `PruneBackups` | Aplica la retención (`retention_days` / `keep`); devuelve cuántos eliminó |
+| `PruneBackups` | Aplica la retención (`backups.retention.days` / `keep` de settings); devuelve cuántos eliminó |
 | `RestoreBackup` | Crea safety backup → verifica que completó → ejecuta `BackupDriver::restore()` |
 | `DeleteBackup` | Elimina el artefacto del disk (si existe) y borra el registro |
 

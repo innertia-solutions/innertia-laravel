@@ -31,20 +31,19 @@ class BackupsServiceProvider extends ServiceProvider
     }
 
     /**
-     * Respaldo automático por defecto en todo producto: una entrada por horario
-     * (03:00, 11:00, 19:00 hora de Chile). Desactivable con
-     * innertia.backups.schedule.enabled = false (BACKUP_SCHEDULE_ENABLED=false).
+     * Respaldo automático en todo producto, siempre activo (no hay switch): una
+     * entrada por horario de la política guardada en /platform (default 03:00,
+     * 11:00 y 19:00 America/Santiago). schedule:run reconstruye el schedule cada
+     * minuto, así que un cambio en /platform rige desde el minuto siguiente.
      */
     public function schedule(Schedule $schedule): void
     {
-        if (! BackupSettings::scheduleEnabled()) {
-            return;
-        }
+        $timezone = BackupSettings::timezone();
 
         foreach (BackupSettings::times() as $time) {
             $schedule->command(RunBackupCommand::class)
                 ->dailyAt($time)
-                ->timezone(BackupSettings::timezone())
+                ->timezone($timezone)
                 ->name("innertia:backups:run@{$time}")
                 ->withoutOverlapping(360)
                 ->onOneServer()

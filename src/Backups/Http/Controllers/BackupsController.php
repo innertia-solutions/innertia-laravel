@@ -6,10 +6,14 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Innertia\Backups\Models\Backup;
+use Innertia\Backups\Support\BackupLog;
+use Innertia\Backups\Support\BackupSettings;
 use Innertia\Backups\UseCases\DeleteBackup;
 use Innertia\Backups\UseCases\RestoreBackup;
 use Innertia\Backups\UseCases\RunBackup;
 use Innertia\Facades\DataTable;
+use Cron\CronExpression;
+use Illuminate\Support\Carbon;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class BackupsController
@@ -81,5 +85,62 @@ class BackupsController
         (new DeleteBackup($backup))->execute();
 
         return response()->json(['status' => 'deleted']);
+    }
+
+    /**
+     * GET platform/backups/settings — política vigente del respaldo automático
+     * (siempre activo), defaults y próximas ejecuciones.
+     */
+    public function settings(): JsonResponse
+    {
+        return response()->json($this->settingsPayload());
+    }
+
+    /** PUT platform/backups/settings — edita horarios y retención desde /platform. */
+    public function updateSettings(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'times'          => 'required|array|min:1|max:' . BackupSettings::MAX_TIMES,
+            'times.*'        => ['required', 'string', 'regex:/^([01]\d|2[0-3]):[0-5]\d$/'],
+            'timezone'       => 'required|timezone:all',
+            'retention_days' => 'required|integer|min:1|max:3650',
+            'keep'           => 'required|integer|min:1|max:1000',
+        ]);
+
+        BackupSettings::save($data);
+        BackupLog::write('info', 'Política de respaldos actualizada.', BackupSettings::all());
+
+        return response()->json($this->settingsPayload());
+    }
+
+    private function settingsPayload(): array
+    {
+        $current = BackupSettings::all();
+        $now = Carbon::now($current['timezone']);
+
+        $next = collect($current['times'])
+            ->map(fn (string $time) => Carbon::instance(
+                (new CronExpression($this->cronFor($time)))->getNextRunDate($now, 0, false, $current['timezone'])
+            )->toIso8601String())
+            ->sort()
+            ->values()
+            ->all();
+
+        $last = Backup::query()->where('is_safety', false)->where('status', 'completed')
+            ->latest('created_at')->first(['id', 'created_at', 'size_bytes']);
+
+        return $current + [
+            'enabled'        => true,
+            'defaults'       => BackupSettings::defaults(),
+            'next_runs'      => $next,
+            'last_completed' => $last,
+        ];
+    }
+
+    private function cronFor(string $time): string
+    {
+        [$h, $m] = array_map('intval', explode(':', $time));
+
+        return "{$m} {$h} * * *";
     }
 }

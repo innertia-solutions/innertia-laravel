@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed — Política de respaldos editable desde /platform
+
+- Horarios, zona horaria y retención se guardan en `settings` (nivel plataforma) y se editan con
+  `GET/PUT platform/backups/settings` (`BackupsController::settings` / `updateSettings`).
+- El respaldo automático ya no se puede apagar: se eliminan `innertia.backups.schedule.*`,
+  `retention_days`, `keep` y las envs `BACKUP_SCHEDULE_*`, `BACKUP_RETENTION_DAYS`, `BACKUP_KEEP`.
+  `config('innertia.backups')` queda solo con `mode` y `disk`.
+
 ### Added — Respaldos automáticos (`Innertia\Backups`)
 
 - Schedule por defecto de `innertia:backups:run` a las 03:00, 11:00 y 19:00 (America/Santiago),

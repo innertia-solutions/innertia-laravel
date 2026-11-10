@@ -20,6 +20,18 @@ function innertiaBackupsMigrateUp(): void
         });
     }
 
+    // settings: la política de respaldos (horarios/retención) se guarda ahí.
+    if (!Schema::hasTable('settings')) {
+        Schema::create('settings', function (Blueprint $table) {
+            $table->id();
+            $table->string('key')->unique();
+            $table->string('value_type')->default('string');
+            $table->text('value')->nullable();
+            $table->boolean('is_encrypted')->default(false);
+            $table->timestamps();
+        });
+    }
+
     Schema::create('backups', function (Blueprint $table) {
         $table->uuid('id')->primary();
         $table->string('status')->default('pending'); // pending|running|completed|failed
@@ -41,5 +53,7 @@ function innertiaBackupsMigrateUp(): void
 function innertiaBackupsMigrateDown(): void
 {
     Schema::dropIfExists('backups');
+    Schema::dropIfExists('settings');
+    \Illuminate\Support\Facades\Cache::flush();
     Schema::dropIfExists('activity_logs');
 }
