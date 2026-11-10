@@ -15,6 +15,9 @@ class ProviderPresets
     /** Modelo de embedding por defecto: 1536 dimensiones (= columna pgvector del RAG). */
     public const OPENAI_EMBEDDING = 'text-embedding-3-small';
 
+    /** Chat + visión de OpenAI (lectura de documentos/imágenes con salida estructurada). */
+    public const OPENAI_VISION = 'gpt-4.1';
+
     /** Modelos de transcripción por defecto (audio → texto). */
     public const OPENAI_TRANSCRIPTION = 'whisper-1';
 
@@ -23,6 +26,7 @@ class ProviderPresets
     public const MODELS = [
         'openai' => [
             ['key' => self::OPENAI_EMBEDDING, 'name' => 'text-embedding-3-small (embedding)', 'capabilities' => ['embedding']],
+            ['key' => self::OPENAI_VISION, 'name' => 'GPT-4.1', 'capabilities' => ['chat', 'vision']],
             ['key' => self::OPENAI_TRANSCRIPTION, 'name' => 'Whisper (transcripción)', 'capabilities' => ['transcription']],
             ['key' => 'gpt-4o-transcribe', 'name' => 'GPT-4o Transcribe (transcripción)', 'capabilities' => ['transcription']],
         ],
