@@ -29,7 +29,10 @@ class FileResource extends JsonResource
             'provider'           => $this->provider,
             'external_url'       => $this->external_url,
             'external_synced_at' => $this->external_synced_at?->toIso8601String(),
-            'can_refresh'        => filled($this->provider) && filled($this->external_id) && $this->deleted_at === null,
+            'can_refresh'        => $this->provider === 'google_drive'
+                && filled($this->external_id)
+                && $this->deleted_at === null
+                && \Innertia\Files\Drive\DriveSourceResolver::available(),
             // Público → URL absoluta estable sin firma (apta para firmas de correo,
             // web, CDN). Privado → path firmado RELATIVO: el browser lo resuelve
             // contra su origen y la firma relativa valida tras cualquier proxy.

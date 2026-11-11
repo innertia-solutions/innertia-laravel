@@ -105,10 +105,8 @@ class Routes
         Route::get ("{$pre}drive/items/{id}", [$browseController, 'item'])->where('id', '[A-Za-z0-9_-]{1,200}')->name('innertia.files.drive.item');
         Route::post("{$pre}drive/folders",    [$browseController, 'createFolder'])->name('innertia.files.drive.folders.store');
 
-        if (class_exists($importsController)) {
-            Route::post("{$pre}files/imports",      [$importsController, 'store'])->name('innertia.files.imports.store');
-            Route::get ("{$pre}files/imports/{id}", [$importsController, 'show'])->whereUuid('id')->name('innertia.files.imports.show');
-            Route::post("{$pre}files/{id}/refresh", [$importsController, 'refresh'])->whereUuid('id')->name('innertia.files.refresh');
-        }
+        Route::post("{$pre}files/imports",      [$importsController, 'store'])->name('innertia.files.imports.store');
+        Route::get ("{$pre}files/imports/{id}", [$importsController, 'show'])->whereUuid('id')->name('innertia.files.imports.show');
+        Route::post("{$pre}files/{id}/refresh", [$importsController, 'refresh'])->whereUuid('id')->name('innertia.files.refresh');
     }
 }
