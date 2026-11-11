@@ -85,7 +85,8 @@ class FileVersionsController extends Controller
                 'file_id' => $file->id,
             ]);
 
-            return response()->json(['message' => $e->getMessage()], 422);
+            // El detalle (paths, disk) queda solo en el log; al cliente, mensaje genérico.
+            return response()->json(['message' => 'No se pudo procesar la versión del archivo.'], 422);
         }
 
         $result->file->loadCount('versions');
