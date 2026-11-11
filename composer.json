@@ -22,7 +22,11 @@
         "dompdf/dompdf": "^2.0",
         "laravel/mcp": "^0.9.1",
         "mercadopago/dx-php": "^3.10",
-        "laravel/ai": "^0.9.1"
+        "laravel/ai": "^0.9.1",
+        "web-auth/webauthn-lib": "^5.2",
+        "symfony/serializer": "^7.3|^8.0",
+        "symfony/property-access": "^7.3|^8.0",
+        "symfony/property-info": "^7.3|^8.0"
     },
     "require-dev": {
         "orchestra/testbench": "^10.6|^11.0",

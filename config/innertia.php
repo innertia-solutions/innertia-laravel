@@ -540,6 +540,23 @@ return [
         'default_password' => env('INNERTIA_PLATFORM_DEFAULT_PASSWORD'),
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Passkeys (WebAuthn)
+    |--------------------------------------------------------------------------
+    | Opt-in. Ingreso con huella/rostro/PIN del dispositivo como complemento de la
+    | contraseña (salta OTP y 2FA). rp_id = dominio al que se amarra la passkey:
+    | por defecto el host de app.frontend_url (o app.url). En productos con
+    | subdominios por tenant usar el dominio padre.
+    */
+    'passkeys' => [
+        'enabled'       => env('PASSKEYS_ENABLED', false),
+        'rp_id'         => env('PASSKEYS_RP_ID'),
+        'rp_name'       => env('PASSKEYS_RP_NAME'),
+        'origins'       => array_values(array_filter(explode(',', (string) env('PASSKEYS_ORIGINS', '')))),
+        'challenge_ttl' => 300,
+    ],
+
     'auth' => [
         /*
         |----------------------------------------------------------------------
