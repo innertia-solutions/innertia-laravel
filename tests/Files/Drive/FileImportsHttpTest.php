@@ -124,3 +124,16 @@ class DriveHttpOwnedImportsController extends FileImportsController
         return ['owner_type' => 'platform'];
     }
 }
+
+it('recovers a stale running import lazily when it is queried', function () {
+    config()->set('innertia.files.drive.job_timeout', 60);
+    $import = FileImport::create(['kind' => 'import', 'provider' => 'google_drive', 'source_items' => ['a']]);
+    $import->markRunning('t');
+
+    test()->getJson("/api/files/imports/{$import->id}")->assertJsonPath('data.status', 'running');
+
+    $this->travel(361)->seconds();
+    test()->getJson("/api/files/imports/{$import->id}")
+        ->assertJsonPath('data.status', 'failed')
+        ->assertJsonPath('data.error', 'El proceso no terminó (tiempo excedido).');
+});

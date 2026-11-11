@@ -82,6 +82,9 @@ class FileImportsController extends Controller
             return response()->json(['message' => 'Import not found.'], 404);
         }
 
+        // Recuperación perezosa: un worker muerto no deja el proceso en `running` para siempre.
+        $import->markStaleAsFailed();
+
         return (new FileImportResource($import))->response();
     }
 

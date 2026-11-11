@@ -394,6 +394,20 @@ nunca cambia: dueños, permisos, tags y URLs firmadas siguen apuntando al archiv
   concurrente".
 - **Nunca** escribir `files.path`/`size`/`checksum` a mano para cambiar contenido: usar `ReplaceFileContents`.
 
+## Importar desde Google Drive — operación de la cola
+
+`ImportFromDrive` / `RefreshFromProvider` corren en cola (`innertia.files.drive.queue`) con
+`$timeout = innertia.files.drive.job_timeout` y `tries = 1`. Requisitos de despliegue:
+
+- El `retry_after` de la conexión de cola **debe ser mayor** que `job_timeout`; si no, la cola
+  reentrega el job mientras sigue corriendo.
+- En multi-host el cache store debe soportar **locks atómicos compartidos** (redis o database).
+  Los locks por ítem/carpeta duran `max(300, job_timeout)`; la espera es `innertia.files.drive.lock_wait`
+  (default 60 s) y al vencer el ítem queda `skipped`.
+- Un proceso que quedó `running` (worker muerto) se marca `failed` en `failed()` del job o, si eso no
+  corrió, de forma perezosa al consultar `GET files/imports/{id}` pasado `job_timeout + 300` s.
+- El dedupe (archivo y carpeta) se acota por `owner_type`/`owner_id` del import (File no tiene tenant).
+
 ## Skills relacionados
 
 - `innertia-directories` — árbol de carpetas, materialized path, cascade trash

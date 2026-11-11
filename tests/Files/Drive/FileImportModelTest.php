@@ -82,3 +82,38 @@ it('keeps only allowed file attributes', function () {
     expect(FileImport::filterAttributes(['owner_type' => 'platform', 'owner_id' => null, 'path' => '/etc', 'disk' => 's3']))
         ->toBe(['owner_type' => 'platform', 'owner_id' => null]);
 });
+
+it('detects a running import past job_timeout + 300s as stale and fails it', function () {
+    config()->set('innertia.files.drive.job_timeout', 600);
+    $import = newImport();
+    $import->markRunning('t');
+
+    $this->travel(899)->seconds();
+    expect($import->fresh()->isStale())->toBeFalse();
+    expect($import->fresh()->markStaleAsFailed())->toBeFalse();
+
+    $this->travel(2)->seconds();
+    $fresh = $import->fresh();
+    expect($fresh->isStale())->toBeTrue();
+    expect($fresh->markStaleAsFailed())->toBeTrue();
+    expect($fresh->status)->toBe(FileImportStatus::Failed);
+    expect($import->fresh()->error)->toBe('El proceso no terminó (tiempo excedido).');
+    expect($import->fresh()->finished_at)->not->toBeNull();
+
+    $pending = newImport();
+    expect($pending->isStale())->toBeFalse();
+});
+
+it('marks failed only while still running', function () {
+    $running = newImport();
+    $running->markRunning('t');
+    $done = newImport();
+    $done->markDone();
+
+    $running->markFailedIfRunning('x');
+    $done->markFailedIfRunning('x');
+
+    expect($running->fresh()->status)->toBe(FileImportStatus::Failed);
+    expect($running->fresh()->error)->toBe('x');
+    expect($done->fresh()->status)->toBe(FileImportStatus::Done);
+});

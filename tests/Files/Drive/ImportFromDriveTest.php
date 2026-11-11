@@ -307,3 +307,17 @@ it('stops the whole import on a Drive auth or connection error, keeping partial 
     expect($import->imported)->toBe(1);
     expect($this->drive->calls)->not->toContain('download:next');
 })->with(['auth', 'connection']);
+
+it('marks a still-running import as failed when the job dies', function () {
+    $running = FileImport::create(['kind' => FileImportKind::Import, 'provider' => 'google_drive', 'source_items' => ['a']]);
+    $running->markRunning('t');
+    $done = FileImport::create(['kind' => FileImportKind::Import, 'provider' => 'google_drive', 'source_items' => ['a']]);
+    $done->markDone();
+
+    (new ImportFromDrive($running->id))->failed(new \RuntimeException('timeout'));
+    (new ImportFromDrive($done->id))->failed(new \RuntimeException('timeout'));
+
+    expect($running->fresh()->status)->toBe(FileImportStatus::Failed);
+    expect($running->fresh()->error)->toBe('El proceso se interrumpió: timeout');
+    expect($done->fresh()->status)->toBe(FileImportStatus::Done);
+});

@@ -89,3 +89,67 @@ it('fails with the reason, without throwing, when the owner disabled downloads',
     expect($import->error)->not->toBeEmpty();
     expect($file->fresh()->version)->toBe(1);
 });
+
+it('marks a still-running refresh as failed when the job dies', function () {
+    $import = FileImport::create(['kind' => FileImportKind::Refresh, 'provider' => 'google_drive', 'source_items' => ['a']]);
+    $import->markRunning('t');
+
+    (new RefreshFromProvider($import->id))->failed(new \RuntimeException('timeout'));
+
+    expect($import->fresh()->status)->toBe(FileImportStatus::Failed);
+    expect($import->fresh()->error)->toBe('El proceso se interrumpió: timeout');
+});
+
+it('fails with the reason, without throwing, when the file or export got too large', function () {
+    $this->drive->file('f1', 'a.txt', 'uno');
+    $file = importOne('f1');
+    config()->set('innertia.files.drive.max_file_size', 3);
+    $this->drive->edit('f1', 'demasiado');
+
+    $import = runRefresh($file);
+
+    expect($import->status)->toBe(FileImportStatus::Failed);
+    expect($import->error)->not->toBeEmpty();
+
+    $this->drive->native('d1', 'Acta', 'document', [DOCX => 'D']);
+    $file->forceDelete();
+    $native = importOne('d1');
+    $this->drive->edit('d1', 'E');
+    $this->drive->exportTooLarge[] = 'd1';
+
+    $import = runRefresh($native);
+
+    expect($import->status)->toBe(FileImportStatus::Failed);
+    expect($native->fresh()->version)->toBe(1);
+});
+
+it('fails clearly when the file is in the trash', function () {
+    $this->drive->file('f1', 'a.txt', 'uno');
+    $file = importOne('f1');
+    $file->delete();
+
+    $import = runRefresh($file);
+
+    expect($import->status)->toBe(FileImportStatus::Failed);
+    expect($import->error)->toBe('El archivo está en la papelera.');
+});
+
+it('claims the refresh atomically: a worker that lost the race does nothing', function () {
+    $this->drive->file('f1', 'a.txt', 'uno');
+    $file = importOne('f1');
+    $this->drive->edit('f1', 'dos');
+    $import = FileImport::create(['kind' => FileImportKind::Refresh, 'provider' => 'google_drive', 'source_items' => ['f1'], 'file_id' => $file->id]);
+
+    $raced = false;
+    \Illuminate\Support\Facades\DB::connection()->beforeExecuting(function (string $sql) use (&$raced, $import) {
+        if (! $raced && str_starts_with(strtolower($sql), 'update') && str_contains($sql, 'file_imports')) {
+            $raced = true;
+            \Illuminate\Support\Facades\DB::table('file_imports')->where('id', $import->id)->update(['status' => 'running', 'trace_id' => 'otro']);
+        }
+    });
+
+    (new RefreshFromProvider($import->id))->execute();
+
+    expect($file->fresh()->version)->toBe(1);
+    expect($import->fresh()->trace_id)->toBe('otro');
+});

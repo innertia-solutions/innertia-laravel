@@ -99,6 +99,42 @@ class FileImport extends Model
         $this->forceFill(['status' => FileImportStatus::Failed, 'error' => $error, 'finished_at' => now()])->save();
     }
 
+    /** Pasa a `failed` solo si sigue `running` (UPDATE condicional: no pisa un done concurrente). */
+    public function markFailedIfRunning(string $error): bool
+    {
+        $now = now();
+        $updated = static::query()
+            ->whereKey($this->getKey())
+            ->where('status', FileImportStatus::Running->value)
+            ->update(['status' => FileImportStatus::Failed->value, 'error' => $error, 'finished_at' => $now]);
+
+        if ($updated > 0) {
+            $this->refresh();
+        }
+
+        return $updated > 0;
+    }
+
+    /**
+     * `running` por más de job_timeout + 300 s: el worker murió sin pasar por failed()
+     * (OOM, kill, deploy). Se recupera de forma perezosa al consultarlo.
+     */
+    public function isStale(): bool
+    {
+        if ($this->status !== FileImportStatus::Running || $this->started_at === null) {
+            return false;
+        }
+
+        $limit = (int) config('innertia.files.drive.job_timeout', 3600) + 300;
+
+        return $this->started_at->lt(now()->subSeconds($limit));
+    }
+
+    public function markStaleAsFailed(): bool
+    {
+        return $this->isStale() && $this->markFailedIfRunning('El proceso no terminó (tiempo excedido).');
+    }
+
     public function isFinished(): bool
     {
         return in_array($this->status, [FileImportStatus::Done, FileImportStatus::Failed], true);

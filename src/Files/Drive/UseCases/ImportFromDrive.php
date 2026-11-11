@@ -145,6 +145,12 @@ class ImportFromDrive extends UseCase
         return $import;
     }
 
+    /** El worker murió o agotó el timeout: no dejar el registro en `running` para siempre. */
+    public function failed(\Throwable $e): void
+    {
+        FileImport::find($this->importId)?->markFailedIfRunning('El proceso se interrumpió: ' . $e->getMessage());
+    }
+
     private function importOne(DriveFileImporter $importer, DriveItem $item, ?Directory $dir, string $path, FileImport $import): void
     {
         $entry = ['external_id' => $item->id, 'name' => $item->name, 'path' => $path];

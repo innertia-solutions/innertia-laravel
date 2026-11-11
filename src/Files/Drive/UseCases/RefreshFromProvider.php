@@ -5,6 +5,8 @@ namespace Innertia\Files\Drive\UseCases;
 use Illuminate\Auth\GenericUser;
 use Innertia\Files\Drive\DriveFileFetcher;
 use Innertia\Files\Drive\DriveSourceResolver;
+use Innertia\Files\Drive\Exceptions\DriveExportTooLargeException;
+use Innertia\Files\Drive\Exceptions\DriveFileTooLargeException;
 use Innertia\Files\Drive\Exceptions\DriveItemNotFoundException;
 use Innertia\Files\Drive\Exceptions\DriveItemNotImportableException;
 use Innertia\Files\Drive\Import\DriveDirectoryMapper;
@@ -17,8 +19,9 @@ use Innertia\Platform\Contracts\UseCase;
 
 /**
  * "Actualizar desde Drive" de un archivo (registro kind=refresh en file_imports).
- * Un problema esperable (origen borrado, descarga deshabilitada, archivo no importado) deja el registro en `failed`
- * con un motivo claro sin relanzar; un error inesperado además se relanza.
+ * Un problema esperable (origen borrado, descarga deshabilitada, demasiado grande, archivo no
+ * importado o en la papelera) deja el registro en `failed` con un motivo claro sin relanzar;
+ * un error inesperado además se relanza. Claim atómico: solo un worker lo corre.
  */
 class RefreshFromProvider extends UseCase
 {
@@ -31,18 +34,28 @@ class RefreshFromProvider extends UseCase
 
     public function execute(): FileImport
     {
+        $claimed = FileImport::query()
+            ->whereKey($this->importId)
+            ->where('status', FileImportStatus::Pending->value)
+            ->update(['status' => FileImportStatus::Running->value, 'started_at' => now(), 'trace_id' => traceId()]);
+
         $import = FileImport::findOrFail($this->importId);
 
-        if ($import->status !== FileImportStatus::Pending) {
+        if ($claimed === 0) {
             return $import;
         }
 
-        $import->markRunning(traceId());
+        FilesLog::info('files.drive.refresh: inicio', ['import_id' => $import->id, 'file_id' => $import->file_id]);
 
-        $file = $import->file_id ? File::find($import->file_id) : null;
+        $file = $import->file_id ? File::withTrashed()->find($import->file_id) : null;
 
         if (! $file || $file->provider !== DriveDirectoryMapper::PROVIDER || ! $file->external_id) {
             $import->markFailed('El archivo no fue importado desde Google Drive.');
+
+            return $import;
+        }
+        if ($file->trashed()) {
+            $import->markFailed('El archivo está en la papelera.');
 
             return $import;
         }
@@ -58,9 +71,10 @@ class RefreshFromProvider extends UseCase
             $import->found = 1;
             $import->record($result, ['external_id' => $item->id, 'name' => $file->original_name, 'path' => '', 'file_id' => $file->id]);
             $import->markDone();
-        } catch (DriveItemNotFoundException $e) {
+            FilesLog::info('files.drive.refresh: fin', ['import_id' => $import->id, 'file_id' => $file->id, 'result' => $result]);
+        } catch (DriveItemNotFoundException) {
             $import->markFailed('El archivo ya no existe en Google Drive o se perdió el acceso.');
-        } catch (DriveItemNotImportableException $e) {
+        } catch (DriveItemNotImportableException|DriveFileTooLargeException|DriveExportTooLargeException $e) {
             $import->markFailed($e->getMessage());
         } catch (\Throwable $e) {
             $import->markFailed($e->getMessage());
@@ -69,5 +83,11 @@ class RefreshFromProvider extends UseCase
         }
 
         return $import;
+    }
+
+    /** El worker murió o agotó el timeout: no dejar el registro en `running` para siempre. */
+    public function failed(\Throwable $e): void
+    {
+        FileImport::find($this->importId)?->markFailedIfRunning('El proceso se interrumpió: ' . $e->getMessage());
     }
 }
