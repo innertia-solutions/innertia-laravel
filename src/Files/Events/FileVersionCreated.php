@@ -24,10 +24,13 @@ class FileVersionCreated extends DomainEvent
     public function payload(): array
     {
         return [
-            'file_id'          => $this->file->id,
-            'version'          => $this->file->version,
-            'previous_version' => $this->previous->version,
-            'source'           => $this->file->version_source,
+            'file_id'           => $this->file->id,
+            'version'           => $this->file->version,
+            'previous_version'  => $this->previous->version,
+            'source'            => $this->file->version_source,
+            'checksum'          => $this->file->checksum,
+            'previous_checksum' => $this->previous->checksum,
+            'performed_by'      => $this->performedBy?->getAuthIdentifier(),
         ];
     }
 }

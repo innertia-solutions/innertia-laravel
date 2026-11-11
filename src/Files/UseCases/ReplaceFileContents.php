@@ -3,6 +3,7 @@
 namespace Innertia\Files\UseCases;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -15,21 +16,34 @@ use Innertia\Files\Support\Checksum;
 use Innertia\Files\Support\FileVersioning;
 use Innertia\Files\Support\FilesLog;
 use Innertia\Files\Versioning\FileVersionResult;
+use Symfony\Component\Mime\MimeTypes;
 
 /**
  * ÚNICO camino para cambiar el contenido de un File.
  *
- * - Mismo checksum que el vigente → `unchanged`, no escribe nada.
+ * - Mismo checksum que el vigente → `unchanged`, no escribe bytes ni crea versión
+ *   (solo persiste los metadatos externos de $meta, p. ej. la revisión de Drive).
  * - Si cambió: sube los bytes a una ruta NUEVA (nunca sobrescribe), y en una
  *   transacción con lockForUpdate archiva el vigente en file_versions y
- *   actualiza files (version + 1). Si la BD falla, borra los bytes nuevos.
+ *   actualiza files (version + 1). Si la escritura o la BD fallan, borra los
+ *   bytes nuevos.
+ * - El evento FileVersionCreated y la poda corren con DB::afterCommit: si el
+ *   llamador abrió una transacción, esperan a su commit (y no corren si hace
+ *   rollback).
+ *
+ * Limitación conocida: si la transacción EXTERNA del llamador hace rollback, los
+ * bytes nuevos ya escritos quedan huérfanos en el disk (basura inofensiva: ninguna
+ * fila los referencia).
  *
  * $meta admite: restored_from_version, external_revision, external_export_mime,
- * external_synced_at, original_name.
+ * external_synced_at, original_name. Cualquier otra clave se ignora.
  */
 class ReplaceFileContents
 {
     private const META_KEYS = ['restored_from_version', 'external_revision', 'external_export_mime', 'external_synced_at', 'original_name'];
+
+    /** Metadatos que se persisten aunque el contenido no cambie. */
+    private const EXTERNAL_META_KEYS = ['external_revision', 'external_export_mime', 'external_synced_at'];
 
     public function __construct(
         public readonly File $file,
@@ -50,7 +64,7 @@ class ReplaceFileContents
         }
 
         $current = File::withTrashed()->find($this->file->id)
-            ?? throw new \Illuminate\Database\Eloquent\ModelNotFoundException("File {$this->file->id} no existe.");
+            ?? throw new ModelNotFoundException("File {$this->file->id} no existe.");
 
         if ($current->trashed()) {
             throw new FileTrashedException($current->id);
@@ -60,19 +74,22 @@ class ReplaceFileContents
         $currentChecksum = $current->checksum ?? $this->lazyChecksum($current);
 
         if ($currentChecksum !== null && hash_equals($currentChecksum, $newChecksum)) {
+            $this->applyExternalMeta($current);
             $this->syncCaller($current);
 
             return FileVersionResult::unchanged($current);
         }
 
         $disk = $current->disk;
-        $extension = strtolower((string) ($this->extension ?? $current->extension ?? ''));
-        $newPath = 'files/' . now()->format('Y/m') . '/' . Str::uuid() . ($extension !== '' ? ".{$extension}" : '');
-
-        $this->writeBytes($disk, $newPath);
+        $extension = $this->normalizedExtension($current);
+        $mimeType = $this->resolveMimeType($current, $extension);
+        $size = $this->localSize();
+        $newPath = 'files/' . now()->format('Y/m') . '/' . Str::uuid() . ($extension !== null ? ".{$extension}" : '');
 
         try {
-            $outcome = DB::transaction(function () use ($newPath, $newChecksum, $extension, $current, $currentChecksum) {
+            $this->writeBytes($disk, $newPath);
+
+            $outcome = DB::transaction(function () use ($newPath, $newChecksum, $extension, $mimeType, $size, $current, $currentChecksum) {
                 $locked = File::withTrashed()->whereKey($current->id)->lockForUpdate()->firstOrFail();
 
                 if ($locked->trashed()) {
@@ -81,6 +98,8 @@ class ReplaceFileContents
 
                 // Otro proceso dejó ya estos mismos bytes como vigentes.
                 if ($locked->checksum !== null && hash_equals($locked->checksum, $newChecksum)) {
+                    $this->applyExternalMeta($locked);
+
                     return ['unchanged', $locked, null];
                 }
 
@@ -107,9 +126,9 @@ class ReplaceFileContents
 
                 $locked->forceFill(array_merge([
                     'path'                  => $newPath,
-                    'mime_type'             => $this->mimeType ?? (mime_content_type($this->localPath) ?: $locked->mime_type),
-                    'extension'             => $extension !== '' ? $extension : null,
-                    'size'                  => filesize($this->localPath),
+                    'mime_type'             => $mimeType,
+                    'extension'             => $extension,
+                    'size'                  => $size,
                     'checksum'              => $newChecksum,
                     'version'               => $locked->version + 1,
                     'version_source'        => $this->source->value,
@@ -121,24 +140,31 @@ class ReplaceFileContents
                 return ['created', $locked, $previous];
             });
         } catch (\Throwable $e) {
-            Storage::disk($disk)->delete($newPath);
+            $this->deleteQuietly($disk, $newPath);
             throw $e;
         }
 
         [$status, $file, $previous] = $outcome;
 
+        $this->syncCaller($file);
+
         if ($status === 'unchanged') {
-            Storage::disk($disk)->delete($newPath);
-            $this->syncCaller($file);
+            $this->deleteQuietly($disk, $newPath);
 
             return FileVersionResult::unchanged($file);
         }
 
-        event(new FileVersionCreated($file, $previous, $this->performedBy));
+        DB::afterCommit(function () use ($file, $previous) {
+            event(new FileVersionCreated($file, $previous, $this->performedBy));
 
-        (new PruneFileVersions($file))->execute();
-
-        $this->syncCaller($file);
+            try {
+                (new PruneFileVersions($file))->execute();
+            } catch (\Throwable $e) {
+                FilesLog::warning('files.versioning: falló la poda de versiones', [
+                    'file_id' => $file->id, 'error' => $e->getMessage(),
+                ]);
+            }
+        });
 
         return FileVersionResult::created($file, $previous);
     }
@@ -165,14 +191,105 @@ class ReplaceFileContents
             return null;
         }
 
-        $current->forceFill(['checksum' => $checksum])->saveQuietly();
+        // Condicional: nunca pisa una versión más nueva ni toca updated_at.
+        File::withTrashed()
+            ->whereKey($current->id)
+            ->where('path', $current->path)
+            ->whereNull('checksum')
+            ->toBase()
+            ->update(['checksum' => $checksum]);
+
+        $current->setAttribute('checksum', $checksum);
+        $current->syncOriginalAttribute('checksum');
 
         return $checksum;
+    }
+
+    /**
+     * Contenido sin cambios: persiste solo los metadatos externos (revisión de
+     * Drive, etc.) sobre la fila vigente, sin versión nueva ni updated_at.
+     */
+    private function applyExternalMeta(File $file): void
+    {
+        $external = array_intersect_key($this->meta, array_flip(self::EXTERNAL_META_KEYS));
+
+        if ($external === []) {
+            return;
+        }
+
+        foreach ($external as $key => $value) {
+            $file->setAttribute($key, $value);
+        }
+
+        // Valores ya convertidos por los casts del modelo (fechas → string de BD).
+        $values = array_intersect_key($file->getAttributes(), $external);
+
+        File::withTrashed()
+            ->whereKey($file->id)
+            ->where('path', $file->path)
+            ->toBase()
+            ->update($values);
+
+        $file->syncOriginalAttributes(array_keys($external));
+    }
+
+    private function normalizedExtension(File $current): ?string
+    {
+        $ext = strtolower((string) ($this->extension ?? $current->extension ?? ''));
+        $ext = preg_replace('/[^a-z0-9]/', '', ltrim($ext, '.'));
+        $ext = substr($ext, 0, 20);
+
+        return $ext !== '' ? $ext : null;
+    }
+
+    private function resolveMimeType(File $current, ?string $extension): ?string
+    {
+        if ($this->mimeType !== null) {
+            return $this->mimeType;
+        }
+
+        $currentExt = $current->extension !== null ? strtolower(ltrim($current->extension, '.')) : null;
+
+        if ($extension === $currentExt && $current->mime_type !== null) {
+            return $current->mime_type;
+        }
+
+        if ($extension !== null) {
+            $guessed = MimeTypes::getDefault()->getMimeTypes($extension)[0] ?? null;
+            if ($guessed !== null) {
+                return $guessed;
+            }
+        }
+
+        if (function_exists('mime_content_type')) {
+            $detected = @mime_content_type($this->localPath);
+            if (is_string($detected) && $detected !== '') {
+                return $detected;
+            }
+        }
+
+        return $current->mime_type;
+    }
+
+    private function localSize(): int
+    {
+        clearstatcache(true, $this->localPath);
+        $size = filesize($this->localPath);
+
+        if ($size === false) {
+            throw new \RuntimeException("No se pudo leer el tamaño de {$this->localPath}.");
+        }
+
+        return $size;
     }
 
     private function writeBytes(string $disk, string $path): void
     {
         $stream = fopen($this->localPath, 'rb');
+
+        if ($stream === false) {
+            throw new \RuntimeException("No se pudo abrir {$this->localPath}.");
+        }
 
         try {
             $ok = Storage::disk($disk)->writeStream($path, $stream);
@@ -187,9 +304,22 @@ class ReplaceFileContents
         }
     }
 
+    /** Limpieza que nunca enmascara el error original ni convierte un "unchanged" en error. */
+    private function deleteQuietly(string $disk, string $path): void
+    {
+        try {
+            Storage::disk($disk)->delete($path);
+        } catch (\Throwable $e) {
+            FilesLog::warning('files.versioning: no se pudieron borrar bytes temporales', [
+                'disk' => $disk, 'path' => $path, 'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
     /** La instancia que recibió el UseCase queda igual a la BD. */
     private function syncCaller(File $fresh): void
     {
         $this->file->setRawAttributes($fresh->getAttributes(), true);
+        $this->file->unsetRelation('versions');
     }
 }
