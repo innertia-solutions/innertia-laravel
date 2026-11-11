@@ -13,6 +13,9 @@ use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Innertia\Auth\RBAC\Models\EntityPermission;
 use Innertia\Files\Directories\Models\Directory;
+use Innertia\Files\Enums\FileVersionSource;
+use Innertia\Files\Support\Checksum;
+use Innertia\Files\Support\FileVersioning;
 use Innertia\Platform\Traits\HasEntityPermissions;
 use Innertia\Tags\Traits\HasTags;
 
@@ -83,7 +86,45 @@ class File extends Model
         'external_id',
         'external_url',
         'external_account_id',
+        'version',
+        'checksum',
+        'version_source',
+        'version_created_by',
+        'version_created_at',
+        'restored_from_version',
+        'external_revision',
+        'external_export_mime',
+        'external_synced_at',
     ];
+
+    protected $casts = [
+        'size'                  => 'integer',
+        'version'               => 'integer',
+        'restored_from_version' => 'integer',
+        'version_created_at'    => 'datetime',
+        'external_synced_at'    => 'datetime',
+    ];
+
+    protected static function booted(): void
+    {
+        // Toda creación de File (UploadFile, factories, código de producto) queda
+        // como versión 1 con checksum. Si la lib está desplegada sin migrar, no se
+        // tocan columnas que aún no existen.
+        static::creating(function (File $file) {
+            if (! FileVersioning::ready()) {
+                return;
+            }
+
+            $file->version            ??= 1;
+            $file->version_source     ??= FileVersionSource::Upload->value;
+            $file->version_created_at ??= now();
+            $file->version_created_by ??= $file->created_by;
+
+            if ($file->checksum === null && $file->disk && $file->path) {
+                $file->checksum = Checksum::ofStored($file->disk, $file->path);
+            }
+        });
+    }
 
     // ── Static factories ──────────────────────────────────────────────────────
 
@@ -105,7 +146,7 @@ class File extends Model
         $mimeType  = $file->getMimeType();
         $extension = $file->getClientOriginalExtension();
 
-        return static::create([
+        return static::create(static::withChecksum([
             'disk'          => $disk,
             'path'          => $path,
             'original_name' => $file->getClientOriginalName(),
@@ -113,7 +154,7 @@ class File extends Model
             'extension'     => strtolower($extension),
             'size'          => $file->getSize(),
             'created_by'    => auth()->id(),
-        ]);
+        ], fn () => Checksum::ofLocal($file->getRealPath())));
     }
 
     public static function fromPath(string $absolutePath, string $disk = '', string $visibility = 'auth'): static
@@ -130,7 +171,7 @@ class File extends Model
 
         Storage::disk($disk)->put($storagePath, file_get_contents($absolutePath));
 
-        return static::create([
+        return static::create(static::withChecksum([
             'disk'          => $disk,
             'path'          => $storagePath,
             'original_name' => $filename,
@@ -139,7 +180,7 @@ class File extends Model
             'size'          => filesize($absolutePath),
             'visibility'    => $visibility,
             'created_by'    => auth()->id(),
-        ]);
+        ], fn () => Checksum::ofLocal($absolutePath)));
     }
 
     public static function fromUrl(string $url, string $disk = '', string $visibility = 'auth'): static
@@ -154,7 +195,7 @@ class File extends Model
 
         Storage::disk($disk)->put($storagePath, $contents);
 
-        return static::create([
+        return static::create(static::withChecksum([
             'disk'          => $disk,
             'path'          => $storagePath,
             'original_name' => $filename,
@@ -163,7 +204,7 @@ class File extends Model
             'size'          => strlen($contents),
             'visibility'    => $visibility,
             'created_by'    => auth()->id(),
-        ]);
+        ], fn () => hash('sha256', $contents)));
     }
 
     // ── URLs ──────────────────────────────────────────────────────────────────
@@ -384,6 +425,12 @@ class File extends Model
         return $this->morphTo();
     }
 
+    /** Versiones superadas (la vigente es esta fila). */
+    public function versions(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(FileVersion::class, 'file_id')->orderByDesc('version');
+    }
+
     public function directory(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(
@@ -393,6 +440,16 @@ class File extends Model
     }
 
     // ── Private ───────────────────────────────────────────────────────────────
+
+    /** Agrega el checksum ya conocido solo si la columna existe (lib sin migrar). */
+    private static function withChecksum(array $attrs, \Closure $checksum): array
+    {
+        if (FileVersioning::ready()) {
+            $attrs['checksum'] = $checksum();
+        }
+
+        return $attrs;
+    }
 
     private function checkRestricted(Authenticatable $user): bool
     {

@@ -25,7 +25,7 @@ class UploadFile
         $disk = $this->disk ?: config('filesystems.default', 'local');
         $path = $this->uploaded->store('files/' . now()->format('Y/m'), $disk);
 
-        $file = File::create([
+        $attrs = [
             'disk'          => $disk,
             'path'          => $path,
             'original_name' => $this->uploaded->getClientOriginalName(),
@@ -37,7 +37,13 @@ class UploadFile
             'owner_type'    => $this->owner ? $this->owner::class : null,
             'owner_id'      => $this->owner?->getKey(),
             'created_by'    => $this->performedBy?->getAuthIdentifier(),
-        ]);
+        ];
+
+        if (\Innertia\Files\Support\FileVersioning::ready() && $this->uploaded->getRealPath()) {
+            $attrs['checksum'] = \Innertia\Files\Support\Checksum::ofLocal($this->uploaded->getRealPath());
+        }
+
+        $file = File::create($attrs);
 
         event(new FileUploaded($file, $this->performedBy));
 
