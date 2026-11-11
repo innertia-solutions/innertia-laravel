@@ -64,7 +64,7 @@ class ServiceAccountDriveSource implements DriveSource
         $page = null;
 
         do {
-            $res = $this->http()->get(self::API . '/files', $query + ($page ? ['pageToken' => $page] : []));
+            $res = $this->send(fn () => $this->http()->get(self::API . '/files', $query + ($page ? ['pageToken' => $page] : [])));
             $this->ensureOk($res, 'listar la carpeta');
 
             foreach ($res->json('files', []) as $f) {
@@ -87,7 +87,7 @@ class ServiceAccountDriveSource implements DriveSource
         $page = null;
 
         do {
-            $res = $this->http()->get(self::API . '/drives', ['pageSize' => 100, 'fields' => 'nextPageToken, drives(id, name)'] + ($page ? ['pageToken' => $page] : []));
+            $res = $this->send(fn () => $this->http()->get(self::API . '/drives', ['pageSize' => 100, 'fields' => 'nextPageToken, drives(id, name)'] + ($page ? ['pageToken' => $page] : [])));
             $this->ensureOk($res, 'listar las unidades compartidas');
 
             foreach ($res->json('drives', []) as $d) {
@@ -101,7 +101,7 @@ class ServiceAccountDriveSource implements DriveSource
 
     public function metadata(string $id): DriveItem
     {
-        $res = $this->http()->get(self::API . '/files/' . rawurlencode($id), ['fields' => DriveItem::API_FIELDS, 'supportsAllDrives' => 'true']);
+        $res = $this->send(fn () => $this->http()->get(self::API . '/files/' . rawurlencode($id), ['fields' => DriveItem::API_FIELDS, 'supportsAllDrives' => 'true']));
         $this->ensureOk($res, 'leer el elemento', $id);
 
         return DriveItem::fromApi($res->json());
@@ -127,8 +127,12 @@ class ServiceAccountDriveSource implements DriveSource
         }
 
         if ($item->driveId !== null && $path[0]['id'] === $item->driveId) {
-            $drive = $this->http()->get(self::API . '/drives/' . rawurlencode($item->driveId), ['fields' => 'name']);
-            $path[0]['name'] = $drive->successful() ? (string) $drive->json('name', $path[0]['name']) : $path[0]['name'];
+            try {
+                $drive = $this->send(fn () => $this->http()->get(self::API . '/drives/' . rawurlencode($item->driveId), ['fields' => 'name']));
+                $path[0]['name'] = $drive->successful() ? (string) $drive->json('name', $path[0]['name']) : $path[0]['name'];
+            } catch (DriveException) {
+                // sin conexión para el nombre de la unidad: se conserva el nombre de la raíz
+            }
         } elseif ($item->driveId === null) {
             $path[0] = ['id' => 'root', 'name' => 'Mi unidad'];
         }
@@ -138,8 +142,8 @@ class ServiceAccountDriveSource implements DriveSource
 
     public function download(string $id, int $maxBytes): string
     {
-        $res = $this->http()->withOptions(['stream' => true])
-            ->get(self::API . '/files/' . rawurlencode($id), ['alt' => 'media', 'supportsAllDrives' => 'true']);
+        $res = $this->send(fn () => $this->http()->withOptions(['stream' => true])
+            ->get(self::API . '/files/' . rawurlencode($id), ['alt' => 'media', 'supportsAllDrives' => 'true']));
         $this->ensureOk($res, 'descargar el archivo', $id);
 
         return $this->streamToTemp($res, $maxBytes);
@@ -147,8 +151,8 @@ class ServiceAccountDriveSource implements DriveSource
 
     public function export(string $id, string $mime): string
     {
-        $res = $this->http()->withOptions(['stream' => true])
-            ->get(self::API . '/files/' . rawurlencode($id) . '/export', ['mimeType' => $mime]);
+        $res = $this->send(fn () => $this->http()->withOptions(['stream' => true])
+            ->get(self::API . '/files/' . rawurlencode($id) . '/export', ['mimeType' => $mime]));
         $this->ensureOk($res, 'exportar el documento', $id);
 
         return $this->streamToTemp($res, (int) config('innertia.files.drive.max_file_size', 200 * 1024 * 1024));
@@ -156,11 +160,11 @@ class ServiceAccountDriveSource implements DriveSource
 
     public function createFolder(string $name, string $parentId): DriveItem
     {
-        $res = $this->http()->post(self::API . '/files?supportsAllDrives=true&fields=' . urlencode(DriveItem::API_FIELDS), [
+        $res = $this->send(fn () => $this->http()->post(self::API . '/files?supportsAllDrives=true&fields=' . urlencode(DriveItem::API_FIELDS), [
             'name'     => $name,
             'mimeType' => DriveItem::FOLDER_MIME,
             'parents'  => [$parentId],
-        ]);
+        ]));
         $this->ensureOk($res, 'crear la carpeta');
 
         return DriveItem::fromApi($res->json());
@@ -174,6 +178,19 @@ class ServiceAccountDriveSource implements DriveSource
             ->acceptJson()
             ->timeout(60)
             ->retry(2, 300, fn ($e) => $e instanceof ConnectionException, throw: false);
+    }
+
+    /**
+     * Único punto que ejecuta requests a Google: un error de conexión (agotados los
+     * reintentos) sale como DriveException, igual que cualquier otra falla de la API.
+     */
+    private function send(\Closure $request): Response
+    {
+        try {
+            return $request();
+        } catch (ConnectionException $e) {
+            throw new DriveException('No se pudo conectar con Google Drive: ' . $e->getMessage(), 'connection');
+        }
     }
 
     private function streamToTemp(Response $res, int $maxBytes): string
@@ -237,10 +254,10 @@ class ServiceAccountDriveSource implements DriveSource
                 $claims['sub'] = $subject;
             }
 
-            $res = Http::asForm()->timeout(20)->post($tokenUri, [
+            $res = $this->send(fn () => Http::asForm()->timeout(20)->post($tokenUri, [
                 'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
                 'assertion'  => JWT::encode($claims, $sa['private_key'], 'RS256'),
-            ]);
+            ]));
 
             if ($res->failed() || ! $res->json('access_token')) {
                 $detail = $res->json('error_description') ?: $res->json('error') ?: ('HTTP ' . $res->status());

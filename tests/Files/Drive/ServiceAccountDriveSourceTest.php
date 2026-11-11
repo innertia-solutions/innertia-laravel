@@ -174,3 +174,35 @@ it('resolves the service account source, a bound source, or fails when not confi
     expect(DriveSourceResolver::available())->toBeFalse();
     expect(fn () => DriveSourceResolver::resolve())->toThrow(DriveNotConfiguredException::class);
 });
+
+it('surfaces connection errors on the API as DriveException', function () {
+    Http::fake(tokenFake() + [API . '/*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('timeout')]);
+
+    try {
+        app(ServiceAccountDriveSource::class)->listChildren();
+        $this->fail('Debió lanzar DriveException');
+    } catch (DriveException $e) {
+        expect($e->reason)->toBe('connection')->and($e->getMessage())->toContain('timeout');
+    }
+});
+
+it('surfaces connection errors on the token request as DriveException', function () {
+    Http::fake(fn () => throw new \Illuminate\Http\Client\ConnectionException('timeout'));
+
+    try {
+        app(ServiceAccountDriveSource::class)->listChildren();
+        $this->fail('Debió lanzar DriveException');
+    } catch (DriveException $e) {
+        expect($e->reason)->toBe('connection');
+    }
+});
+
+it('keeps the shared drive root name when the drives lookup cannot connect', function () {
+    Http::fake(tokenFake() + [
+        API . '/files/s2?*'  => Http::response(['id' => 's2', 'name' => 'S2', 'mimeType' => 'application/vnd.google-apps.folder', 'driveId' => 'sd', 'parents' => ['sd']]),
+        API . '/files/sd?*'  => Http::response(['id' => 'sd', 'name' => 'Drive', 'mimeType' => 'application/vnd.google-apps.folder', 'driveId' => 'sd']),
+        API . '/drives/sd?*' => fn () => throw new \Illuminate\Http\Client\ConnectionException('timeout'),
+    ]);
+
+    expect(app(ServiceAccountDriveSource::class)->path('s2'))->toBe([['id' => 'sd', 'name' => 'Drive']]);
+});
