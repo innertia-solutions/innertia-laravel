@@ -48,6 +48,11 @@ class Routes
             Route::get   ('users/{id}/roles',               [$usersController, 'roles']);
             Route::post  ('users/{id}/roles',               [$usersController, 'assignRole']);
             Route::delete('users/{id}/roles/{role}',        [$usersController, 'removeRole']);
+
+            if (\Innertia\Passkeys\Support\PasskeyConfig::enabled()) {
+                Route::get   ('users/{id}/passkeys', [$usersController, 'passkeys']);
+                Route::delete('users/{id}/passkeys', [$usersController, 'revokePasskeys']);
+            }
             Route::get   ('users/{id}/contexts',            [$usersController, 'contexts']);
             Route::post  ('users/{id}/contexts',            [$usersController, 'grantContext']);
             Route::post  ('users/{id}/contexts/sync',       [$usersController, 'syncContexts']);

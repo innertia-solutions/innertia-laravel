@@ -314,6 +314,34 @@ class UsersController extends Controller
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
+    // ── Passkeys (si innertia.passkeys.enabled) ───────────────────────────────
+
+    /** GET users/{id}/passkeys — mismas reglas de alcance que show(). */
+    public function passkeys(string $id): JsonResponse
+    {
+        $user = $this->findUser($id);
+
+        $items = \Innertia\Passkeys\Models\Passkey::where('user_id', (string) $user->getKey())
+            ->orderByDesc('created_at')->get()
+            ->map->toPublicArray()->values();
+
+        return response()->json(['data' => $items]);
+    }
+
+    /** DELETE users/{id}/passkeys — "Revocar todas" (dispositivo perdido, funcionario que se va). */
+    public function revokePasskeys(string $id): JsonResponse
+    {
+        $user = $this->findUser($id);
+
+        $revoked = (new \Innertia\Passkeys\UseCases\RevokePasskeys(
+            (string) $user->getKey(),
+            null,
+            auth()->id() !== null ? (string) auth()->id() : null,
+        ))->execute();
+
+        return response()->json(['revoked' => $revoked]);
+    }
+
     /**
      * Resuelve un usuario que el actor puede administrar (ver
      * applyManageableScope). Fuera de alcance → 404, sin revelar existencia.
