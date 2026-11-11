@@ -12,14 +12,16 @@ beforeEach(function () {
         'build_date' => null,
         'file'       => sys_get_temp_dir() . '/innertia-build-info-' . getmypid() . '.json',
         'git'        => false,
+        'version_file' => sys_get_temp_dir() . '/innertia-VERSION-' . getmypid(),
     ]);
     File::delete(config('innertia.version.file'));
+    File::delete(config('innertia.version.version_file'));
 
     Routes::public();
     Routes::platform('plat-test');
 });
 
-afterEach(fn () => File::delete(config('innertia.version.file')));
+afterEach(fn () => File::delete([config('innertia.version.file'), config('innertia.version.version_file')]));
 
 it('el público expone solo app, version, commit, build_date y environment', function () {
     config()->set('innertia.version.app', '1.4.0');
@@ -28,7 +30,8 @@ it('el público expone solo app, version, commit, build_date y environment', fun
 
     $json = $this->getJson('/version')->assertOk()->json();
 
-    expect(array_keys($json))->toBe(['app', 'version', 'commit', 'build_date', 'environment'])
+    expect(array_keys($json))->toBe(['app', 'version', 'version_parts', 'commit', 'build_date', 'environment'])
+        ->and($json['version_parts'])->toBeNull()
         ->and($json['app'])->toBe('acme')
         ->and($json['version'])->toBe('1.4.0')
         ->and($json['commit'])->toBe('0123456')
@@ -92,4 +95,33 @@ it('el detalle omite paquetes configurados que no están instalados', function (
 
     expect($json['packages'])->toHaveKey('laravel/framework')
         ->and($json['packages'])->not->toHaveKey('vendor/no-existe');
+});
+
+it('expone version_parts cuando la versión es estándar', function () {
+    config()->set('innertia.version.app', 'v1.0.2-20261111-QA.7');
+
+    $this->getJson('/version')
+        ->assertOk()
+        ->assertJsonPath('version', 'v1.0.2-20261111-QA.7')
+        ->assertJsonPath('version_parts.semver', '1.0.2')
+        ->assertJsonPath('version_parts.date', '2026-11-11')
+        ->assertJsonPath('version_parts.environment', 'qa')
+        ->assertJsonPath('version_parts.sequence', 7);
+});
+
+it('en dev sin APP_VERSION usa el archivo VERSION del monorepo', function () {
+    File::put(config('innertia.version.version_file'), "1.0.2\n");
+
+    $this->getJson('/version')
+        ->assertOk()
+        ->assertJsonPath('version', 'v1.0.2-dev')
+        ->assertJsonPath('version_parts.environment', 'dev');
+});
+
+it('ignora un archivo VERSION inválido', function () {
+    File::put(config('innertia.version.version_file'), 'uno-punto-cero');
+
+    $json = $this->getJson('/version')->assertOk()->json();
+
+    expect($json['version'])->not->toBe('vuno-punto-cero-dev');
 });

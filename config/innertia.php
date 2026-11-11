@@ -493,6 +493,7 @@ return [
         'commit'     => env('APP_COMMIT'),
         'build_date' => env('APP_BUILD_DATE'),
         'file'       => env('APP_BUILD_INFO_FILE'),   // null → base_path('build-info.json')
+        'version_file' => env('APP_VERSION_FILE'),    // null → base_path('../VERSION') (raíz del monorepo, solo dev)
         'git'        => true,                         // fallback git rev-parse (dev local)
         'packages'   => \Innertia\Version\VersionInfo::DEFAULT_PACKAGES,
     ],

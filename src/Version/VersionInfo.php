@@ -33,15 +33,18 @@ class VersionInfo
 
     private ?array $buildInfo = null;
 
-    /** @return array{app: string, version: ?string, commit: ?string, build_date: ?string, environment: string} */
+    /** @return array{app: string, version: ?string, version_parts: ?array, commit: ?string, build_date: ?string, environment: string} */
     public function public(): array
     {
+        $version = $this->version();
+
         return [
-            'app'         => (string) config('app.name'),
-            'version'     => $this->version(),
-            'commit'      => $this->shortCommit($this->commit()),
-            'build_date'  => $this->pick('build_date'),
-            'environment' => app()->environment(),
+            'app'           => (string) config('app.name'),
+            'version'       => $version,
+            'version_parts' => VersionString::parse($version),
+            'commit'        => $this->shortCommit($this->commit()),
+            'build_date'    => $this->pick('build_date'),
+            'environment'   => app()->environment(),
         ];
     }
 
@@ -55,7 +58,16 @@ class VersionInfo
 
     private function version(): ?string
     {
-        return $this->pick('version', 'app') ?? $this->rootVersion();
+        return $this->pick('version', 'app') ?? $this->devVersion() ?? $this->rootVersion();
+    }
+
+    /** Dev local: VERSION del monorepo (X.Y.Z) → "vX.Y.Z-dev". */
+    private function devVersion(): ?string
+    {
+        $path = config('innertia.version.version_file') ?: base_path('../VERSION');
+        $semver = is_file($path) ? trim((string) @file_get_contents($path)) : '';
+
+        return preg_match('/^\d+\.\d+\.\d+$/', $semver) ? "v{$semver}-dev" : null;
     }
 
     private function commit(): ?string
