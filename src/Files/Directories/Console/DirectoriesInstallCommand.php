@@ -77,6 +77,11 @@ return new class extends Migration
             $table->softDeletes();
             $table->uuid('trash_group_id')->nullable()->index();
 
+            // Procedencia de carpetas importadas desde un proveedor (Google Drive).
+            $table->string('provider')->nullable();
+            $table->string('external_id')->nullable();
+            $table->index(['provider', 'external_id'], 'directories_provider_external_idx');
+
             $table->index(['tenant_id', 'owner_type', 'owner_id'], 'directories_owner_idx');
             $table->index(['tenant_id', 'parent_id'], 'directories_parent_idx');
             $table->index('path');

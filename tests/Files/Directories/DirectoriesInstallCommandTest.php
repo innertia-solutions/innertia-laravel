@@ -65,3 +65,14 @@ it('does not overwrite without --force', function () {
 
     expect(glob($this->migrationsDir . '/*_create_directories_table*.php'))->toHaveCount(1);
 });
+
+it('includes provider columns in the generated migration', function () {
+    config()->set('innertia.directories.enabled', true);
+
+    $this->artisan('innertia:directories:install', ['--path' => $this->migrationsDir])->assertSuccessful();
+
+    $contents = file_get_contents(glob($this->migrationsDir . '/*_create_directories_table*.php')[0]);
+    expect($contents)->toContain("\$table->string('provider')->nullable();");
+    expect($contents)->toContain("\$table->string('external_id')->nullable();");
+    expect($contents)->toContain('directories_provider_external_idx');
+});

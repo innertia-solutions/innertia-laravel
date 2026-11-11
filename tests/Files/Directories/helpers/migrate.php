@@ -19,6 +19,8 @@ function innertiaDirectoriesMigrateUp(): void
         $table->timestamps();
         $table->softDeletes();
         $table->uuid('trash_group_id')->nullable()->index();
+        $table->string('provider')->nullable();
+        $table->string('external_id')->nullable();
 
         $table->index('path');
         $table->unique(

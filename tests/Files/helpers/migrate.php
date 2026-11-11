@@ -34,11 +34,13 @@ function innertiaFilesMigrateUp(): void
     });
 
     innertiaFileVersionsMigration()->up();
+    innertiaDriveImportMigration()->up();
     \Innertia\Files\Support\FileVersioning::flush();
 }
 
 function innertiaFilesMigrateDown(): void
 {
+    Schema::dropIfExists('file_imports');
     Schema::dropIfExists('file_versions');
     \Innertia\Files\Support\FileVersioning::flush();
     Schema::dropIfExists('files');
@@ -48,4 +50,9 @@ function innertiaFilesMigrateDown(): void
 function innertiaFileVersionsMigration(): \Illuminate\Database\Migrations\Migration
 {
     return require __DIR__ . '/../../../database/migrations/app/2025_01_03_000001_add_file_versions.php';
+}
+
+function innertiaDriveImportMigration(): \Illuminate\Database\Migrations\Migration
+{
+    return require __DIR__ . '/../../../database/migrations/app/2025_01_03_000002_add_drive_import.php';
 }
