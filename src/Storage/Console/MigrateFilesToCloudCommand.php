@@ -3,8 +3,11 @@
 namespace Innertia\Storage\Console;
 
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Storage;
 use Innertia\Files\Models\File;
+use Innertia\Files\Models\FileVersion;
+use Innertia\Files\Support\FileVersioning;
 use Innertia\Storage\StorageManager;
 
 /**
@@ -33,20 +36,47 @@ class MigrateFilesToCloudCommand extends Command
         $from = array_values(array_filter(array_map('trim', explode(',', (string) $this->option('from')))));
         $dry = (bool) $this->option('dry-run');
 
-        $query = File::withTrashed()->whereIn('disk', $from)->orderBy('created_at');
-        $total = (clone $query)->count();
-        $this->info(($dry ? '[dry-run] ' : '')."{$total} archivo(s) en ".implode(', ', $from)." → {$target}");
+        $versioned = FileVersioning::ready();
 
+        $filesQuery = File::withTrashed()->whereIn('disk', $from)->orderBy('created_at');
+        $versionsQuery = $versioned ? FileVersion::query()->whereIn('disk', $from)->orderBy('created_at') : null;
+
+        $totalFiles = (clone $filesQuery)->count();
+        $totalVersions = $versionsQuery ? (clone $versionsQuery)->count() : 0;
+        $this->info(($dry ? '[dry-run] ' : '').$totalFiles.' archivo(s)'
+            .($versioned ? " y {$totalVersions} versión(es)" : '').' en '.implode(', ', $from)." → {$target}");
+
+        [$moved, $missing, $failed] = $this->migrateRows($filesQuery, $target, $dry);
+
+        $this->info(($dry ? 'Se migrarían' : 'Migrados').": {$moved} · sin contenido: {$missing} · errores: {$failed}");
+
+        if ($versionsQuery) {
+            [$vMoved, $vMissing, $vFailed] = $this->migrateRows($versionsQuery, $target, $dry);
+            $this->info("Versiones migradas: {$vMoved} · sin contenido: {$vMissing} · errores: {$vFailed}");
+            $failed += $vFailed;
+        }
+
+        return $failed > 0 ? self::FAILURE : self::SUCCESS;
+    }
+
+    /**
+     * Migra filas con `disk`/`path` (File o FileVersion) al disco destino.
+     * El borrado del origen ocurre solo después de actualizar la fila.
+     *
+     * @return array{int, int, int} [migrados, sin contenido, errores]
+     */
+    private function migrateRows(Builder $query, string $target, bool $dry): array
+    {
         $moved = 0;
         $missing = 0;
         $failed = 0;
 
-        foreach ($query->cursor() as $file) {
-            $source = Storage::disk($file->disk);
+        foreach ($query->cursor() as $row) {
+            $source = Storage::disk($row->disk);
 
-            if (! $source->exists($file->path)) {
+            if (! $source->exists($row->path)) {
                 $missing++;
-                $this->warn("  sin contenido en {$file->disk}: {$file->id} ({$file->path})");
+                $this->warn("  sin contenido en {$row->disk}: {$row->id} ({$row->path})");
                 continue;
             }
 
@@ -55,28 +85,30 @@ class MigrateFilesToCloudCommand extends Command
                 continue;
             }
 
+            $stream = null;
             try {
-                $stream = $source->readStream($file->path);
-                Storage::disk($target)->writeStream($file->path, $stream);
-                if (is_resource($stream)) {
-                    fclose($stream);
+                $stream = $source->readStream($row->path);
+                if (Storage::disk($target)->writeStream($row->path, $stream) === false) {
+                    throw new \RuntimeException("no se pudo escribir {$row->path} en {$target}");
                 }
 
-                $oldDisk = $file->disk;
-                $file->forceFill(['disk' => $target])->saveQuietly();
+                $oldDisk = $row->disk;
+                $row->forceFill(['disk' => $target])->saveQuietly();
 
                 if ($this->option('delete-source')) {
-                    Storage::disk($oldDisk)->delete($file->path);
+                    Storage::disk($oldDisk)->delete($row->path);
                 }
                 $moved++;
             } catch (\Throwable $e) {
                 $failed++;
-                $this->error("  error en {$file->id}: ".$e->getMessage());
+                $this->error("  error en {$row->id}: ".$e->getMessage());
+            } finally {
+                if (is_resource($stream)) {
+                    fclose($stream);
+                }
             }
         }
 
-        $this->info(($dry ? 'Se migrarían' : 'Migrados').": {$moved} · sin contenido: {$missing} · errores: {$failed}");
-
-        return $failed > 0 ? self::FAILURE : self::SUCCESS;
+        return [$moved, $missing, $failed];
     }
 }
