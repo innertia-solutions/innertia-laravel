@@ -8,6 +8,8 @@ use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 use Innertia\Files\Events\FileUploaded;
 use Innertia\Files\Models\File;
+use Innertia\Files\Support\Checksum;
+use Innertia\Files\Support\FileVersioning;
 
 class UploadFile
 {
@@ -39,8 +41,8 @@ class UploadFile
             'created_by'    => $this->performedBy?->getAuthIdentifier(),
         ];
 
-        if (\Innertia\Files\Support\FileVersioning::ready() && $this->uploaded->getRealPath()) {
-            $attrs['checksum'] = \Innertia\Files\Support\Checksum::ofLocal($this->uploaded->getRealPath());
+        if (FileVersioning::ready() && $this->uploaded->getRealPath()) {
+            $attrs['checksum'] = Checksum::ofLocal($this->uploaded->getRealPath());
         }
 
         $file = File::create($attrs);

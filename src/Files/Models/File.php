@@ -121,7 +121,21 @@ class File extends Model
             $file->version_created_by ??= $file->created_by;
 
             if ($file->checksum === null && $file->disk && $file->path) {
-                $file->checksum = Checksum::ofStored($file->disk, $file->path);
+                // Metadato best-effort: crear un File nunca debe fallar por el disk.
+                try {
+                    $file->checksum = Checksum::ofStored($file->disk, $file->path);
+                } catch (\Throwable $e) {
+                    try {
+                        \Innertia\Facades\Telemetry::log('operational', 'warning', 'files.versioning: no se pudo calcular checksum al crear', [
+                            'module' => 'files',
+                            'disk'   => $file->disk,
+                            'path'   => $file->path,
+                            'error'  => $e->getMessage(),
+                        ]);
+                    } catch (\Throwable) {
+                        // la telemetría tampoco debe romper la creación
+                    }
+                }
             }
         });
     }
@@ -425,10 +439,10 @@ class File extends Model
         return $this->morphTo();
     }
 
-    /** Versiones superadas (la vigente es esta fila). */
+    /** Versiones superadas (la vigente es esta fila). Sin orden: ordenar en el sitio de uso. */
     public function versions(): \Illuminate\Database\Eloquent\Relations\HasMany
     {
-        return $this->hasMany(FileVersion::class, 'file_id')->orderByDesc('version');
+        return $this->hasMany(FileVersion::class, 'file_id');
     }
 
     public function directory(): \Illuminate\Database\Eloquent\Relations\BelongsTo

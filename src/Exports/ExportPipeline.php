@@ -166,7 +166,7 @@ class ExportPipeline
         $size = Storage::disk($disk)->size($path);
 
         // Create a File record — restricted to process owner access
-        $file = File::create([
+        $attrs = [
             'disk'          => $disk,
             'path'          => $path,
             'original_name' => $filename,
@@ -175,7 +175,14 @@ class ExportPipeline
             'size'          => $size,
             'visibility'    => 'restricted',
             'created_by'    => $process->triggered_by,
-        ]);
+        ];
+
+        // Evita que el hook de File relea el zip desde un disk cloud.
+        if (\Innertia\Files\Support\FileVersioning::ready()) {
+            $attrs['checksum'] = \Innertia\Files\Support\Checksum::ofLocal($this->tmpZipPath);
+        }
+
+        $file = File::create($attrs);
 
         $process->attachFile($file);
         $process->complete([
