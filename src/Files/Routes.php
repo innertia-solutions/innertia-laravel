@@ -31,6 +31,10 @@ class Routes
     {
         Route::get('/files/{id}/view',     [Http\FileController::class, 'view'])->name('innertia.files.view');
         Route::get('/files/{id}/download', [Http\FileController::class, 'download'])->name('innertia.files.download');
+        Route::get('/files/{id}/versions/{version}/view', [Http\FileVersionServingController::class, 'view'])
+            ->whereNumber('version')->name('innertia.files.versions.view');
+        Route::get('/files/{id}/versions/{version}/download', [Http\FileVersionServingController::class, 'download'])
+            ->whereNumber('version')->name('innertia.files.versions.download');
     }
 
     /**
