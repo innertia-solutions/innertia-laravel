@@ -426,7 +426,8 @@ impersonando al usuario de `config('innertia.files.drive.subject_setting')` o, s
 - El `retry_after` de la conexión de cola **debe ser mayor** que `job_timeout`; si no, la cola
   reentrega el job mientras sigue corriendo. Usar un worker/cola dedicado.
 - Locks por ítem/carpeta: duran `max(300, job_timeout)`; la espera es `files.drive.lock_wait`
-  (60 s) y al vencer (LockTimeout) el ítem queda `skipped`. En multi-host el cache store debe
+  (60 s). Al vencer (LockTimeout) un archivo queda `skipped`; una carpeta queda `failed` y todo su
+  contenido `skipped`. En multi-host el cache store debe
   soportar **locks atómicos compartidos** (redis o database, no file/array).
 - Worker muerto: `failed()` del job marca `failed`; si no corrió, `GET files/imports/{id}` lo marca
   `failed` de forma perezosa pasado `job_timeout + 300` s.
@@ -435,9 +436,10 @@ impersonando al usuario de `config('innertia.files.drive.subject_setting')` o, s
 
 ### Reglas
 
-- Las carpetas se recrean como `Directories` (requiere el feature; si no, 422). Toda carpeta creada
-  recibe el owner del import si el producto lo entrega. Si una carpeta falla, no aborta: su
-  contenido se omite.
+- Las carpetas se recrean como `Directories` (requiere el feature; si no, 422). Si el producto
+  entrega owner (`importAttributes`), se aplica a toda carpeta y archivo creado; si no, cada carpeta
+  hereda el owner de su padre (raíz/destino), pero los **archivos quedan sin owner** (no heredan).
+  Si una carpeta falla, no aborta: su contenido queda `skipped`.
 - Los nativos se exportan a Office/PDF según `native_exports` (`native_format`); se omiten
   Forms/Sites/atajos, lo que supere `max_file_size` o los 10 MB de exportación de Drive, y los
   archivos con descarga deshabilitada (403 de Drive → `skipped`).
@@ -447,8 +449,10 @@ impersonando al usuario de `config('innertia.files.drive.subject_setting')` o, s
   Hermanos con el mismo nombre reciben el sufijo " (2)".
 - Resiliencia HTTP: reintentos con backoff en 429/5xx/403 por rate-limit; 401 refresca el token una
   vez. `path()` solo nombra la raíz cuando se llega a ella.
-- Comportamientos conocidos: reimportar tras **mover** el archivo localmente lo duplica; selecciones
-  solapadas (carpeta + su contenido) se resuelven por dedupe pero pueden contarse dos veces.
+- Comportamientos conocidos: reimportar tras **mover** el archivo localmente lo duplica (el dedupe
+  es por directorio). Selecciones solapadas (una carpeta + un archivo o subcarpeta suya) **no**
+  duplican ni se cuentan dos veces: cada id de Drive se planifica una sola vez, y lo seleccionado
+  explícitamente gana, así que ese elemento queda en la raíz del destino (no anidado en su carpeta).
 
 ### Refresh
 
