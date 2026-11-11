@@ -3,18 +3,21 @@
 namespace Innertia\Files\Http\Controllers;
 
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Str;
 use Innertia\Files\Enums\FileVersionSource;
 use Innertia\Files\Exceptions\FileTrashedException;
+use Innertia\Files\Exceptions\FileVersionBytesMissingException;
 use Innertia\Files\Exceptions\FileVersionNotFoundException;
 use Innertia\Files\Exceptions\FileVersioningNotMigratedException;
 use Innertia\Files\Http\Resources\FileResource;
 use Innertia\Files\Http\Resources\FileVersionResource;
 use Innertia\Files\Models\File;
 use Innertia\Files\Support\FilesLog;
+use Innertia\Files\Support\FileVersioning;
 use Innertia\Files\UseCases\ReplaceFileContents;
 use Innertia\Files\UseCases\RestoreFileVersion;
 use Innertia\Files\Versioning\FileVersionResult;
@@ -25,6 +28,10 @@ class FileVersionsController extends Controller
     public function index(Request $request, string $id): JsonResponse
     {
         $file = $this->findAccessible($request, $id);
+
+        if (! FileVersioning::ready()) {
+            return response()->json(['message' => (new FileVersioningNotMigratedException())->getMessage()], 422);
+        }
 
         $entries = collect([FileVersionResource::fromCurrent($file)])
             ->concat($file->versions()->orderByDesc('version')->get()->map(fn ($v) => new FileVersionResource($v)));
@@ -66,8 +73,12 @@ class FileVersionsController extends Controller
             $result = $run();
         } catch (FileVersionNotFoundException|ModelNotFoundException $e) {
             return response()->json(['message' => $e->getMessage()], 404);
-        } catch (FileTrashedException|FileVersioningNotMigratedException $e) {
+        } catch (FileTrashedException|FileVersioningNotMigratedException|FileVersionBytesMissingException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
+        } catch (QueryException|\PDOException $e) {
+            // Errores de BD: nunca su mensaje (SQL, tablas) al cliente; el handler
+            // de Laravel los reporta y responde un 500 genérico.
+            throw $e;
         } catch (\RuntimeException $e) {
             FilesLog::warning('files.versioning: error en API de versiones', [
                 'error'   => $e->getMessage(),

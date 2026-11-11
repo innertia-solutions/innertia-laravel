@@ -32,9 +32,9 @@ class Routes
         Route::get('/files/{id}/view',     [Http\FileController::class, 'view'])->name('innertia.files.view');
         Route::get('/files/{id}/download', [Http\FileController::class, 'download'])->name('innertia.files.download');
         Route::get('/files/{id}/versions/{version}/view', [Http\FileVersionServingController::class, 'view'])
-            ->whereNumber('version')->name('innertia.files.versions.view');
+            ->where('version', '[0-9]{1,9}')->name('innertia.files.versions.view');
         Route::get('/files/{id}/versions/{version}/download', [Http\FileVersionServingController::class, 'download'])
-            ->whereNumber('version')->name('innertia.files.versions.download');
+            ->where('version', '[0-9]{1,9}')->name('innertia.files.versions.download');
     }
 
     /**
@@ -57,7 +57,7 @@ class Routes
             Route::post  ('/',             [$controller, 'store'])->name('files.store');
             // Versiones (siempre activo)
             Route::get ('{id}/versions',                   [$versionsController, 'index'])->name('files.versions.index');
-            Route::post('{id}/versions/{version}/restore', [$versionsController, 'restore'])->whereNumber('version')->name('files.versions.restore');
+            Route::post('{id}/versions/{version}/restore', [$versionsController, 'restore'])->where('version', '[0-9]{1,9}')->name('files.versions.restore');
             Route::post('{id}/contents',                   [$versionsController, 'replaceContents'])->name('files.contents.replace');
 
             Route::get   ('{id}/share-link', [$controller, 'shareLink'])->name('files.share-link');

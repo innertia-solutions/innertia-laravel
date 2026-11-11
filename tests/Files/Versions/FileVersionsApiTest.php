@@ -102,3 +102,47 @@ it('exposes version fields in FileResource', function () {
     $list = test()->getJson('/files')->assertOk();
     expect($list->json('data.0.versions_count'))->toBe(2);
 });
+
+it('answers 422 (not 500/SQL) for history and restore when versioning is not migrated', function () {
+    $file = versionsUpload('uno');
+    innertiaFileVersionsMigration()->down();
+    \Innertia\Files\Support\FileVersioning::flush();
+
+    $list = test()->getJson("/files/{$file->id}/versions")->assertStatus(422);
+    $restore = test()->postJson("/files/{$file->id}/versions/1/restore")->assertStatus(422);
+
+    foreach ([$list, $restore] as $res) {
+        expect($res->getContent())->not->toContain('SQLSTATE')->not->toContain('file_versions');
+        expect($res->json('message'))->toContain('migrate');
+    }
+});
+
+it('does not leak SQL errors from the versions API', function () {
+    config()->set('app.debug', false);
+    $file = versionsUpload('uno');
+    (new ReplaceFileContents($file, versionsTmpFile('dos'), FileVersionSource::Replace))->execute();
+    expect(\Innertia\Files\Support\FileVersioning::ready())->toBeTrue();
+    \Illuminate\Support\Facades\Schema::drop('file_versions');
+
+    $res = test()->postJson("/files/{$file->id}/versions/1/restore");
+
+    $res->assertStatus(500);
+    expect($res->getContent())->not->toContain('SQLSTATE')->not->toContain('file_versions');
+});
+
+it('answers 422 when the bytes of the version to restore are missing', function () {
+    $file = versionsUpload('uno');
+    (new ReplaceFileContents($file, versionsTmpFile('dos'), FileVersionSource::Replace))->execute();
+    $v1 = \Innertia\Files\Models\FileVersion::where('file_id', $file->id)->sole();
+    Storage::disk('local')->delete($v1->path);
+
+    test()->postJson("/files/{$file->id}/versions/1/restore")
+        ->assertStatus(422)
+        ->assertJsonPath('message', 'Los bytes de la versión 1 no existen en storage.');
+});
+
+it('rejects out-of-range version numbers on restore with 404', function () {
+    $file = versionsUpload('uno');
+
+    test()->postJson("/files/{$file->id}/versions/99999999999999999999/restore")->assertNotFound();
+});

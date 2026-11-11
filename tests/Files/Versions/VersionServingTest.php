@@ -85,3 +85,22 @@ it('strips quotes and newlines from the Content-Disposition filename', function 
     $res->assertOk();
     expect($res->headers->get('Content-Disposition'))->toBe('attachment; filename="nota.txt"');
 });
+
+it('answers 404 (not 500) on the versions route when versioning is not migrated', function () {
+    $file = versionsUpload('uno');
+    $file->forceFill(['visibility' => 'public'])->save();
+    innertiaFileVersionsMigration()->down();
+    \Innertia\Files\Support\FileVersioning::flush();
+
+    $res = test()->get("/files/{$file->id}/versions/1/download");
+
+    $res->assertNotFound();
+    expect($res->getContent())->not->toContain('SQLSTATE');
+});
+
+it('answers 404 for an out-of-range version number', function () {
+    $file = servedTwoVersions('public');
+
+    test()->get("/files/{$file->id}/versions/99999999999999999999/download")->assertNotFound();
+    test()->get("/files/{$file->id}/versions/99999999999999999999/view")->assertNotFound();
+});

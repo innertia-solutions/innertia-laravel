@@ -8,9 +8,11 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Innertia\Files\Enums\FileVersionSource;
 use Innertia\Files\Events\FileVersionRestored;
+use Innertia\Files\Exceptions\FileVersionBytesMissingException;
 use Innertia\Files\Exceptions\FileVersionNotFoundException;
 use Innertia\Files\Models\File;
 use Innertia\Files\Models\FileVersion;
+use Innertia\Files\Support\FileVersioning;
 use Innertia\Files\Versioning\FileVersionResult;
 
 /**
@@ -28,6 +30,8 @@ class RestoreFileVersion
 
     public function execute(): FileVersionResult
     {
+        FileVersioning::ensureReady();
+
         $fresh = File::withTrashed()->find($this->file->id)
             ?? throw new ModelNotFoundException("File {$this->file->id} no existe.");
 
@@ -71,13 +75,13 @@ class RestoreFileVersion
         $fs = Storage::disk($old->disk);
 
         if (! $fs->exists($old->path)) {
-            throw new \RuntimeException("Los bytes de la versión {$old->version} no existen en storage.");
+            throw new FileVersionBytesMissingException($old->version);
         }
 
         $in = $fs->readStream($old->path);
 
         if (! is_resource($in)) {
-            throw new \RuntimeException("Los bytes de la versión {$old->version} no existen en storage.");
+            throw new FileVersionBytesMissingException($old->version);
         }
 
         $tmp = sys_get_temp_dir() . '/innertia-restore-' . bin2hex(random_bytes(8))

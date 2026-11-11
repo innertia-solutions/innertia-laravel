@@ -89,3 +89,11 @@ it('throws for a trashed file and writes nothing', function () {
         expect(Storage::disk('local')->allFiles())->toEqualCanonicalizing($before);
     }
 });
+
+it('fails clearly when versioning is not migrated', function () {
+    $file = versionsUpload('uno');
+    innertiaFileVersionsMigration()->down();
+    \Innertia\Files\Support\FileVersioning::flush();
+
+    (new RestoreFileVersion(\Innertia\Files\Models\File::find($file->id), 1))->execute();
+})->throws(\Innertia\Files\Exceptions\FileVersioningNotMigratedException::class);

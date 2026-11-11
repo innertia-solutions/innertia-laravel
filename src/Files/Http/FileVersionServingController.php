@@ -8,6 +8,7 @@ use Illuminate\Support\Str;
 use Innertia\Files\Http\Concerns\ServesFiles;
 use Innertia\Files\Models\File;
 use Innertia\Files\Models\FileVersion;
+use Innertia\Files\Support\FileVersioning;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -41,6 +42,8 @@ class FileVersionServingController extends Controller
     private function resolve(string $id, int $version): array
     {
         abort_unless(Str::isUuid($id), 404, 'File not found.');
+        // Producto sin migrar: no hay historial ni columna version → 404 limpio, nunca SQL.
+        abort_unless(FileVersioning::ready(), 404, 'Version not found.');
 
         $file = File::findOrFail($id);
 
