@@ -32,10 +32,20 @@ function innertiaFilesMigrateUp(): void
         $table->softDeletes();
         $table->index('mime_type');
     });
+
+    innertiaFileVersionsMigration()->up();
+    \Innertia\Files\Support\FileVersioning::flush();
 }
 
 function innertiaFilesMigrateDown(): void
 {
+    Schema::dropIfExists('file_versions');
+    \Innertia\Files\Support\FileVersioning::flush();
     Schema::dropIfExists('files');
     Schema::dropIfExists('entity_permissions');
+}
+
+function innertiaFileVersionsMigration(): \Illuminate\Database\Migrations\Migration
+{
+    return require __DIR__ . '/../../../database/migrations/app/2025_01_03_000001_add_file_versions.php';
 }
