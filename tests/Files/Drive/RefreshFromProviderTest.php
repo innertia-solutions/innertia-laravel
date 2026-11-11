@@ -97,7 +97,7 @@ it('marks a still-running refresh as failed when the job dies', function () {
     (new RefreshFromProvider($import->id))->failed(new \RuntimeException('timeout'));
 
     expect($import->fresh()->status)->toBe(FileImportStatus::Failed);
-    expect($import->fresh()->error)->toBe('El proceso se interrumpió: timeout');
+    expect($import->fresh()->error)->toBe('El proceso se interrumpió: ' . \Innertia\Files\Drive\Import\ImportErrors::GENERIC);
 });
 
 it('fails with the reason, without throwing, when the file or export got too large', function () {

@@ -318,7 +318,7 @@ it('marks a still-running import as failed when the job dies', function () {
     (new ImportFromDrive($done->id))->failed(new \RuntimeException('timeout'));
 
     expect($running->fresh()->status)->toBe(FileImportStatus::Failed);
-    expect($running->fresh()->error)->toBe('El proceso se interrumpió: timeout');
+    expect($running->fresh()->error)->toBe('El proceso se interrumpió: ' . \Innertia\Files\Drive\Import\ImportErrors::GENERIC);
     expect($done->fresh()->status)->toBe(FileImportStatus::Done);
 });
 

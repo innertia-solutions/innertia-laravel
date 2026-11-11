@@ -90,6 +90,11 @@ class RefreshFromProvider extends UseCase
     /** El worker murió o agotó el timeout: no dejar el registro en `running` para siempre. */
     public function failed(?\Throwable $e = null): void
     {
-        FileImport::find($this->importId)?->markFailedIfRunning('El proceso se interrumpió: ' . ($e?->getMessage() ?? 'sin detalle'));
+        if ($e !== null) {
+            FilesLog::warning('files.drive: el proceso se interrumpió', ['import_id' => $this->importId, 'error' => $e->getMessage()]);
+        }
+
+        // Al usuario solo mensajes públicos; el detalle queda en el registro.
+        FileImport::find($this->importId)?->markFailedIfRunning('El proceso se interrumpió: ' . ($e ? ImportErrors::publicMessage($e) : 'sin detalle'));
     }
 }
