@@ -16,6 +16,7 @@ use Innertia\Files\Directories\Models\Directory;
 use Innertia\Files\Enums\FileVersionSource;
 use Innertia\Files\Support\Checksum;
 use Innertia\Files\Support\FileVersioning;
+use Innertia\Files\Support\FilesLog;
 use Innertia\Platform\Traits\HasEntityPermissions;
 use Innertia\Tags\Traits\HasTags;
 
@@ -125,16 +126,11 @@ class File extends Model
                 try {
                     $file->checksum = Checksum::ofStored($file->disk, $file->path);
                 } catch (\Throwable $e) {
-                    try {
-                        \Innertia\Facades\Telemetry::log('operational', 'warning', 'files.versioning: no se pudo calcular checksum al crear', [
-                            'module' => 'files',
-                            'disk'   => $file->disk,
-                            'path'   => $file->path,
-                            'error'  => $e->getMessage(),
-                        ]);
-                    } catch (\Throwable) {
-                        // la telemetría tampoco debe romper la creación
-                    }
+                    FilesLog::warning('files.versioning: no se pudo calcular checksum al crear', [
+                        'disk'  => $file->disk,
+                        'path'  => $file->path,
+                        'error' => $e->getMessage(),
+                    ]);
                 }
             }
         });

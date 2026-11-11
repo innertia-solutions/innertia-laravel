@@ -12,6 +12,8 @@ enum FileEvent: string implements DomainEventKey
     case Trashed     = 'files.trashed';
     case Restored    = 'files.restored';
     case HardDeleted = 'files.hard_deleted';
+    case VersionCreated  = 'files.version_created';
+    case VersionRestored = 'files.version_restored';
 
     public function key(): string
     {
