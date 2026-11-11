@@ -29,3 +29,24 @@ it('rechaza un origen no permitido', function () {
 
     Webauthn::verifyRegistration($creation, $auth->register($creation, 'http://evil.test'));
 })->throws(PasskeyVerificationFailed::class);
+
+it('rechaza una aserción sin verificación de usuario (UV)', function () {
+    $auth = new FakeAuthenticator();
+    $creation = Webauthn::creationOptions(random_bytes(16), 'a@b.cl', 'A B', []);
+    $registered = Webauthn::verifyRegistration($creation, $auth->register($creation));
+
+    $request = Webauthn::requestOptions();
+    Webauthn::verifyAssertion($registered['credential'], $request, $auth->assert($request, uv: false, counter: 1));
+})->throws(PasskeyVerificationFailed::class);
+
+it('rechaza una regresión del contador de firmas', function () {
+    $auth = new FakeAuthenticator();
+    $creation = Webauthn::creationOptions(random_bytes(16), 'a@b.cl', 'A B', []);
+    $registered = Webauthn::verifyRegistration($creation, $auth->register($creation));
+
+    $request = Webauthn::requestOptions();
+    $updated = Webauthn::verifyAssertion($registered['credential'], $request, $auth->assert($request, counter: 5));
+
+    $request2 = Webauthn::requestOptions();
+    Webauthn::verifyAssertion($updated, $request2, $auth->assert($request2, counter: 3));
+})->throws(PasskeyVerificationFailed::class);

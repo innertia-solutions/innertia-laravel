@@ -40,8 +40,8 @@ final class FakeAuthenticator
             ->add(UnsignedIntegerObject::create(1), UnsignedIntegerObject::create(2))
             ->add(UnsignedIntegerObject::create(3), NegativeIntegerObject::create(-7))
             ->add(NegativeIntegerObject::create(-1), UnsignedIntegerObject::create(1))
-            ->add(NegativeIntegerObject::create(-2), ByteStringObject::create($d['x']))
-            ->add(NegativeIntegerObject::create(-3), ByteStringObject::create($d['y']));
+            ->add(NegativeIntegerObject::create(-2), ByteStringObject::create(str_pad($d['x'], 32, "\0", STR_PAD_LEFT)))
+            ->add(NegativeIntegerObject::create(-3), ByteStringObject::create(str_pad($d['y'], 32, "\0", STR_PAD_LEFT)));
 
         // flags: UP (0x01) | UV (0x04) | AT (0x40)
         $authData = hash('sha256', $this->rpId, true) . chr(0x45) . pack('N', $this->counter)

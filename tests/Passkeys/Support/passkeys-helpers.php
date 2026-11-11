@@ -37,6 +37,7 @@ if (! class_exists('PasskeyTestUser')) {
 if (! function_exists('passkeysSetUp')) {
     function passkeysSetUp(): void
     {
+        Schema::dropIfExists('passkey_test_users');
         Schema::create('passkey_test_users', function ($t) {
             $t->increments('id');
             $t->string('name')->nullable();

@@ -129,6 +129,7 @@ final class Webauthn
         return self::serializer()->serialize($updated, 'json');
     }
 
+    /** Equivale a Base64UrlSafe::encodeUnpadded; evita importar web-auth/paragonie fuera de esta clase. */
     public static function b64(string $bytes): string
     {
         return rtrim(strtr(base64_encode($bytes), '+/', '-_'), '=');

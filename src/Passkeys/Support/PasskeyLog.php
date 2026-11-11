@@ -20,7 +20,8 @@ final class PasskeyLog
     private static function write(string $level, string $message, array $context): void
     {
         try {
-            Telemetry::log('auth', $level, $message, ['module' => 'passkeys', 'trace_id' => traceId()] + $context);
+            Telemetry::tag('module', 'passkeys');
+            Telemetry::log('operational', $level, $message, ['module' => 'passkeys', 'trace_id' => traceId()] + $context);
         } catch (Throwable) {
             // La telemetría nunca rompe un ingreso.
         }
