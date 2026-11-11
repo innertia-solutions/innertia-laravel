@@ -5,11 +5,13 @@ namespace Innertia\Passkeys;
 use Illuminate\Support\Facades\Route;
 use Innertia\Passkeys\Http\Controllers\MyPasskeysController;
 use Innertia\Passkeys\Http\Controllers\PasskeyLoginController;
-use Innertia\Passkeys\Support\PasskeyConfig;
+use Innertia\Passkeys\Http\Controllers\PasskeySettingsController;
+use Innertia\Passkeys\Http\Middleware\EnsurePasskeysEnabled;
 
 /**
- * Registradores de rutas. Auth\Routes los llama solos cuando
- * innertia.passkeys.enabled = true; un producto que compone rutas a mano
+ * Registradores de rutas. Auth\Routes los llama solos. Siempre se
+ * registran (las rutas no pueden depender de un valor en BD): el interruptor de
+ * plataforma lo aplica EnsurePasskeysEnabled (404) en login y autogestión. Un producto que compone rutas a mano
  * puede llamarlos directo.
  */
 class Routes
@@ -17,36 +19,46 @@ class Routes
     /** Públicas, dentro del grupo/prefijo de publicRoutes (default 'auth'). */
     public static function login(): void
     {
-        if (! PasskeyConfig::enabled()) {
-            return;
-        }
+        Route::get('passkey/status', [PasskeySettingsController::class, 'status'])->middleware('throttle:60,1');
 
+        Route::middleware(EnsurePasskeysEnabled::class)->group(function () {
         Route::post('passkey/login/options', [PasskeyLoginController::class, 'options'])->middleware('throttle:20,1');
         Route::post('passkey/login',         [PasskeyLoginController::class, 'login'])->middleware('throttle:10,1');
+        });
     }
 
     /** Públicas de plataforma (sin tenant). */
     public static function platformLogin(string $prefix = 'platform'): void
     {
-        if (! PasskeyConfig::enabled()) {
-            return;
-        }
+        Route::get($prefix . '/auth/passkey/status', [PasskeySettingsController::class, 'status'])->middleware('throttle:60,1');
 
+        Route::middleware(EnsurePasskeysEnabled::class)->group(function () use ($prefix) {
         Route::post($prefix . '/auth/passkey/login/options', [PasskeyLoginController::class, 'options'])->middleware('throttle:20,1');
         Route::post($prefix . '/auth/passkey/login',         [PasskeyLoginController::class, 'platformLogin'])->middleware('throttle:10,1');
+        });
     }
 
     /** Autenticadas, dentro del grupo/prefijo de sessionRoutes (default 'auth'). */
     public static function account(): void
     {
-        if (! PasskeyConfig::enabled()) {
-            return;
-        }
-
+        Route::middleware(EnsurePasskeysEnabled::class)->group(function () {
         Route::get   ('me/passkeys',         [MyPasskeysController::class, 'index']);
         Route::post  ('me/passkeys/options', [MyPasskeysController::class, 'options'])->middleware('throttle:10,1');
         Route::post  ('me/passkeys',         [MyPasskeysController::class, 'store'])->middleware('throttle:10,1');
         Route::patch ('me/passkeys/{id}',    [MyPasskeysController::class, 'update'])->whereUuid('id');
         Route::delete('me/passkeys/{id}',    [MyPasskeysController::class, 'destroy'])->whereUuid('id');
+        });
+    }
+
+    /**
+     * Interruptor de plataforma. Registrar dentro del grupo platform del producto
+     * (con su auth), p. ej. \Innertia\Passkeys\Routes::platformSettings('').
+     */
+    public static function platformSettings(string $prefix = ''): void
+    {
+        $base = ltrim($prefix . '/passkeys/settings', '/');
+
+        Route::get($base, [PasskeySettingsController::class, 'show']);
+        Route::put($base, [PasskeySettingsController::class, 'update']);
     }
 }

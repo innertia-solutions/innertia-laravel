@@ -123,10 +123,8 @@ class Routes
 
         \Innertia\Passkeys\Routes::platformLogin($prefix);
         // Gestión propia de passkeys de la cuenta de plataforma (token platform).
-        if (\Innertia\Passkeys\Support\PasskeyConfig::enabled()) {
-            Route::prefix($prefix . '/auth')
-                ->middleware(\Innertia\Auth\Middleware\Authenticate::class)
-                ->group(fn () => \Innertia\Passkeys\Routes::account());
-        }
+        Route::prefix($prefix . '/auth')
+            ->middleware(\Innertia\Auth\Middleware\Authenticate::class)
+            ->group(fn () => \Innertia\Passkeys\Routes::account());
     }
 }

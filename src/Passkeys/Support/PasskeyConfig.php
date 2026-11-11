@@ -6,7 +6,7 @@ final class PasskeyConfig
 {
     public static function enabled(): bool
     {
-        return (bool) config('innertia.passkeys.enabled', false);
+        return PasskeySettings::enabled();
     }
 
     public static function rpId(): string
@@ -40,7 +40,7 @@ final class PasskeyConfig
 
     public static function allowSubdomains(): bool
     {
-        return (bool) config('innertia.passkeys.allow_subdomains', false);
+        return PasskeySettings::allowSubdomains();
     }
 
     private static function frontendUrl(): string

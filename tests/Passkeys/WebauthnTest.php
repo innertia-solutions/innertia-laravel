@@ -52,7 +52,9 @@ it('rechaza una regresión del contador de firmas', function () {
 })->throws(PasskeyVerificationFailed::class);
 
 it('acepta un subdominio del origen cuando allow_subdomains está activo', function () {
-    config(['innertia.passkeys.rp_id' => 'pomely.cl', 'innertia.passkeys.origins' => ['https://pomely.cl'], 'innertia.passkeys.allow_subdomains' => true]);
+    config(['innertia.passkeys.rp_id' => 'pomely.cl', 'innertia.passkeys.origins' => ['https://pomely.cl']]);
+    passkeysSettingsTable();
+    \Innertia\Passkeys\Support\PasskeySettings::save(['allow_subdomains' => true]);
     $auth = new FakeAuthenticator('pomely.cl');
     $creation = Webauthn::creationOptions(random_bytes(16), 'a@b.cl', 'A B', []);
 

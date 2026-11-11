@@ -42,6 +42,7 @@ class TenantController
                 'teams'         => \Innertia\Platform\Teams\TeamsFeature::isActive(),
                 'twoFactor'     => (bool) ($tenant->configs['features']['twoFactor'] ?? false),
                 'oauth'         => array_values($tenant->configs['oauthProviders'] ?? []),
+                'passkeys'      => \Innertia\Passkeys\Support\PasskeyConfig::enabled(),
             ],
             'branding' => [
                 'demo' => $tenant->configs['demo'] ?? null,

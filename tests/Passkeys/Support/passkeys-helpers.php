@@ -57,9 +57,25 @@ if (! function_exists('passkeysSetUp')) {
         config()->set('innertia.auth.user_model', PasskeyTestUser::class);
         config()->set('innertia.contexts', ['backoffice' => [], 'portal' => []]);
         config()->set('jwt.secret', str_repeat('k', 64));
-        config()->set('innertia.passkeys.enabled', true);
         config()->set('innertia.passkeys.rp_id', 'localhost');
         config()->set('innertia.passkeys.origins', ['http://localhost']);
+    }
+}
+
+if (! function_exists('passkeysSettingsTable')) {
+    /** Tabla settings (interruptor en BD); sin ella rige el default (encendido). */
+    function passkeysSettingsTable(): void
+    {
+        Schema::dropIfExists('settings');
+        Schema::create('settings', function ($t) {
+            $t->id();
+            $t->string('key')->unique();
+            $t->string('value_type')->default('string');
+            $t->text('value')->nullable();
+            $t->boolean('is_encrypted')->default(false);
+            $t->timestamps();
+        });
+        \Illuminate\Support\Facades\Cache::flush();
     }
 }
 
@@ -67,6 +83,8 @@ if (! function_exists('passkeysTearDown')) {
     function passkeysTearDown(): void
     {
         Schema::dropIfExists('passkey_test_users');
+        Schema::dropIfExists('settings');
+        \Illuminate\Support\Facades\Cache::flush();
     }
 }
 

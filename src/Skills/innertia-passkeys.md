@@ -1,6 +1,6 @@
 ---
 name: innertia-passkeys
-description: Ingreso con passkeys (WebAuthn) con Innertia\Passkeys — opt-in por PASSKEYS_ENABLED, rutas auth/passkey/login y auth/me/passkeys, salta OTP/2FA, rp_id, revocación. Trigger para "passkey", "WebAuthn", "huella", "PASSKEYS_ENABLED", "passkeys:revoke", "rp_id".
+description: Ingreso con passkeys (WebAuthn) con Innertia\Passkeys — encendido por defecto con interruptor en BD (/platform), rutas auth/passkey/login y auth/me/passkeys, salta OTP/2FA, rp_id, revocación. Trigger para "passkey", "WebAuthn", "huella", "passkeys/settings", "passkeys:revoke", "rp_id".
 ---
 
 # Innertia Passkeys
@@ -9,7 +9,7 @@ Detalle completo en `src/Passkeys/README.md` del paquete. Front: `usePasskeys` +
 
 ## Activación
 
-`PASSKEYS_ENABLED=true`. Opcionales: `PASSKEYS_RP_ID`, `PASSKEYS_RP_NAME`, `PASSKEYS_ORIGINS` (coma).
+Encendido por defecto; el interruptor vive en BD (Settings de plataforma: `passkeys.enabled`, `passkeys.allow_subdomains`), sin env. Se apaga desde /platform: registrar `\Innertia\Passkeys\Routes::platformSettings('')` en el grupo platform del producto (`GET|PUT platform/passkeys/settings`). Apagado: login y `me/passkeys*` dan 404; admin `users/{id}/passkeys` y `passkeys:revoke` siguen. Front: `GET auth/passkey/status` / `platform/auth/passkey/status` → `{enabled}` (público); `/status` trae `features.passkeys`. Overrides avanzados opcionales (normalmente innecesarios): `PASSKEYS_RP_ID`, `PASSKEYS_RP_NAME`, `PASSKEYS_ORIGINS`.
 `rp_id` por defecto = host de `app.frontend_url` (si no, `app.url`); challenge 300 s.
 
 ## Rutas (se registran solas desde Auth\Routes / Backoffice\Routes)
@@ -22,9 +22,9 @@ Detalle completo en `src/Passkeys/README.md` del paquete. Front: `usePasskeys` +
 
 ## Cómo lo consume un producto
 
-1. Setear `PASSKEYS_ENABLED=true` (y `PASSKEYS_RP_ID` si hay subdominios por tenant: dominio padre).
+1. Registrar `Routes::platformSettings('')` en el grupo platform; `PASSKEYS_RP_ID` solo si hay subdominios por tenant (dominio padre).
 2. Usar el front de innertia-nuxt; el BFF sella el token en la sesión httpOnly.
-3. Correr `php artisan migrate` (crea `passkeys`; la migración solo se registra con `PASSKEYS_ENABLED=true`).
+3. Correr `php artisan migrate` (crea `passkeys`; la migración se carga siempre).
    En QA/prod, si el deploy no migra, correrlo a mano. Las rutas se montan solas.
 4. El cache store por defecto guarda los challenges y debe ser compartido entre réplicas (redis/database;
    `array` no sirve).
@@ -36,7 +36,7 @@ Detalle completo en `src/Passkeys/README.md` del paquete. Front: `usePasskeys` +
 ## Gotchas
 
 - `rp_id` debe coincidir con el host del front (o ser su dominio padre). En dev: `localhost`.
-- Productos con subdominios por tenant: `PASSKEYS_RP_ID` = dominio padre + `PASSKEYS_ALLOW_SUBDOMAINS=true`
+- Productos con subdominios por tenant: `PASSKEYS_RP_ID` = dominio padre + `allow_subdomains` activo en /platform
   (con `PASSKEYS_ORIGINS` = origen padre).
 - Passkey salta OTP y 2FA, pero respeta cambio forzado de contraseña, verificación de correo y
   `separate_identity`.

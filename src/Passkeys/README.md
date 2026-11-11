@@ -8,28 +8,49 @@ componentes) vive en `innertia-nuxt`; ver innertia-nuxt.
 
 ## Activación
 
-Desactivado por defecto. Se habilita por env (bloque `passkeys` de `config/innertia.php`):
+**Encendido por defecto**: un producto que actualiza la lib ofrece passkeys de inmediato. El interruptor
+vive en la BD (tabla `settings`, nivel plataforma, tenant_id NULL) y se cambia desde /platform; no hay
+env para eso. Si la BD no responde o no hay valor guardado, rige el default (encendido).
+
+Settings (`Innertia\Passkeys\Support\PasskeySettings`): `passkeys.enabled` (default `true`) y
+`passkeys.allow_subdomains` (default `false`).
+
+Registrar el endpoint de administración dentro del grupo platform del producto (aplica su auth):
+
+```php
+\Innertia\Passkeys\Routes::platformSettings('');   // GET|PUT platform/passkeys/settings
+```
+
+`GET` responde `{enabled, allow_subdomains, rp_id, origins}` (`rp_id`/`origins` solo lectura, para mostrar
+el dominio en uso). `PUT` recibe `enabled` (boolean, requerido) y `allow_subdomains` (boolean, opcional).
+
+Overrides avanzados por env (bloque `passkeys` de `config/innertia.php`), normalmente innecesarios:
 
 | Env | Config | Default | Descripción |
 |-----|--------|---------|-------------|
-| `PASSKEYS_ENABLED` | `innertia.passkeys.enabled` | `false` | Activa el módulo y registra las rutas |
 | `PASSKEYS_RP_ID` | `innertia.passkeys.rp_id` | host de `app.frontend_url` (si no, `app.url`) | Dominio al que se amarra la passkey |
 | `PASSKEYS_RP_NAME` | `innertia.passkeys.rp_name` | `app.name` | Nombre que ve el usuario al registrar |
 | `PASSKEYS_ORIGINS` | `innertia.passkeys.origins` | origen de `app.frontend_url` | Lista separada por comas de orígenes permitidos |
 | — | `innertia.passkeys.challenge_ttl` | `300` | Vida del challenge en segundos |
-| `PASSKEYS_ALLOW_SUBDOMAINS` | `innertia.passkeys.allow_subdomains` | `false` | Acepta orígenes que sean subdominios de `origins` |
 
-Después de activarlo hay que correr `php artisan migrate`: crea la tabla `passkeys` (la migración solo se
-registra cuando `PASSKEYS_ENABLED=true`). En QA/prod, si el deploy no migra, correrlo a mano.
+Hay que correr `php artisan migrate`: crea la tabla `passkeys` (la migración se carga siempre). En QA/prod,
+si el deploy no migra, correrlo a mano.
+
+Las rutas se registran siempre (no pueden depender de un valor en BD); con el interruptor apagado, el
+login y la autogestión (`passkey/login*`, `me/passkeys*`) responden 404 vía `EnsurePasskeysEnabled`.
+Las rutas de admin `users/{id}/passkeys` y el comando `passkeys:revoke` siguen funcionando apagado, para
+poder revocar. El front, antes del login, consulta `GET auth/passkey/status` o
+`GET platform/auth/passkey/status` (públicos, throttle 60/min, sin 404): `{enabled: bool}`. `/status`
+también trae `features.passkeys`.
 
 Los challenges viven en el store de caché por defecto, que debe ser compartido entre réplicas
 (`redis` o `database`); `array` no funciona entre requests.
 
-Las rutas las registran solas `Auth\Routes` y `Backoffice\Routes` cuando está habilitado. Un producto
+Las rutas las registran solas `Auth\Routes` y `Backoffice\Routes` siempre. Un producto
 que compone rutas a mano puede llamar `Innertia\Passkeys\Routes::login()`, `platformLogin()` y `account()`.
 
 > **Subdominios por tenant**: el `rp_id` debe ser el dominio padre (ej. `pomely.cl`), de lo contrario
-> la passkey solo vale en un subdominio. Además hay que setear `PASSKEYS_ALLOW_SUBDOMAINS=true` con
+> la passkey solo vale en un subdominio. Además hay que activar `allow_subdomains` en /platform (`PUT platform/passkeys/settings`) y setear
 > `PASSKEYS_ORIGINS` = el origen padre (ej. `https://pomely.cl`); sin eso se rechazan los orígenes `acme.pomely.cl`. **Apps móviles nativas (Capacitor)** están fuera de alcance.
 
 ---
@@ -38,6 +59,8 @@ que compone rutas a mano puede llamar `Innertia\Passkeys\Routes::login()`, `plat
 
 | Método | Ruta | Auth | Descripción |
 |--------|------|------|-------------|
+| `GET` | `auth/passkey/status` · `platform/auth/passkey/status` | pública | `{enabled}` (nunca 404) |
+| `GET`/`PUT` | `platform/passkeys/settings` | platform (producto) | Interruptor; ver Activación |
 | `POST` | `auth/passkey/login/options` | pública | Challenge para ingresar |
 | `POST` | `auth/passkey/login` | pública | Body: `key`, `response`, `contexts[]` (ordenados). Entra al primer contexto permitido y responde `{token, user, context}` |
 | `POST` | `platform/auth/passkey/login/options` | pública | Challenge (cuentas de plataforma) |

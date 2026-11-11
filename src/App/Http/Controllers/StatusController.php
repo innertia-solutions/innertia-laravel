@@ -20,6 +20,7 @@ class StatusController extends Controller
                 'organizations' => \Innertia\Platform\Organizations\OrganizationsFeature::isActive(),
                 'teams'         => \Innertia\Platform\Teams\TeamsFeature::isActive(),
                 'oauth'         => array_values((array) config('innertia.oauth', [])),
+                'passkeys'      => \Innertia\Passkeys\Support\PasskeyConfig::enabled(),
             ],
             'branding' => [
                 'name' => config('app.name'),
