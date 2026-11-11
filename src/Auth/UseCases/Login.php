@@ -37,8 +37,19 @@ class Login extends UseCase
             );
         }
 
-        // 1b — Rechazo de cuentas de plataforma (opt-in). Tras validar el
-        // password: una password incorrecta ya cayó arriba (anti-enumeración).
+        return self::issueFor($user, $this->context);
+    }
+
+    /**
+     * Reglas posteriores a la autenticación primaria, compartidas por el login con
+     * contraseña y el de passkey. $strongAuth = el factor ya fue fuerte (passkey con
+     * verificación de usuario): no se pide OTP ni 2FA. El cambio forzado de clave y la
+     * verificación de correo se mantienen.
+     */
+    public static function issueFor($user, string $context, bool $strongAuth = false): array
+    {
+        // 1b — Rechazo de cuentas de plataforma (opt-in). Tras validar la
+        // credencial: una credencial incorrecta ya cayó antes (anti-enumeración).
         if (config('innertia.platform.separate_identity') && $user->is_platform_admin) {
             throw new PlatformAccountException();
         }
@@ -46,13 +57,13 @@ class Login extends UseCase
         // 2 — Context exists in config
         $contexts = config('innertia.contexts', []);
 
-        if (! array_key_exists($this->context, $contexts)) {
-            throw new NotFoundException("Context '{$this->context}' not found.");
+        if (! array_key_exists($context, $contexts)) {
+            throw new NotFoundException("Context '{$context}' not found.");
         }
 
         // 3 — User has access to the context
-        if (method_exists($user, 'hasContext') && ! $user->hasContext($this->context)) {
-            throw new ForbiddenException("Access to '{$this->context}' is not allowed for this user.");
+        if (method_exists($user, 'hasContext') && ! $user->hasContext($context)) {
+            throw new ForbiddenException("Access to '{$context}' is not allowed for this user.");
         }
 
         // 4 — force_password_change
@@ -70,23 +81,25 @@ class Login extends UseCase
             return ['requires_email_verification' => true, 'user_id' => $user->getAuthIdentifier()];
         }
 
-        // 6 — OTP por correo (global con ajuste por usuario; ver otpRequired())
-        if ($this->otpRequired($user)) {
-            app(OtpService::class)->send($user, 'login');
+        if (! $strongAuth) {
+            // 6 — OTP por correo (global con ajuste por usuario; ver otpRequired())
+            if (self::otpRequired($user)) {
+                app(OtpService::class)->send($user, 'login');
 
-            return ['requires_otp' => true, 'user_id' => $user->getAuthIdentifier()];
-        }
+                return ['requires_otp' => true, 'user_id' => $user->getAuthIdentifier()];
+            }
 
-        // 7 — 2FA enrolled
-        if (
-            Settings::get('auth.2fa.enabled', config('innertia.auth.2fa.enabled', false))
-            && $user->two_factor_enabled
-        ) {
-            return ['requires_2fa' => true, 'user_id' => $user->getAuthIdentifier()];
+            // 7 — 2FA enrolled
+            if (
+                Settings::get('auth.2fa.enabled', config('innertia.auth.2fa.enabled', false))
+                && $user->two_factor_enabled
+            ) {
+                return ['requires_2fa' => true, 'user_id' => $user->getAuthIdentifier()];
+            }
         }
 
         // 8 — Issue token with context claim
-        $token = app(JwtService::class)->generateToken($user, ['context' => $this->context]);
+        $token = app(JwtService::class)->generateToken($user, ['context' => $context]);
 
         return ['token' => $token, 'user' => $user];
     }

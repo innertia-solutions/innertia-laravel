@@ -72,11 +72,12 @@ if (! function_exists('passkeysTearDown')) {
 if (! function_exists('passkeyUser')) {
     function passkeyUser(array $attrs = []): PasskeyTestUser
     {
+        // refresh(): carga los defaults de BD (p. ej. contexts) que create() no trae.
         return PasskeyTestUser::create($attrs + [
             'name'              => 'Ana',
             'email'             => 'ana' . uniqid() . '@test.cl',
             'password'          => Hash::make('Secreta123!'),
             'email_verified_at' => now(),
-        ]);
+        ])->refresh();
     }
 }
