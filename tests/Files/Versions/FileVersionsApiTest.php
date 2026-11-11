@@ -1,0 +1,104 @@
+<?php
+
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
+use Innertia\Files\Enums\FileVersionSource;
+use Innertia\Files\UseCases\ReplaceFileContents;
+
+beforeEach(function () {
+    config()->set('innertia.mode', 'app');
+    require_once __DIR__ . '/../helpers/migrate.php';
+    require_once __DIR__ . '/../helpers/versions.php';
+    innertiaFilesMigrateUp();
+    Storage::fake('local');
+    Route::middleware([])->group(fn () => \Innertia\Files\Routes::register());
+    \Innertia\Files\Routes::registerFileServing();
+});
+
+afterEach(fn () => innertiaFilesMigrateDown());
+
+it('lists the current version first and then the history', function () {
+    $file = versionsUpload('uno');
+    (new ReplaceFileContents($file, versionsTmpFile('dos'), FileVersionSource::Replace))->execute();
+
+    $res = test()->getJson("/files/{$file->id}/versions")->assertOk();
+
+    expect($res->json('data.0.version'))->toBe(2);
+    expect($res->json('data.0.is_current'))->toBeTrue();
+    expect($res->json('data.0.source'))->toBe('replace');
+    expect($res->json('data.1.version'))->toBe(1);
+    expect($res->json('data.1.is_current'))->toBeFalse();
+    expect($res->json('data.1.download_url'))->toContain('/versions/1/download');
+});
+
+it('answers 404 when listing versions of an unknown file', function () {
+    test()->getJson('/files/' . \Illuminate\Support\Str::uuid() . '/versions')->assertNotFound();
+});
+
+it('restores a version through the API', function () {
+    $file = versionsUpload('uno');
+    (new ReplaceFileContents($file, versionsTmpFile('dos'), FileVersionSource::Replace))->execute();
+
+    $res = test()->postJson("/files/{$file->id}/versions/1/restore")->assertOk();
+
+    expect($res->json('status'))->toBe('created');
+    expect($res->json('file.version'))->toBe(3);
+    expect($res->json('file.version_source'))->toBe('restore');
+});
+
+it('answers 404 for an unknown version and 422 for a trashed file', function () {
+    $file = versionsUpload('uno');
+
+    test()->postJson("/files/{$file->id}/versions/9/restore")->assertNotFound();
+
+    (new ReplaceFileContents($file, versionsTmpFile('dos'), FileVersionSource::Replace))->execute();
+    $file->trash();
+    test()->postJson("/files/{$file->id}/versions/1/restore")->assertStatus(422);
+});
+
+it('replaces contents with an upload', function () {
+    $file = versionsUpload('uno', 'acta.txt');
+    $upload = new UploadedFile(versionsTmpFile('nuevo'), 'otro-nombre.txt', 'text/plain', null, true);
+
+    $res = test()->post("/files/{$file->id}/contents", ['file' => $upload], ['Accept' => 'application/json'])->assertOk();
+
+    expect($res->json('status'))->toBe('created');
+    expect($res->json('file.version'))->toBe(2);
+    expect($res->json('file.original_name'))->toBe('acta.txt');
+});
+
+it('reports unchanged when the upload is identical', function () {
+    $file = versionsUpload('uno');
+    $upload = new UploadedFile(versionsTmpFile('uno'), 'x.txt', 'text/plain', null, true);
+
+    test()->post("/files/{$file->id}/contents", ['file' => $upload], ['Accept' => 'application/json'])
+        ->assertOk()
+        ->assertJsonPath('status', 'unchanged');
+});
+
+it('rejects replacing contents without a file or on a trashed file', function () {
+    $file = versionsUpload('uno');
+
+    test()->postJson("/files/{$file->id}/contents")->assertStatus(422);
+
+    $file->trash();
+    $upload = new UploadedFile(versionsTmpFile('otro'), 'x.txt', 'text/plain', null, true);
+    test()->post("/files/{$file->id}/contents", ['file' => $upload], ['Accept' => 'application/json'])
+        ->assertStatus(422);
+});
+
+it('exposes version fields in FileResource', function () {
+    $file = versionsUpload('uno');
+    (new ReplaceFileContents($file, versionsTmpFile('dos'), FileVersionSource::Replace))->execute();
+
+    $res = test()->getJson("/files/{$file->id}")->assertOk();
+
+    expect($res->json('data.version'))->toBe(2);
+    expect($res->json('data.versions_count'))->toBe(2);
+    expect($res->json('data.version_source'))->toBe('replace');
+    expect($res->json('data.can_refresh'))->toBeFalse();
+
+    $list = test()->getJson('/files')->assertOk();
+    expect($list->json('data.0.versions_count'))->toBe(2);
+});

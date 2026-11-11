@@ -49,6 +49,10 @@ class FilesController extends Controller
             $query->with('tags');
         }
 
+        if (\Innertia\Files\Support\FileVersioning::ready()) {
+            $query->withCount('versions');
+        }
+
         $perPage = min(max((int) $request->query('per_page', 25), 1), 100);
 
         return FileResource::collection($query->paginate($perPage));
@@ -64,6 +68,10 @@ class FilesController extends Controller
 
         if ($request->query('include') === 'tags') {
             $file->load('tags');
+        }
+
+        if (\Innertia\Files\Support\FileVersioning::ready()) {
+            $file->loadCount('versions');
         }
 
         return new FileResource($file);

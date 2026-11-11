@@ -23,6 +23,13 @@ class FileResource extends JsonResource
             'deleted_at'     => $this->deleted_at?->toIso8601String(),
             'created_at'     => $this->created_at?->toIso8601String(),
             'created_by'     => $this->created_by,
+            'version'            => (int) ($this->version ?? 1),
+            'versions_count'     => $this->versions_count !== null ? (int) $this->versions_count + 1 : null,
+            'version_source'     => $this->version_source,
+            'provider'           => $this->provider,
+            'external_url'       => $this->external_url,
+            'external_synced_at' => $this->external_synced_at?->toIso8601String(),
+            'can_refresh'        => filled($this->provider) && filled($this->external_id) && $this->deleted_at === null,
             // Público → URL absoluta estable sin firma (apta para firmas de correo,
             // web, CDN). Privado → path firmado RELATIVO: el browser lo resuelve
             // contra su origen y la firma relativa valida tras cualquier proxy.

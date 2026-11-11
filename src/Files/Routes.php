@@ -45,8 +45,9 @@ class Routes
         string $controller       = Http\Controllers\FilesController::class,
         string $grantsController = Http\Controllers\FileGrantsController::class,
         string $sharedController = Http\Controllers\SharedFilesController::class,
+        string $versionsController = Http\Controllers\FileVersionsController::class,
     ): void {
-        Route::prefix($prefix)->group(function () use ($controller, $grantsController, $sharedController) {
+        Route::prefix($prefix)->group(function () use ($controller, $grantsController, $sharedController, $versionsController) {
             // Specific paths first to avoid {id} capturing these slugs
             Route::get  ('trash',          [$controller, 'trash'])->name('files.trash');
             Route::post ('trash/empty',    [$controller, 'emptyTrash'])->name('files.trash.empty');
@@ -54,6 +55,11 @@ class Routes
 
             Route::get   ('/',             [$controller, 'index'])->name('files.index');
             Route::post  ('/',             [$controller, 'store'])->name('files.store');
+            // Versiones (siempre activo)
+            Route::get ('{id}/versions',                   [$versionsController, 'index'])->name('files.versions.index');
+            Route::post('{id}/versions/{version}/restore', [$versionsController, 'restore'])->whereNumber('version')->name('files.versions.restore');
+            Route::post('{id}/contents',                   [$versionsController, 'replaceContents'])->name('files.contents.replace');
+
             Route::get   ('{id}/share-link', [$controller, 'shareLink'])->name('files.share-link');
             Route::get   ('{id}',          [$controller, 'show'])->name('files.show');
             Route::patch ('{id}',          [$controller, 'update'])->name('files.update');
