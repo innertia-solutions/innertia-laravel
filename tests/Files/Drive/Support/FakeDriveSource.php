@@ -27,6 +27,8 @@ final class FakeDriveSource implements DriveSource
     public array $broken = [];
     /** @var list<string> ids cuyo dueño deshabilitó la descarga */
     public array $downloadDisabled = [];
+    /** @var array<string, \Throwable> id => error que lanza al bajar/exportar */
+    public array $failures = [];
     /** @var list<string> */
     public array $calls = [];
 
@@ -106,6 +108,9 @@ final class FakeDriveSource implements DriveSource
     public function download(string $id, int $maxBytes): string
     {
         $this->calls[] = "download:{$id}";
+        if (isset($this->failures[$id])) {
+            throw $this->failures[$id];
+        }
         if (in_array($id, $this->downloadDisabled, true)) {
             throw \Innertia\Files\Drive\Exceptions\DriveItemNotImportableException::downloadDisabled();
         }
@@ -123,6 +128,9 @@ final class FakeDriveSource implements DriveSource
     public function export(string $id, string $mime): string
     {
         $this->calls[] = "export:{$id}:{$mime}";
+        if (isset($this->failures[$id])) {
+            throw $this->failures[$id];
+        }
         if (in_array($id, $this->exportTooLarge, true)) {
             throw new DriveExportTooLargeException();
         }

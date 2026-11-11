@@ -213,3 +213,97 @@ it('inherits the parent owner on folders when the import has no owner attributes
     expect(Directory::where('external_id', 'A')->sole()->owner_id)->toBe('33333333-3333-3333-3333-333333333333');
     expect($again->unchanged)->toBe(1);
 });
+
+it('fails without writing when the target directory vanished or was trashed', function () {
+    $this->drive->file('f1', 'a.txt', 'x');
+    $trashed = (new \Innertia\Files\Directories\UseCases\CreateDirectory(null, 'Destino'))->execute();
+    $trashed->delete();
+
+    $gone = runImport(['f1'], ['target_directory_id' => '00000000-0000-0000-0000-000000000000']);
+    $inTrash = runImport(['f1'], ['target_directory_id' => $trashed->id]);
+
+    foreach ([$gone, $inTrash] as $import) {
+        expect($import->status)->toBe(FileImportStatus::Failed);
+        expect($import->error)->toBe('La carpeta destino ya no existe o está en la papelera.');
+    }
+    expect(File::count())->toBe(0);
+    expect(Storage::disk('local')->allFiles())->toBe([]);
+});
+
+it('claims the import atomically: a worker that lost the race does nothing', function () {
+    $this->drive->file('a', 'a.txt', 'x');
+    $import = FileImport::create(['kind' => FileImportKind::Import, 'provider' => 'google_drive', 'source_items' => ['a']]);
+
+    // Otro worker lo toma justo antes de que este escriba su claim.
+    $raced = false;
+    \Illuminate\Support\Facades\DB::connection()->beforeExecuting(function (string $sql) use (&$raced, $import) {
+        if (! $raced && str_starts_with(strtolower($sql), 'update') && str_contains($sql, 'file_imports')) {
+            $raced = true;
+            \Illuminate\Support\Facades\DB::table('file_imports')->where('id', $import->id)->update(['status' => 'running', 'trace_id' => 'otro']);
+        }
+    });
+
+    $result = (new ImportFromDrive($import->id))->execute();
+
+    expect(File::count())->toBe(0);
+    expect($result->status)->toBe(FileImportStatus::Running);
+    expect($import->fresh()->trace_id)->toBe('otro');
+});
+
+it('records a folder that cannot be created as failed and skips everything under it', function () {
+    config()->set('innertia.directories.max_depth', 2);
+    $this->drive->folder('A', 'A');
+    $this->drive->file('a1', 'a.txt', 'x', 'A');
+    $this->drive->folder('B', 'B', 'A');
+    $this->drive->file('b1', 'b.txt', 'x', 'B');
+    $this->drive->folder('C', 'C', 'B');
+    $this->drive->file('c1', 'c.txt', 'x', 'C');
+    $this->drive->folder('D', 'D', 'C');
+    $this->drive->file('d1', 'd.txt', 'x', 'D');
+    $this->drive->file('loose', 'loose.txt', 'x');
+
+    $import = runImport(['A', 'loose']);
+
+    expect($import->status)->toBe(FileImportStatus::Done);
+    expect([$import->imported, $import->skipped, $import->failed_count])->toBe([3, 3, 1]);
+    $items = collect($import->items)->keyBy('external_id');
+    expect($items['C']['result'])->toBe('failed');
+    expect($items['C']['is_folder'])->toBeTrue();
+    expect($items['D']['result'])->toBe('skipped');
+    expect($items['D']['is_folder'])->toBeTrue();
+    expect($items['c1']['result'])->toBe('skipped');
+    expect($items['c1']['reason'])->toBe('No se pudo crear la carpeta contenedora.');
+    expect($items['d1']['result'])->toBe('skipped');
+    expect(File::pluck('original_name')->all())->toEqualCanonicalizing(['a.txt', 'b.txt', 'loose.txt']);
+});
+
+it('skips an item another process is importing (lock contention)', function () {
+    config()->set('innertia.files.drive.lock_wait', 0);
+    $this->drive->file('a', 'a.txt', 'x');
+    $this->drive->file('b', 'b.txt', 'y');
+    $owner = \Innertia\Files\Drive\Import\ImportOwner::from([]);
+    $lock = \Illuminate\Support\Facades\Cache::lock(\Innertia\Files\Drive\Import\DriveFileImporter::lockKey('a', null, $owner), 60);
+    expect($lock->get())->toBeTrue();
+
+    $import = runImport(['a', 'b']);
+    $lock->release();
+
+    expect([$import->imported, $import->skipped, $import->failed_count])->toBe([1, 1, 0]);
+    expect(collect($import->items)->firstWhere('external_id', 'a')['reason'])->toBe('Otro proceso está importando este elemento.');
+});
+
+it('stops the whole import on a Drive auth or connection error, keeping partial results', function (string $reason) {
+    $this->drive->file('ok', 'ok.txt', 'x');
+    $this->drive->file('bad', 'bad.txt', 'y');
+    $this->drive->file('next', 'next.txt', 'z');
+    $this->drive->failures['bad'] = new \Innertia\Files\Drive\Exceptions\DriveException('Google caído', $reason);
+
+    $import = FileImport::create(['kind' => FileImportKind::Import, 'provider' => 'google_drive', 'source_items' => ['ok', 'bad', 'next']]);
+    expect(fn () => (new ImportFromDrive($import->id))->execute())->toThrow(\Innertia\Files\Drive\Exceptions\DriveException::class);
+
+    $import = $import->fresh();
+    expect($import->status)->toBe(FileImportStatus::Failed);
+    expect($import->error)->toBe('Google caído');
+    expect($import->imported)->toBe(1);
+    expect($this->drive->calls)->not->toContain('download:next');
+})->with(['auth', 'connection']);

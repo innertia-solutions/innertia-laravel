@@ -19,13 +19,27 @@ use Innertia\Files\Support\FileVersioning;
 /**
  * Importa UN ítem de Drive a un directorio. Si ese mismo ítem ya fue importado en ese
  * directorio por el mismo dueño (File no tiene tenant: el dueño aísla), lo refresca (versión nueva o sin cambios) en vez de duplicarlo. Un lock por
- * ítem+directorio evita duplicados entre imports concurrentes; si no se obtiene a tiempo,
+ * ítem+directorio+dueño evita duplicados entre imports concurrentes; si no se obtiene a tiempo,
  * `LockTimeoutException` se propaga y el llamador anota el ítem como fallido.
  */
 final class DriveFileImporter
 {
-    private const LOCK_SECONDS = 300;
-    private const LOCK_WAIT = 60;
+    /** TTL del lock: al menos lo que puede durar el job (un lock vencido a mitad deja duplicar). */
+    public static function lockSeconds(): int
+    {
+        return max(300, (int) config('innertia.files.drive.job_timeout', 3600));
+    }
+
+    /** Espera máxima por un lock tomado por otro proceso. */
+    public static function lockWait(): int
+    {
+        return (int) config('innertia.files.drive.lock_wait', 60);
+    }
+
+    public static function lockKey(string $itemId, ?string $directoryId, ImportOwner $owner): string
+    {
+        return 'innertia.files.drive.import:' . $itemId . ':' . ($directoryId ?? 'root') . ':' . $owner->key();
+    }
 
     public function __construct(
         private readonly DriveFileFetcher $fetcher,
@@ -36,9 +50,9 @@ final class DriveFileImporter
     public function import(DriveItem $item, ?Directory $directory, FileImport $import): array
     {
         $owner = ImportOwner::from(FileImport::filterAttributes($import->file_attributes ?? []));
-        $key = 'innertia.files.drive.import:' . $item->id . ':' . ($directory?->id ?? 'root') . ':' . $owner->key();
+        $key = self::lockKey($item->id, $directory?->id, $owner);
 
-        return Cache::lock($key, self::LOCK_SECONDS)->block(self::LOCK_WAIT, function () use ($item, $directory, $import, $owner) {
+        return Cache::lock($key, self::lockSeconds())->block(self::lockWait(), function () use ($item, $directory, $import, $owner) {
             $existing = $owner->scope(File::query())
                 ->where('provider', DriveDirectoryMapper::PROVIDER)
                 ->where('external_id', $item->id)

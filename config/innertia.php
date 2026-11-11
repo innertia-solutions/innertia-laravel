@@ -272,7 +272,13 @@ return [
         // usar una cola/worker dedicado con retry_after MAYOR que job_timeout.
         'drive' => [
             'queue'           => env('INNERTIA_FILES_DRIVE_QUEUE'),
+            // Timeout (s) del job de import/refresh. El `retry_after` de la conexión de cola DEBE
+            // superarlo; si no, la cola reentrega el job mientras sigue corriendo.
             'job_timeout'     => (int) env('INNERTIA_FILES_DRIVE_JOB_TIMEOUT', 3600),
+            // Espera (s) por el lock de un ítem/carpeta que otro import está escribiendo; al vencer
+            // el ítem queda `skipped`. Los locks duran max(300, job_timeout). En multi-host el cache
+            // store debe soportar locks atómicos compartidos (redis o database, no file/array).
+            'lock_wait'       => (int) env('INNERTIA_FILES_DRIVE_LOCK_WAIT', 60),
             'max_items'       => (int) env('INNERTIA_FILES_DRIVE_MAX_ITEMS', 2000),
             'max_file_size'   => (int) env('INNERTIA_FILES_DRIVE_MAX_FILE_MB', 200) * 1024 * 1024,
             'list_max'        => (int) env('INNERTIA_FILES_DRIVE_LIST_MAX', 5000),

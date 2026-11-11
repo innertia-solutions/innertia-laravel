@@ -2,6 +2,7 @@
 namespace Innertia\Files\Drive\Import;
 
 use Illuminate\Auth\GenericUser;
+use Illuminate\Support\Facades\Cache;
 use Innertia\Files\Directories\Exceptions\DuplicateDirectoryNameException;
 use Innertia\Files\Directories\Models\Directory;
 use Innertia\Files\Directories\UseCases\CreateDirectory;
@@ -21,10 +22,22 @@ final class DriveDirectoryMapper
     public const PROVIDER = 'google_drive';
     private const MAX_SUFFIX = 50;
 
+    /**
+     * Lock por carpeta+padre+dueño: dos imports concurrentes de la misma carpeta no la duplican
+     * (el segundo la encuentra al re-consultar dentro del lock). Sin lock a tiempo →
+     * LockTimeoutException (el llamador anota la carpeta como fallida).
+     */
     public function ensure(DriveItem $folder, ?Directory $parent, FileImport $import): Directory
     {
         $owner = self::ownerFor($parent, $import);
+        $key = 'innertia.files.drive.dir:' . $folder->id . ':' . ($parent?->id ?? 'root') . ':' . $owner->key();
 
+        return Cache::lock($key, DriveFileImporter::lockSeconds())
+            ->block(DriveFileImporter::lockWait(), fn () => $this->findOrCreate($folder, $parent, $import, $owner));
+    }
+
+    private function findOrCreate(DriveItem $folder, ?Directory $parent, FileImport $import, ImportOwner $owner): Directory
+    {
         $existing = $owner->scope(Directory::query())
             ->where('provider', self::PROVIDER)
             ->where('external_id', $folder->id)
