@@ -394,19 +394,84 @@ nunca cambia: dueños, permisos, tags y URLs firmadas siguen apuntando al archiv
   concurrente".
 - **Nunca** escribir `files.path`/`size`/`checksum` a mano para cambiar contenido: usar `ReplaceFileContents`.
 
-## Importar desde Google Drive — operación de la cola
+## Importar desde Google Drive
 
-`ImportFromDrive` / `RefreshFromProvider` corren en cola (`innertia.files.drive.queue`) con
-`$timeout = innertia.files.drive.job_timeout` y `tries = 1`. Requisitos de despliegue:
+Importa archivos y carpetas de Drive a `Files`/`Directories` y permite refrescar un archivo ya importado.
 
+### Activación
+
+En el grupo de rutas del producto (con su middleware de permisos):
+`\Innertia\Files\Routes::registerDriveImport($prefix, $browseController, $importsController)`.
+Rutas: `GET drive/browse`, `GET drive/items/{id}`, `POST drive/folders`, `POST files/imports`,
+`GET files/imports/{id}`, `POST files/{id}/refresh`. Los controllers son sobrescribibles.
+
+### Credencial
+
+`DriveSource` + `DriveSourceResolver`: el producto puede bindear su propio `DriveSource` en el
+container; si no, se usa la cuenta de servicio de Workspace (`workspace.google.service_account_json`)
+impersonando al usuario de `config('innertia.files.drive.subject_setting')` o, si está vacío,
+`workspace.google.admin_email`. Requiere **delegación a nivel de dominio** con el scope
+`https://www.googleapis.com/auth/drive` y la **Drive API habilitada** en el proyecto de GCP.
+`OAuthDriveSource` es solo contrato (no implementado).
+
+### Proceso y cola
+
+- Tabla `file_imports` (`FileImport`): `kind` import|refresh, `status` pending→running→done|failed,
+  contadores (`found/imported/updated/unchanged/skipped/failed_count`), `items` con el motivo por
+  ítem, `error`, `trace_id`. Migración `2025_01_03_000002_add_drive_import` (agrega también
+  `provider`/`external_*` a `files` si faltan, y `provider`/`external_id` a `directories`).
+- `ImportFromDrive` / `RefreshFromProvider` corren en la cola `innertia.files.drive.queue` con
+  `$timeout = job_timeout` y `tries = 1`. Son idempotentes: el claim `pending→running` es atómico y
+  solo corre desde `pending`.
 - El `retry_after` de la conexión de cola **debe ser mayor** que `job_timeout`; si no, la cola
-  reentrega el job mientras sigue corriendo.
-- En multi-host el cache store debe soportar **locks atómicos compartidos** (redis o database).
-  Los locks por ítem/carpeta duran `max(300, job_timeout)`; la espera es `innertia.files.drive.lock_wait`
-  (default 60 s) y al vencer el ítem queda `skipped`.
-- Un proceso que quedó `running` (worker muerto) se marca `failed` en `failed()` del job o, si eso no
-  corrió, de forma perezosa al consultar `GET files/imports/{id}` pasado `job_timeout + 300` s.
-- El dedupe (archivo y carpeta) se acota por `owner_type`/`owner_id` del import (File no tiene tenant).
+  reentrega el job mientras sigue corriendo. Usar un worker/cola dedicado.
+- Locks por ítem/carpeta: duran `max(300, job_timeout)`; la espera es `files.drive.lock_wait`
+  (60 s) y al vencer (LockTimeout) el ítem queda `skipped`. En multi-host el cache store debe
+  soportar **locks atómicos compartidos** (redis o database, no file/array).
+- Worker muerto: `failed()` del job marca `failed`; si no corrió, `GET files/imports/{id}` lo marca
+  `failed` de forma perezosa pasado `job_timeout + 300` s.
+- Falla de autenticación/conexión con Drive: el import se detiene (`failed`). Si el directorio
+  destino desapareció: `failed`.
+
+### Reglas
+
+- Las carpetas se recrean como `Directories` (requiere el feature; si no, 422). Toda carpeta creada
+  recibe el owner del import si el producto lo entrega. Si una carpeta falla, no aborta: su
+  contenido se omite.
+- Los nativos se exportan a Office/PDF según `native_exports` (`native_format`); se omiten
+  Forms/Sites/atajos, lo que supere `max_file_size` o los 10 MB de exportación de Drive, y los
+  archivos con descarga deshabilitada (403 de Drive → `skipped`).
+- `max_items` se valida antes de escribir nada.
+- Reimportar al mismo directorio refresca en vez de duplicar; el dedupe se acota por
+  `owner_type`/`owner_id` (mismo id de Drive bajo owners distintos nunca colisiona).
+  Hermanos con el mismo nombre reciben el sufijo " (2)".
+- Resiliencia HTTP: reintentos con backoff en 429/5xx/403 por rate-limit; 401 refresca el token una
+  vez. `path()` solo nombra la raíz cuando se llega a ella.
+- Comportamientos conocidos: reimportar tras **mover** el archivo localmente lo duplica; selecciones
+  solapadas (carpeta + su contenido) se resuelven por dedupe pero pueden contarse dos veces.
+
+### Refresh
+
+`POST files/{id}/refresh` compara la señal de revisión: nativos = `modifiedTime`, binarios =
+`md5Checksum`/`headRevisionId`. Misma revisión = `unchanged` sin descargar; si cambió,
+`ReplaceFileContents` con `provider_refresh` en el mismo formato de exportación. El nombre local
+no cambia.
+
+### Hooks del controller
+
+`extraImportRules()` (reglas extra de validación), `importAttributes(Request)` (solo
+`owner_type`/`owner_id` se respetan; se aplican a cada File/Directory creado) y
+`ownsImport(Request, FileImport)` (por defecto cada usuario ve solo sus procesos).
+
+### FileResource
+
+`can_refresh` es true solo para un archivo de Drive (`provider=google_drive` con `external_id`),
+no eliminado y con una fuente disponible.
+
+### Config `innertia.files.drive`
+
+`queue`, `job_timeout` (3600), `lock_wait` (60), `max_items` (2000), `max_file_size` (200 MB),
+`list_max`, `disk`, `subject_setting`, `native_exports`.
 
 ## Skills relacionados
 
