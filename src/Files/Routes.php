@@ -86,5 +86,29 @@ class Routes
             Route::delete('{provider}/connection', [$c, 'disconnect'])->name('innertia.files.providers.disconnect');
         });
     }
-}
 
+    /**
+     * Opt-in: importación desde Google Drive (navegar, crear carpeta, importar, refrescar).
+     * Envolver en el middleware de permisos del producto:
+     *
+     *   Route::middleware([...])->group(fn () => \Innertia\Files\Routes::registerDriveImport('platform'));
+     */
+    public static function registerDriveImport(
+        string $prefix            = '',
+        string $browseController  = \Innertia\Files\Drive\Http\DriveBrowseController::class,
+        string $importsController = \Innertia\Files\Drive\Http\FileImportsController::class,
+    ): void {
+        $p = trim($prefix, '/');
+        $pre = $p === '' ? '' : "{$p}/";
+
+        Route::get ("{$pre}drive/browse",     [$browseController, 'browse'])->name('innertia.files.drive.browse');
+        Route::get ("{$pre}drive/items/{id}", [$browseController, 'item'])->where('id', '[A-Za-z0-9_-]{1,200}')->name('innertia.files.drive.item');
+        Route::post("{$pre}drive/folders",    [$browseController, 'createFolder'])->name('innertia.files.drive.folders.store');
+
+        if (class_exists($importsController)) {
+            Route::post("{$pre}files/imports",      [$importsController, 'store'])->name('innertia.files.imports.store');
+            Route::get ("{$pre}files/imports/{id}", [$importsController, 'show'])->whereUuid('id')->name('innertia.files.imports.show');
+            Route::post("{$pre}files/{id}/refresh", [$importsController, 'refresh'])->whereUuid('id')->name('innertia.files.refresh');
+        }
+    }
+}
