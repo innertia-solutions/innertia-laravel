@@ -335,6 +335,47 @@ Validation rule de upload aplicada automáticamente en `FilesController::store()
 | Inline view URL | `/files/{id}` | `/files/{id}/view` — named route `innertia.files.view` |
 | Hard-delete explícito | N/A | `$file->forceDelete()` |
 
+## Versionamiento de contenido (siempre activo)
+
+El `File` es la **versión vigente**; `file_versions` guarda las **superadas** (append-only). El `id`
+nunca cambia: dueños, permisos, tags y URLs firmadas siguen apuntando al archivo y sirven lo vigente.
+
+- Migración del núcleo `2025_01_03_000001_add_file_versions` (app + saas). Productos existentes:
+  `php artisan migrate`. Sin migrar, las subidas siguen funcionando y el reemplazo responde 422
+  (`FileVersioningNotMigratedException`). `FileVersioning::ready()` cachea solo el resultado positivo
+  (un worker iniciado antes de `migrate` lo detecta sin reiniciarse).
+- **Único camino** para cambiar bytes: `ReplaceFileContents($file, $localPath, FileVersionSource::X,
+  mimeType:, extension:, performedBy:, meta: [...])` → `FileVersionResult` (`created` | `unchanged`).
+  - Mismo checksum = `unchanged`: no escribe bytes ni crea versión, pero igual persiste
+    `external_revision` / `external_export_mime` / `external_synced_at` de `meta`.
+  - Bytes nuevos siempre en ruta nueva; archiva + actualiza en transacción con `lockForUpdate`; si la
+    BD falla, borra los bytes nuevos. El nombre no cambia salvo `meta['original_name']`.
+  - La extensión se normaliza (minúsculas, sin punto, solo `[a-z0-9]`, máx. 20). Resolución del mime:
+    explícito (`mimeType:`) → el actual si la extensión no cambió → inferido por extensión → detectado
+    por contenido (sniff).
+  - `FileVersionCreated` y la poda corren en `DB::afterCommit`: si el llamador hace rollback de su
+    transacción externa no hay evento, y los bytes nuevos pueden quedar huérfanos en el disk
+    (limitación aceptada, basura inofensiva). La poda es best-effort (si falla, `FilesLog::warning`).
+  - El checksum al crear/subir un archivo es best-effort; los archivos previos lo calculan de forma
+    perezosa en el primer reemplazo.
+- **Restaurar:** `RestoreFileVersion($file, $n)` crea una versión nueva (`source=restore`,
+  `restored_from_version=n`); el historial no se edita.
+- **Retención:** `config('innertia.files.versions.keep')` (`INNERTIA_FILES_VERSIONS_KEEP`; vacío = todas).
+- **Borrado definitivo** (`forceDelete`, vaciar papelera) elimina bytes y filas de todas las versiones.
+  La papelera no toca versiones.
+- **Eventos:** `FileEvent::VersionCreated`, `FileEvent::VersionRestored`.
+- **Serving:** `GET /files/{id}/versions/{n}/view|download` (mismo acceso y firma que el archivo;
+  `FileVersion::signedDownloadPath()`). El filename del `Content-Disposition` se sanitiza.
+- **API** (en `Routes::register()`): `GET files/{id}/versions`, `POST files/{id}/versions/{n}/restore`,
+  `POST files/{id}/contents` (multipart `file`).
+- **FileResource:** `version`, `versions_count` (con `withCount('versions')`), `version_source`,
+  `provider`, `external_url`, `external_synced_at`, `can_refresh`.
+- `File::versions()` **no tiene orden**: ordenar en el sitio de uso (`->orderByDesc('version')`).
+- **Uso de almacenamiento:** `StorageUsage::totals(?scope)` → `current_bytes`, `versions_bytes`, `total_bytes`
+  (incluye archivos en papelera).
+- **Migración de disk:** `innertia:storage:migrate-files` también migra los bytes de `file_versions`.
+- **Nunca** escribir `files.path`/`size`/`checksum` a mano para cambiar contenido: usar `ReplaceFileContents`.
+
 ## Skills relacionados
 
 - `innertia-directories` — árbol de carpetas, materialized path, cascade trash
