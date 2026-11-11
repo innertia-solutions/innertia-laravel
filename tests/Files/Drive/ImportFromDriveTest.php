@@ -356,3 +356,21 @@ it('marks the import failed when the job dies without an exception', function ()
 
     expect($running->fresh()->error)->toBe('El proceso se interrumpió: sin detalle');
 });
+
+it('files inherit the folder owner when the import has no owner attributes', function () {
+    $ownerId = '33333333-3333-3333-3333-333333333333';
+    $target = (new \Innertia\Files\Directories\UseCases\CreateDirectory(null, 'Destino'))->execute();
+    $target->forceFill(['owner_type' => 'team', 'owner_id' => $ownerId])->save();
+    $this->drive->folder('A', 'A');
+    $this->drive->file('a1', 'a.txt', 'x', 'A');
+    $this->drive->file('loose', 'b.txt', 'y');
+
+    runImport(['A', 'loose'], ['target_directory_id' => $target->id]);
+    $again = runImport(['A', 'loose'], ['target_directory_id' => $target->id]);
+
+    expect(File::count())->toBe(2);
+    foreach (File::all() as $file) {
+        expect([$file->owner_type, $file->owner_id])->toBe(['team', $ownerId]);
+    }
+    expect([$again->imported, $again->unchanged])->toBe([0, 2]);
+});

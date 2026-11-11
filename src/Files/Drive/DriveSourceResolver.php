@@ -23,14 +23,38 @@ final class DriveSourceResolver
         throw new DriveNotConfiguredException();
     }
 
+    private const AVAILABLE_KEY = 'innertia.files.drive.available';
+
+    /**
+     * ¿Hay una fuente de Drive utilizable? Nunca lanza: una fuente ligada que no se puede
+     * construir cuenta como no disponible. Se memoiza por request (atributo del Request, no
+     * estático: seguro en Octane) porque FileResource lo consulta por cada archivo listado.
+     */
     public static function available(): bool
     {
+        $request = app()->bound('request') ? app('request') : null;
+
+        if ($request !== null && $request->attributes->has(self::AVAILABLE_KEY)) {
+            return (bool) $request->attributes->get(self::AVAILABLE_KEY);
+        }
+
         try {
             self::resolve();
+            $available = true;
+        } catch (\Throwable) {
+            $available = false;
+        }
 
-            return true;
-        } catch (DriveNotConfiguredException) {
-            return false;
+        $request?->attributes->set(self::AVAILABLE_KEY, $available);
+
+        return $available;
+    }
+
+    /** Olvida la disponibilidad memoizada en el request actual (tests o cambio de credencial). */
+    public static function flush(): void
+    {
+        if (app()->bound('request')) {
+            app('request')->attributes->remove(self::AVAILABLE_KEY);
         }
     }
 }

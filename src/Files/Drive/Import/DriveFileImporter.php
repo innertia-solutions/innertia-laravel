@@ -17,9 +17,11 @@ use Innertia\Files\Support\FilesLog;
 use Innertia\Files\Support\FileVersioning;
 
 /**
- * Importa UN ítem de Drive a un directorio. Si ese mismo ítem ya fue importado en ese
- * directorio por el mismo dueño (File no tiene tenant: el dueño aísla), lo refresca (versión nueva o sin cambios) en vez de duplicarlo. Un lock por
- * ítem+directorio+dueño evita duplicados entre imports concurrentes; si no se obtiene a tiempo,
+ * Importa UN ítem de Drive a un directorio. Dueño: el del import si lo trae; si no, el del
+ * directorio (raíz: sin dueño), igual que las carpetas (DriveDirectoryMapper::ownerFor).
+ * Si ese mismo ítem ya fue importado en ese directorio por el mismo dueño (File no tiene
+ * tenant: el dueño aísla), lo refresca (versión nueva o sin cambios) en vez de duplicarlo.
+ * Un lock por ítem+directorio+dueño evita duplicados entre imports concurrentes; si no se obtiene a tiempo,
  * `LockTimeoutException` se propaga y el llamador anota el ítem como fallido.
  */
 final class DriveFileImporter
@@ -49,7 +51,7 @@ final class DriveFileImporter
     /** @return array{0: 'imported'|'updated'|'unchanged', 1: string} resultado e id del File */
     public function import(DriveItem $item, ?Directory $directory, FileImport $import): array
     {
-        $owner = ImportOwner::from(FileImport::filterAttributes($import->file_attributes ?? []));
+        $owner = DriveDirectoryMapper::ownerFor($directory, $import);
         $key = self::lockKey($item->id, $directory?->id, $owner);
 
         return Cache::lock($key, self::lockSeconds())->block(self::lockWait(), function () use ($item, $directory, $import, $owner) {
@@ -65,11 +67,11 @@ final class DriveFileImporter
                 return [$this->refresher->refresh($existing, $item, $by, $import->native_format), $existing->id];
             }
 
-            return ['imported', $this->create($item, $directory, $import)->id];
+            return ['imported', $this->create($item, $directory, $import, $owner)->id];
         });
     }
 
-    private function create(DriveItem $item, ?Directory $directory, FileImport $import): File
+    private function create(DriveItem $item, ?Directory $directory, FileImport $import, ImportOwner $owner): File
     {
         $fetched = $this->fetcher->fetch($item, $import->native_format);
 
@@ -80,7 +82,7 @@ final class DriveFileImporter
             try {
                 $this->write($disk, $path, $fetched->localPath);
 
-                $attributes = array_merge(ImportOwner::from(FileImport::filterAttributes($import->file_attributes ?? []))->attributes(), [
+                $attributes = array_merge($owner->attributes(), [
                     'disk'          => $disk,
                     'path'          => $path,
                     'original_name' => $fetched->name,

@@ -449,7 +449,8 @@ impersonando al usuario de `config('innertia.files.drive.subject_setting')` o, s
 
 - Las carpetas se recrean como `Directories` (requiere el feature; si no, 422). Si el producto
   entrega owner (`importAttributes`), se aplica a toda carpeta y archivo creado; si no, cada carpeta
-  hereda el owner de su padre (raíz/destino), pero los **archivos quedan sin owner** (no heredan).
+  y cada archivo heredan el owner de la carpeta que los contiene (raíz/destino; en la raíz sin
+  destino quedan sin owner). El dedupe usa ese mismo owner.
   Si una carpeta falla, no aborta: su contenido queda `skipped`.
 - Los nativos se exportan a Office/PDF según `native_exports` (`native_format`); se omiten
   Forms/Sites/atajos, lo que supere `max_file_size` o los 10 MB de exportación de Drive, y los
@@ -481,7 +482,9 @@ no cambia.
 ### FileResource
 
 `can_refresh` es true solo para un archivo de Drive (`provider=google_drive` con `external_id`),
-no eliminado y con una fuente disponible.
+no eliminado y con una fuente disponible. `DriveSourceResolver::available()` nunca lanza (una
+fuente ligada que no se puede construir = no disponible) y se memoiza por request
+(`DriveSourceResolver::flush()` para olvidarla).
 
 ### Config `innertia.files.drive`
 

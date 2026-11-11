@@ -176,6 +176,7 @@ it('resolves the service account source, a bound source, or fails when not confi
     app()->offsetUnset(DriveSource::class);
 
     Settings::forget('workspace.google.service_account_json');
+    DriveSourceResolver::flush();
     expect(DriveSourceResolver::available())->toBeFalse();
     expect(fn () => DriveSourceResolver::resolve())->toThrow(DriveNotConfiguredException::class);
 });

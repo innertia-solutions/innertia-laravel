@@ -151,3 +151,29 @@ it('rejects folders or a target directory when directories lacks the provenance 
     test()->postJson('/api/files/imports', ['items' => ['a']])->assertStatus(202);
     expect(FileImport::count())->toBe(1);
 });
+
+it('treats a bound Drive source that cannot be built as unavailable without breaking file listings', function () {
+    $this->drive->file('a', 'a.txt', 'x');
+    test()->postJson('/api/files/imports', ['items' => ['a']])->assertStatus(202);
+    app()->bind(DriveSource::class, fn () => throw new \RuntimeException('credenciales corruptas'));
+
+    expect(\Innertia\Files\Drive\DriveSourceResolver::available())->toBeFalse();
+    test()->getJson('/api/files')->assertOk()->assertJsonPath('data.0.can_refresh', false);
+});
+
+it('memoizes Drive availability per request', function () {
+    $built = 0;
+    app()->bind(DriveSource::class, function () use (&$built) {
+        $built++;
+
+        return $this->drive;
+    });
+
+    expect(\Innertia\Files\Drive\DriveSourceResolver::available())->toBeTrue();
+    expect(\Innertia\Files\Drive\DriveSourceResolver::available())->toBeTrue();
+    expect($built)->toBe(1);
+
+    \Innertia\Files\Drive\DriveSourceResolver::flush();
+    \Innertia\Files\Drive\DriveSourceResolver::available();
+    expect($built)->toBe(2);
+});
