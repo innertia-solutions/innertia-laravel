@@ -217,19 +217,28 @@ class ReplaceFileContents
             return;
         }
 
+        // Valores ya convertidos por los casts del modelo (fechas → string de BD),
+        // calculados sobre una copia para no tocar la instancia si no se persiste.
+        $probe = $file->replicate();
         foreach ($external as $key => $value) {
-            $file->setAttribute($key, $value);
+            $probe->setAttribute($key, $value);
         }
+        $values = array_intersect_key($probe->getAttributes(), $external);
 
-        // Valores ya convertidos por los casts del modelo (fechas → string de BD).
-        $values = array_intersect_key($file->getAttributes(), $external);
-
-        File::withTrashed()
+        $affected = File::withTrashed()
             ->whereKey($file->id)
             ->where('path', $file->path)
             ->toBase()
             ->update($values);
 
+        // Si la fila cambió de path (otro proceso), la instancia queda como se leyó de la BD.
+        if ($affected !== 1) {
+            return;
+        }
+
+        foreach ($values as $key => $value) {
+            $file->setAttribute($key, $external[$key]);
+        }
         $file->syncOriginalAttributes(array_keys($external));
     }
 

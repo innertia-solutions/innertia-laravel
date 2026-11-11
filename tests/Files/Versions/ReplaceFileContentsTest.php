@@ -378,3 +378,19 @@ it('does not dispatch the event when the outer transaction rolls back', function
     $fake->assertNotDispatched(FileEvent::VersionCreated);
     expect(File::find($file->id)->version)->toBe(1);
 });
+
+it('leaves the instance untouched when the conditional external meta update matches no row', function () {
+    $file = versionsUpload('uno');
+
+    // Instancia desfasada: otro proceso movió el path vigente, así que id+path no calza.
+    $stale = File::find($file->id);
+    DB::table('files')->where('id', $file->id)->update(['path' => 'files/moved/other.txt']);
+
+    $useCase = new ReplaceFileContents($stale, versionsTmpFile('uno'), FileVersionSource::ProviderRefresh, meta: ['external_revision' => 'rev-x']);
+    $method = new ReflectionMethod($useCase, 'applyExternalMeta');
+    $method->invoke($useCase, $stale);
+
+    expect($stale->external_revision)->toBeNull();
+    expect($stale->isDirty())->toBeFalse();
+    expect(DB::table('files')->where('id', $file->id)->value('external_revision'))->toBeNull();
+});

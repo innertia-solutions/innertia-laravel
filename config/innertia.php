@@ -262,6 +262,12 @@ return [
         // Lifetime (minutes) of own-domain signed serving URLs (signedViewUrl / FileResource).
         'url_ttl'              => (int) env('INNERTIA_FILES_URL_TTL', 15),
 
+        // Versionamiento de contenido (siempre activo). keep = versiones superadas a
+        // conservar por archivo; vacío = todas.
+        'versions' => [
+            'keep' => env('INNERTIA_FILES_VERSIONS_KEEP'),
+        ],
+
         'providers' => [
             'google_drive' => [
                 'enabled'          => env('INNERTIA_GDRIVE_ENABLED', false),
