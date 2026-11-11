@@ -3,6 +3,7 @@
 namespace Innertia\Passkeys\Console;
 
 use Illuminate\Console\Command;
+use Innertia\Passkeys\Support\PasskeySettings;
 use Innertia\Passkeys\UseCases\RevokePasskeys;
 
 class RevokePasskeysCommand extends Command
@@ -13,6 +14,12 @@ class RevokePasskeysCommand extends Command
 
     public function handle(): int
     {
+        if (! PasskeySettings::passkeysTableExists()) {
+            $this->error('La tabla passkeys no existe: corre php artisan migrate primero.');
+
+            return self::FAILURE;
+        }
+
         $model = config('auth.providers.users.model');
         $user = $model::where('email', $this->argument('email'))->first();
 

@@ -15,7 +15,9 @@ env para eso. Si la BD no responde o no hay valor guardado, rige el default (enc
 Settings (`Innertia\Passkeys\Support\PasskeySettings`): `passkeys.enabled` (default `true`) y
 `passkeys.allow_subdomains` (default `false`).
 
-Registrar el endpoint de administración dentro del grupo platform del producto (aplica su auth):
+Registrar el endpoint de administración **dentro del grupo platform autenticado del producto**.
+`platformSettings()` NO trae auth propia: registrado fuera de ese grupo, cualquiera podría apagar
+passkeys. La ruta real depende del prefijo del grupo (con `prefix('platform')` queda `platform/passkeys/settings`):
 
 ```php
 \Innertia\Passkeys\Routes::platformSettings('');   // GET|PUT platform/passkeys/settings
@@ -34,7 +36,13 @@ Overrides avanzados por env (bloque `passkeys` de `config/innertia.php`), normal
 | — | `innertia.passkeys.challenge_ttl` | `300` | Vida del challenge en segundos |
 
 Hay que correr `php artisan migrate`: crea la tabla `passkeys` (la migración se carga siempre). En QA/prod,
-si el deploy no migra, correrlo a mano.
+si el deploy no migra, correrlo a mano. Mientras la tabla no exista el módulo queda apagado (login y
+autogestión 404, `/status` con `enabled:false`, admin `users/{id}/passkeys` responde vacío); al migrar
+se enciende solo, sin limpiar caché.
+
+> **Nota de actualización:** las env `PASSKEYS_ENABLED` y `PASSKEYS_ALLOW_SUBDOMAINS` **ya no se leen**.
+> El interruptor está en /platform (default encendido; sigue apagado hasta que `php artisan migrate`
+> cree la tabla). Quien tenía `PASSKEYS_ENABLED=false` debe apagarlo ahora desde /platform.
 
 Las rutas se registran siempre (no pueden depender de un valor en BD); con el interruptor apagado, el
 login y la autogestión (`passkey/login*`, `me/passkeys*`) responden 404 vía `EnsurePasskeysEnabled`.

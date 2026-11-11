@@ -37,6 +37,7 @@ if (! class_exists('PasskeyTestUser')) {
 if (! function_exists('passkeysSetUp')) {
     function passkeysSetUp(): void
     {
+        \Innertia\Passkeys\Support\PasskeySettings::flushCache();
         Schema::dropIfExists('passkey_test_users');
         Schema::create('passkey_test_users', function ($t) {
             $t->increments('id');
@@ -76,6 +77,7 @@ if (! function_exists('passkeysSettingsTable')) {
             $t->timestamps();
         });
         \Illuminate\Support\Facades\Cache::flush();
+        \Innertia\Passkeys\Support\PasskeySettings::flushCache();
     }
 }
 
@@ -85,6 +87,7 @@ if (! function_exists('passkeysTearDown')) {
         Schema::dropIfExists('passkey_test_users');
         Schema::dropIfExists('settings');
         \Illuminate\Support\Facades\Cache::flush();
+        \Innertia\Passkeys\Support\PasskeySettings::flushCache();
     }
 }
 

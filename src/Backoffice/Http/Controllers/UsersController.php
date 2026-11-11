@@ -314,12 +314,16 @@ class UsersController extends Controller
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
-    // ── Passkeys (si innertia.passkeys.enabled) ───────────────────────────────
+    // ── Passkeys (administración; sin tabla `passkeys` responden vacío) ───────────────────────────────
 
     /** GET users/{id}/passkeys — mismas reglas de alcance que show(). */
     public function passkeys(string $id): JsonResponse
     {
         $user = $this->findUser($id);
+
+        if (! \Innertia\Passkeys\Support\PasskeySettings::passkeysTableExists()) {
+            return response()->json(['data' => []]);
+        }
 
         $items = \Innertia\Passkeys\Models\Passkey::where('user_id', (string) $user->getKey())
             ->orderByDesc('created_at')->get()
@@ -332,6 +336,10 @@ class UsersController extends Controller
     public function revokePasskeys(string $id): JsonResponse
     {
         $user = $this->findUser($id);
+
+        if (! \Innertia\Passkeys\Support\PasskeySettings::passkeysTableExists()) {
+            return response()->json(['revoked' => 0]);
+        }
 
         $revoked = (new \Innertia\Passkeys\UseCases\RevokePasskeys(
             (string) $user->getKey(),

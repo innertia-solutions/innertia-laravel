@@ -6,7 +6,8 @@ final class PasskeyConfig
 {
     public static function enabled(): bool
     {
-        return PasskeySettings::enabled();
+        // Sin la tabla `passkeys` (producto que aún no migró) el módulo queda apagado.
+        return PasskeySettings::passkeysTableExists() && PasskeySettings::enabled();
     }
 
     public static function rpId(): string

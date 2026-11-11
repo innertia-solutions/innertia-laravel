@@ -22,8 +22,8 @@ class Routes
         Route::get('passkey/status', [PasskeySettingsController::class, 'status'])->middleware('throttle:60,1');
 
         Route::middleware(EnsurePasskeysEnabled::class)->group(function () {
-        Route::post('passkey/login/options', [PasskeyLoginController::class, 'options'])->middleware('throttle:20,1');
-        Route::post('passkey/login',         [PasskeyLoginController::class, 'login'])->middleware('throttle:10,1');
+            Route::post('passkey/login/options', [PasskeyLoginController::class, 'options'])->middleware('throttle:20,1');
+            Route::post('passkey/login',         [PasskeyLoginController::class, 'login'])->middleware('throttle:10,1');
         });
     }
 
@@ -33,8 +33,8 @@ class Routes
         Route::get($prefix . '/auth/passkey/status', [PasskeySettingsController::class, 'status'])->middleware('throttle:60,1');
 
         Route::middleware(EnsurePasskeysEnabled::class)->group(function () use ($prefix) {
-        Route::post($prefix . '/auth/passkey/login/options', [PasskeyLoginController::class, 'options'])->middleware('throttle:20,1');
-        Route::post($prefix . '/auth/passkey/login',         [PasskeyLoginController::class, 'platformLogin'])->middleware('throttle:10,1');
+            Route::post($prefix . '/auth/passkey/login/options', [PasskeyLoginController::class, 'options'])->middleware('throttle:20,1');
+            Route::post($prefix . '/auth/passkey/login',         [PasskeyLoginController::class, 'platformLogin'])->middleware('throttle:10,1');
         });
     }
 
@@ -42,17 +42,20 @@ class Routes
     public static function account(): void
     {
         Route::middleware(EnsurePasskeysEnabled::class)->group(function () {
-        Route::get   ('me/passkeys',         [MyPasskeysController::class, 'index']);
-        Route::post  ('me/passkeys/options', [MyPasskeysController::class, 'options'])->middleware('throttle:10,1');
-        Route::post  ('me/passkeys',         [MyPasskeysController::class, 'store'])->middleware('throttle:10,1');
-        Route::patch ('me/passkeys/{id}',    [MyPasskeysController::class, 'update'])->whereUuid('id');
-        Route::delete('me/passkeys/{id}',    [MyPasskeysController::class, 'destroy'])->whereUuid('id');
+            Route::get   ('me/passkeys',         [MyPasskeysController::class, 'index']);
+            Route::post  ('me/passkeys/options', [MyPasskeysController::class, 'options'])->middleware('throttle:10,1');
+            Route::post  ('me/passkeys',         [MyPasskeysController::class, 'store'])->middleware('throttle:10,1');
+            Route::patch ('me/passkeys/{id}',    [MyPasskeysController::class, 'update'])->whereUuid('id');
+            Route::delete('me/passkeys/{id}',    [MyPasskeysController::class, 'destroy'])->whereUuid('id');
         });
     }
 
     /**
-     * Interruptor de plataforma. Registrar dentro del grupo platform del producto
-     * (con su auth), p. ej. \Innertia\Passkeys\Routes::platformSettings('').
+     * Interruptor de plataforma (GET|PUT {prefix}/passkeys/settings).
+     *
+     * ATENCIÓN: NO trae auth propia. Debe registrarse DENTRO del grupo platform autenticado
+     * del producto (p. ej. \Innertia\Passkeys\Routes::platformSettings('')); la ruta real
+     * depende del prefijo de ese grupo. Registrada fuera, cualquiera podría apagar passkeys.
      */
     public static function platformSettings(string $prefix = ''): void
     {

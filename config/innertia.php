@@ -550,12 +550,14 @@ return [
     |--------------------------------------------------------------------------
     | Passkeys (WebAuthn)
     |--------------------------------------------------------------------------
-    | Encendido por defecto; el interruptor (y allow_subdomains) viven en BD, se
-    | cambian desde /platform (Passkeys\Routes::platformSettings). rp_id/rp_name/origins
-    | son overrides avanzados, normalmente innecesarios. Ingreso con huella/rostro/PIN del dispositivo como complemento de la
-    | contraseña (salta OTP y 2FA). rp_id = dominio al que se amarra la passkey:
-    | por defecto el host de app.frontend_url (o app.url). En productos con
-    | subdominios por tenant usar el dominio padre.
+    | Ingreso con huella/rostro/PIN del dispositivo como complemento de la contraseña
+    | (salta OTP y 2FA). Encendido por defecto; el interruptor (y allow_subdomains) viven
+    | en BD y se cambian desde /platform (Passkeys\Routes::platformSettings). Sin la tabla
+    | `passkeys` (falta migrate) queda apagado. Lo de abajo son overrides avanzados.
+    |
+    | rp_id = dominio al que se amarra la passkey: por defecto el host de
+    | app.frontend_url (o app.url). En productos con subdominios por tenant usar el
+    | dominio padre.
     */
     'passkeys' => [
         'rp_id'         => env('PASSKEYS_RP_ID'),
