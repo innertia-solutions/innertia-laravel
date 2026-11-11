@@ -153,3 +153,25 @@ it('claims the refresh atomically: a worker that lost the race does nothing', fu
     expect($file->fresh()->version)->toBe(1);
     expect($import->fresh()->trace_id)->toBe('otro');
 });
+
+it('never exposes an internal error message when the refresh fails unexpectedly', function () {
+    $this->drive->file('f1', 'a.txt', 'uno');
+    $file = importOne('f1');
+    $this->drive->edit('f1', 'dos');
+    $this->drive->failures['f1'] = new \RuntimeException('SQLSTATE[42S22]: Column not found: secreto');
+    $import = FileImport::create(['kind' => FileImportKind::Refresh, 'provider' => 'google_drive', 'source_items' => ['f1'], 'file_id' => $file->id]);
+
+    expect(fn () => (new RefreshFromProvider($import->id))->execute())->toThrow(\RuntimeException::class);
+
+    expect($import->fresh()->status)->toBe(FileImportStatus::Failed);
+    expect($import->fresh()->error)->toBe('Error interno al importar el elemento (ver registro con el trace_id).');
+});
+
+it('marks the refresh failed when the job dies without an exception', function () {
+    $import = FileImport::create(['kind' => FileImportKind::Refresh, 'provider' => 'google_drive', 'source_items' => ['a']]);
+    $import->markRunning('t');
+
+    (new RefreshFromProvider($import->id))->failed(null);
+
+    expect($import->fresh()->error)->toBe('El proceso se interrumpió: sin detalle');
+});

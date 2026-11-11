@@ -335,3 +335,24 @@ it('fails the import without throwing when folders are planned but directories l
     expect(File::count())->toBe(0);
     expect(Directory::count())->toBe(0);
 });
+
+it('never exposes internal errors in item reasons (generic text, full detail only in the log)', function () {
+    \Illuminate\Support\Facades\Schema::table('files', fn ($t) => $t->dropColumn('external_url'));
+    $this->drive->file('a', 'a.txt', 'x');
+
+    $import = runImport(['a']);
+
+    $reason = collect($import->items)->firstWhere('external_id', 'a')['reason'];
+    expect($import->failed_count)->toBe(1);
+    expect($reason)->toBe('Error interno al importar el elemento (ver registro con el trace_id).');
+    expect($reason)->not->toContain('SQLSTATE');
+});
+
+it('marks the import failed when the job dies without an exception', function () {
+    $running = FileImport::create(['kind' => FileImportKind::Import, 'provider' => 'google_drive', 'source_items' => ['a']]);
+    $running->markRunning('t');
+
+    (new ImportFromDrive($running->id))->failed(null);
+
+    expect($running->fresh()->error)->toBe('El proceso se interrumpió: sin detalle');
+});

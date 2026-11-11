@@ -15,6 +15,7 @@ use Innertia\Files\Drive\Import\DriveDirectoryMapper;
 use Innertia\Files\Drive\Import\DriveFileImporter;
 use Innertia\Files\Drive\Import\DriveFileRefresher;
 use Innertia\Files\Drive\Import\DriveImportPlanner;
+use Innertia\Files\Drive\Import\ImportErrors;
 use Innertia\Files\Imports\Enums\FileImportStatus;
 use Innertia\Files\Imports\Models\FileImport;
 use Innertia\Files\Support\FilesLog;
@@ -27,12 +28,15 @@ use Innertia\Platform\Contracts\UseCase;
  * contiene queda `skipped`. Un error de autenticación o de conexión con Drive (ya reintentado)
  * corta el proceso. Un error fatal deja el import en `failed` y se relanza (queda como caso).
  * Idempotente: solo corre desde `pending` (claim atómico, un solo worker lo toma).
+ * Los motivos guardados pasan por ImportErrors::publicMessage (nunca SQL ni rutas internas);
+ * el detalle completo va al log operacional con el trace_id.
  *
  * Comportamiento conocido (documentado, no se corrige):
  * - El dedupe es por directorio: reimportar un archivo que se movió localmente a otra carpeta
  *   lo vuelve a crear en la carpeta original (queda duplicado).
- * - Una selección que se solapa (una carpeta y un archivo suyo seleccionado suelto) importa ese
- *   archivo dos veces: dentro de su carpeta y en el destino.
+ * - Una selección que se solapa (una carpeta y un archivo o subcarpeta suya) no duplica: cada id
+ *   de Drive se planifica una sola vez y lo seleccionado explícitamente gana, así que ese elemento
+ *   queda en la raíz del destino (no anidado en su carpeta).
  */
 class ImportFromDrive extends UseCase
 {
@@ -118,8 +122,8 @@ class ImportFromDrive extends UseCase
                     $dir = $mapper->ensure($item, $parent['dir'] ?? $target, $import);
                 } catch (\Throwable $e) {
                     $blocked[$item->id] = ltrim($parentPath . '/' . $item->name, '/');
-                    $import->record('failed', $record + ['reason' => $e instanceof LockTimeoutException ? 'Otro proceso está creando esta carpeta.' : $e->getMessage()]);
-                    FilesLog::warning('files.drive.import: no se pudo crear una carpeta', ['import_id' => $import->id, 'external_id' => $item->id, 'error' => $e->getMessage()]);
+                    $import->record('failed', $record + ['reason' => $e instanceof LockTimeoutException ? 'Otro proceso está creando esta carpeta.' : ImportErrors::publicMessage($e)]);
+                    FilesLog::warning('files.drive.import: no se pudo crear una carpeta', ['import_id' => $import->id, 'external_id' => $item->id, 'error' => $e->getMessage(), 'trace_id' => traceId()]);
                     continue;
                 }
 
@@ -144,8 +148,8 @@ class ImportFromDrive extends UseCase
             $import->markDone();
             FilesLog::info('files.drive.import: fin', ['import_id' => $import->id, 'imported' => $import->imported, 'updated' => $import->updated, 'failed' => $import->failed_count]);
         } catch (\Throwable $e) {
-            $import->markFailed($e->getMessage());
-            FilesLog::warning('files.drive.import: falló', ['import_id' => $import->id, 'error' => $e->getMessage()]);
+            $import->markFailed(ImportErrors::publicMessage($e));
+            FilesLog::warning('files.drive.import: falló', ['import_id' => $import->id, 'error' => $e->getMessage(), 'trace_id' => traceId()]);
             throw $e;
         }
 
@@ -153,9 +157,9 @@ class ImportFromDrive extends UseCase
     }
 
     /** El worker murió o agotó el timeout: no dejar el registro en `running` para siempre. */
-    public function failed(\Throwable $e): void
+    public function failed(?\Throwable $e = null): void
     {
-        FileImport::find($this->importId)?->markFailedIfRunning('El proceso se interrumpió: ' . $e->getMessage());
+        FileImport::find($this->importId)?->markFailedIfRunning('El proceso se interrumpió: ' . ($e?->getMessage() ?? 'sin detalle'));
     }
 
     private function importOne(DriveFileImporter $importer, DriveItem $item, ?Directory $dir, string $path, FileImport $import): void
@@ -166,7 +170,7 @@ class ImportFromDrive extends UseCase
             [$result, $fileId] = $importer->import($item, $dir, $import);
             $import->record($result, $entry + ['file_id' => $fileId]);
         } catch (DriveItemNotImportableException|DriveFileTooLargeException|DriveExportTooLargeException $e) {
-            $import->record('skipped', $entry + ['reason' => $e->getMessage()]);
+            $import->record('skipped', $entry + ['reason' => ImportErrors::publicMessage($e)]);
         } catch (LockTimeoutException) {
             $import->record('skipped', $entry + ['reason' => 'Otro proceso está importando este elemento.']);
         } catch (\Throwable $e) {
@@ -174,8 +178,8 @@ class ImportFromDrive extends UseCase
                 throw $e;
             }
 
-            $import->record('failed', $entry + ['reason' => $e->getMessage()]);
-            FilesLog::warning('files.drive.import: falló un elemento', ['import_id' => $import->id, 'external_id' => $item->id, 'error' => $e->getMessage()]);
+            $import->record('failed', $entry + ['reason' => ImportErrors::publicMessage($e)]);
+            FilesLog::warning('files.drive.import: falló un elemento', ['import_id' => $import->id, 'external_id' => $item->id, 'error' => $e->getMessage(), 'trace_id' => traceId()]);
         }
     }
 }

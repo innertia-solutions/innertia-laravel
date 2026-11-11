@@ -8,6 +8,7 @@ use Innertia\Files\Directories\Exceptions\DuplicateDirectoryNameException;
 use Innertia\Files\Directories\Models\Directory;
 use Innertia\Files\Directories\UseCases\CreateDirectory;
 use Innertia\Files\Drive\DriveItem;
+use Innertia\Files\Drive\Exceptions\FolderNameExhaustedException;
 use Innertia\Files\Imports\Models\FileImport;
 
 /**
@@ -93,7 +94,7 @@ final class DriveDirectoryMapper
         }
 
         if ($dir === null) {
-            throw new \RuntimeException("No se pudo crear la carpeta \"{$base}\": demasiados nombres repetidos.");
+            throw new FolderNameExhaustedException($base);
         }
 
         $dir->forceFill(['provider' => self::PROVIDER, 'external_id' => $folder->id] + $owner->attributes())->save();

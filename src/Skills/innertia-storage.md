@@ -437,6 +437,11 @@ impersonando al usuario de `config('innertia.files.drive.subject_setting')` o, s
   soportar **locks atómicos compartidos** (redis o database, no file/array).
 - Worker muerto: `failed()` del job marca `failed`; si no corrió, `GET files/imports/{id}` lo marca
   `failed` de forma perezosa pasado `job_timeout + 300` s.
+- Mensajes de error (`error` y `reason` por ítem): solo se guardan los de Drive (`DriveException`)
+  y de dominio conocidos (Directories, carpeta sin nombre libre, versionamiento sin migrar, lock);
+  cualquier otro (SQL, disks, rutas) queda como "Error interno al importar el elemento (ver
+  registro con el trace_id)." y el detalle completo va a `FilesLog` con el `trace_id`
+  (`ImportErrors::publicMessage`).
 - Falla de autenticación/conexión con Drive: el import se detiene (`failed`). Si el directorio
   destino desapareció: `failed`.
 

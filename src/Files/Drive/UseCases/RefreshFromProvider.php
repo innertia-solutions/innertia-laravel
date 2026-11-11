@@ -11,6 +11,7 @@ use Innertia\Files\Drive\Exceptions\DriveItemNotFoundException;
 use Innertia\Files\Drive\Exceptions\DriveItemNotImportableException;
 use Innertia\Files\Drive\Import\DriveDirectoryMapper;
 use Innertia\Files\Drive\Import\DriveFileRefresher;
+use Innertia\Files\Drive\Import\ImportErrors;
 use Innertia\Files\Imports\Enums\FileImportStatus;
 use Innertia\Files\Imports\Models\FileImport;
 use Innertia\Files\Models\File;
@@ -21,7 +22,8 @@ use Innertia\Platform\Contracts\UseCase;
  * "Actualizar desde Drive" de un archivo (registro kind=refresh en file_imports).
  * Un problema esperable (origen borrado, descarga deshabilitada, demasiado grande, archivo no
  * importado o en la papelera) deja el registro en `failed` con un motivo claro sin relanzar;
- * un error inesperado además se relanza. Claim atómico: solo un worker lo corre.
+ * un error inesperado guarda un texto genérico (ImportErrors), se loguea completo y se relanza.
+ * Claim atómico: solo un worker lo corre.
  */
 class RefreshFromProvider extends UseCase
 {
@@ -75,10 +77,10 @@ class RefreshFromProvider extends UseCase
         } catch (DriveItemNotFoundException) {
             $import->markFailed('El archivo ya no existe en Google Drive o se perdió el acceso.');
         } catch (DriveItemNotImportableException|DriveFileTooLargeException|DriveExportTooLargeException $e) {
-            $import->markFailed($e->getMessage());
+            $import->markFailed(ImportErrors::publicMessage($e));
         } catch (\Throwable $e) {
-            $import->markFailed($e->getMessage());
-            FilesLog::warning('files.drive.refresh: falló', ['import_id' => $import->id, 'file_id' => $file->id, 'error' => $e->getMessage()]);
+            $import->markFailed(ImportErrors::publicMessage($e));
+            FilesLog::warning('files.drive.refresh: falló', ['import_id' => $import->id, 'file_id' => $file->id, 'error' => $e->getMessage(), 'trace_id' => traceId()]);
             throw $e;
         }
 
@@ -86,8 +88,8 @@ class RefreshFromProvider extends UseCase
     }
 
     /** El worker murió o agotó el timeout: no dejar el registro en `running` para siempre. */
-    public function failed(\Throwable $e): void
+    public function failed(?\Throwable $e = null): void
     {
-        FileImport::find($this->importId)?->markFailedIfRunning('El proceso se interrumpió: ' . $e->getMessage());
+        FileImport::find($this->importId)?->markFailedIfRunning('El proceso se interrumpió: ' . ($e?->getMessage() ?? 'sin detalle'));
     }
 }
