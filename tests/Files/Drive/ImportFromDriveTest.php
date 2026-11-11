@@ -321,3 +321,17 @@ it('marks a still-running import as failed when the job dies', function () {
     expect($running->fresh()->error)->toBe('El proceso se interrumpió: timeout');
     expect($done->fresh()->status)->toBe(FileImportStatus::Done);
 });
+
+it('fails the import without throwing when folders are planned but directories lacks the provenance columns', function () {
+    \Illuminate\Support\Facades\Schema::table('directories', fn ($t) => $t->dropColumn(['provider', 'external_id']));
+    \Innertia\Files\Drive\Import\DriveDirectoryMapper::flushSchemaCache();
+    $this->drive->folder('A', 'A');
+    $this->drive->file('a1', 'a.txt', 'x', 'A');
+
+    $import = runImport(['A']);
+
+    expect($import->status)->toBe(FileImportStatus::Failed);
+    expect($import->error)->toBe('Faltan las columnas de procedencia en directories: agrega provider y external_id a tu migración de directories (ver innertia:directories:install).');
+    expect(File::count())->toBe(0);
+    expect(Directory::count())->toBe(0);
+});

@@ -3,6 +3,7 @@ namespace Innertia\Files\Drive\Import;
 
 use Illuminate\Auth\GenericUser;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\Schema;
 use Innertia\Files\Directories\Exceptions\DuplicateDirectoryNameException;
 use Innertia\Files\Directories\Models\Directory;
 use Innertia\Files\Directories\UseCases\CreateDirectory;
@@ -20,7 +21,36 @@ use Innertia\Files\Imports\Models\FileImport;
 final class DriveDirectoryMapper
 {
     public const PROVIDER = 'google_drive';
+    public const MISSING_COLUMNS_MESSAGE = 'Faltan las columnas de procedencia en directories: agrega provider y external_id a tu migración de directories (ver innertia:directories:install).';
     private const MAX_SUFFIX = 50;
+
+    private static ?bool $schemaReady = null;
+
+    /**
+     * ¿`directories` tiene las columnas de procedencia? Un producto cuya propia migración de
+     * directories corre después de la de la lib (migrate:fresh) puede no tenerlas. Solo se
+     * cachea el positivo: un worker ve la migración apenas se aplique, sin reiniciarse.
+     */
+    public static function schemaReady(): bool
+    {
+        if (self::$schemaReady === true) {
+            return true;
+        }
+
+        $ok = Schema::hasTable('directories') && Schema::hasColumns('directories', ['provider', 'external_id']);
+
+        if ($ok) {
+            self::$schemaReady = true;
+        }
+
+        return $ok;
+    }
+
+    /** Para tests y para migraciones dentro del mismo proceso. */
+    public static function flushSchemaCache(): void
+    {
+        self::$schemaReady = null;
+    }
 
     /**
      * Lock por carpeta+padre+dueño: dos imports concurrentes de la misma carpeta no la duplican

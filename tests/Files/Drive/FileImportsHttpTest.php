@@ -137,3 +137,17 @@ it('recovers a stale running import lazily when it is queried', function () {
         ->assertJsonPath('data.status', 'failed')
         ->assertJsonPath('data.error', 'El proceso no terminó (tiempo excedido).');
 });
+
+it('rejects folders or a target directory when directories lacks the provenance columns', function () {
+    \Illuminate\Support\Facades\Schema::table('directories', fn ($t) => $t->dropColumn(['provider', 'external_id']));
+    \Innertia\Files\Drive\Import\DriveDirectoryMapper::flushSchemaCache();
+    $this->drive->folder('A', 'A');
+    $this->drive->file('a', 'a.txt', 'x');
+    $dir = (new CreateDirectory(null, 'Destino'))->execute();
+    $message = 'Faltan las columnas de procedencia en directories: agrega provider y external_id a tu migración de directories (ver innertia:directories:install).';
+
+    test()->postJson('/api/files/imports', ['items' => ['A']])->assertStatus(422)->assertJsonPath('message', $message);
+    test()->postJson('/api/files/imports', ['items' => ['a'], 'target_directory_id' => $dir->id])->assertStatus(422)->assertJsonPath('message', $message);
+    test()->postJson('/api/files/imports', ['items' => ['a']])->assertStatus(202);
+    expect(FileImport::count())->toBe(1);
+});

@@ -83,6 +83,13 @@ class ImportFromDrive extends UseCase
             $plan = (new DriveImportPlanner($source, (int) config('innertia.files.drive.max_items', 2000)))
                 ->plan($import->source_items ?? []);
 
+            if ($plan->folders !== [] && ! DriveDirectoryMapper::schemaReady()) {
+                $import->markFailed(DriveDirectoryMapper::MISSING_COLUMNS_MESSAGE);
+                FilesLog::warning('files.drive.import: directories sin columnas de procedencia', ['import_id' => $import->id, 'trace_id' => traceId()]);
+
+                return $import;
+            }
+
             $import->found = $plan->fileCount();
             foreach ($plan->missing as $id) {
                 $import->record('failed', ['external_id' => $id, 'name' => null, 'path' => '', 'reason' => 'El elemento no existe en Drive o se perdió el acceso.']);

@@ -37,10 +37,17 @@ class FileImportsController extends Controller
         try {
             $source = DriveSourceResolver::resolve();
 
-            if (! DirectoriesFeature::isActive()) {
+            // Sin el módulo o sin las columnas de procedencia en directories no se pueden recrear carpetas.
+            $folderError = match (true) {
+                ! DirectoriesFeature::isActive()       => 'Importar carpetas requiere el módulo de directorios.',
+                ! DriveDirectoryMapper::schemaReady() => DriveDirectoryMapper::MISSING_COLUMNS_MESSAGE,
+                default                                => null,
+            };
+
+            if ($folderError !== null) {
                 foreach ($data['items'] as $id) {
                     if ($source->metadata($id)->isFolder()) {
-                        return response()->json(['message' => 'Importar carpetas requiere el módulo de directorios.'], 422);
+                        return response()->json(['message' => $folderError], 422);
                     }
                 }
             }
@@ -51,6 +58,10 @@ class FileImportsController extends Controller
         }
 
         if (! empty($data['target_directory_id'])) {
+            if (DirectoriesFeature::isActive() && ! DriveDirectoryMapper::schemaReady()) {
+                return response()->json(['message' => DriveDirectoryMapper::MISSING_COLUMNS_MESSAGE], 422);
+            }
+
             $dirClass = DirectoriesFeature::modelClass();
             if (! DirectoriesFeature::isActive() || ! $dirClass::query()->whereKey($data['target_directory_id'])->exists()) {
                 return response()->json(['message' => 'La carpeta de destino no existe.'], 422);

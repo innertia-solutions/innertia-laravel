@@ -420,6 +420,12 @@ impersonando al usuario de `config('innertia.files.drive.subject_setting')` o, s
   contadores (`found/imported/updated/unchanged/skipped/failed_count`), `items` con el motivo por
   ítem, `error`, `trace_id`. Migración `2025_01_03_000002_add_drive_import` (agrega también
   `provider`/`external_*` a `files` si faltan, y `provider`/`external_id` a `directories`).
+- Columnas de procedencia en `directories`: si el producto tiene su propia migración de
+  `directories` y corre **después** de la de la lib (p. ej. en `migrate:fresh`), la tabla queda sin
+  `provider`/`external_id`. Agrégalas a esa migración (como hace `innertia:directories:install`).
+  Mientras falten, `POST files/imports` responde 422 si la selección trae carpetas o hay
+  `target_directory_id`, y un import con carpetas en el plan queda `failed` con ese mismo mensaje
+  (`DriveDirectoryMapper::schemaReady()`, cachea solo el positivo).
 - `ImportFromDrive` / `RefreshFromProvider` corren en la cola `innertia.files.drive.queue` con
   `$timeout = job_timeout` y `tries = 1`. Son idempotentes: el claim `pending→running` es atómico y
   solo corre desde `pending`.
