@@ -83,3 +83,21 @@ it('renderiza el correo de passkey agregada', function () {
 
     expect($html)->toContain('Mac');
 });
+
+it('rechaza registrar dos veces la misma credencial', function () {
+    Mail::fake();
+    $user = passkeyUser();
+    $auth = new FakeAuthenticator();
+    $b1 = (new BeginPasskeyRegistration($user))->execute();
+    (new FinishPasskeyRegistration($user, $b1['key'], $auth->register($b1['options'])))->execute();
+
+    // Opciones frescas sin excludeCredentials, para simular un cliente que lo ignora.
+    $b2 = (new BeginPasskeyRegistration($user))->execute();
+    $stored = \Innertia\Passkeys\Support\ChallengeStore::pull($b2['key'], 'register');
+    $stored['options']['excludeCredentials'] = [];
+    $key = \Innertia\Passkeys\Support\ChallengeStore::put('register', $stored);
+
+    expect(fn () => (new FinishPasskeyRegistration($user, $key, $auth->register($stored['options'])))->execute())
+        ->toThrow(PasskeyVerificationFailed::class);
+    expect(Passkey::count())->toBe(1);
+});

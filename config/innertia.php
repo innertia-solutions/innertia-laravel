@@ -555,6 +555,8 @@ return [
         'rp_name'       => env('PASSKEYS_RP_NAME'),
         'origins'       => array_values(array_filter(explode(',', (string) env('PASSKEYS_ORIGINS', '')))),
         'challenge_ttl' => 300,
+        // Acepta orígenes que sean subdominios de los permitidos (rp_id = dominio padre).
+        'allow_subdomains' => env('PASSKEYS_ALLOW_SUBDOMAINS', false),
     ],
 
     'auth' => [

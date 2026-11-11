@@ -3,6 +3,7 @@
 namespace Innertia\Passkeys\UseCases;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Support\Facades\Mail;
 use Innertia\Passkeys\Exceptions\PasskeyVerificationFailed;
 use Innertia\Passkeys\Mail\PasskeyAddedMail;
@@ -43,13 +44,20 @@ class FinishPasskeyRegistration extends UseCase
 
         $name = trim((string) $this->name);
 
-        $passkey = Passkey::create([
-            'user_id'       => $userId,
-            'name'          => $name !== '' ? mb_substr($name, 0, 120) : 'Passkey',
-            'credential_id' => $verified['credential_id'],
-            'credential'    => $verified['credential'],
-            'aaguid'        => $verified['aaguid'],
-        ]);
+        try {
+            $passkey = Passkey::create([
+                'user_id'       => $userId,
+                'name'          => $name !== '' ? mb_substr($name, 0, 120) : 'Passkey',
+                'credential_id' => $verified['credential_id'],
+                'credential'    => $verified['credential'],
+                'aaguid'        => $verified['aaguid'],
+            ]);
+        } catch (UniqueConstraintViolationException $e) {
+            PasskeyLog::warning('passkey.register_failed', ['user_id' => $userId, 'reason' => 'credencial duplicada']);
+            $failed = new PasskeyVerificationFailed('credencial duplicada', previous: $e);
+            $failed->logged = true;
+            throw $failed;
+        }
 
         PasskeyLog::info('passkey.registered', ['user_id' => $userId, 'passkey_id' => $passkey->id]);
 

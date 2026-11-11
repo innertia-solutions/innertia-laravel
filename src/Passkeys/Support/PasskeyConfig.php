@@ -38,6 +38,11 @@ final class PasskeyConfig
         return (int) config('innertia.passkeys.challenge_ttl', 300);
     }
 
+    public static function allowSubdomains(): bool
+    {
+        return (bool) config('innertia.passkeys.allow_subdomains', false);
+    }
+
     private static function frontendUrl(): string
     {
         return rtrim((string) config('app.frontend_url', config('app.url', 'http://localhost')), '/');

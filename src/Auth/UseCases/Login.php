@@ -37,7 +37,7 @@ class Login extends UseCase
             );
         }
 
-        return self::issueFor($user, $this->context);
+        return static::issueFor($user, $this->context);
     }
 
     /**
@@ -83,7 +83,7 @@ class Login extends UseCase
 
         if (! $strongAuth) {
             // 6 — OTP por correo (global con ajuste por usuario; ver otpRequired())
-            if (self::otpRequired($user)) {
+            if (static::otpRequired($user)) {
                 app(OtpService::class)->send($user, 'login');
 
                 return ['requires_otp' => true, 'user_id' => $user->getAuthIdentifier()];

@@ -50,3 +50,21 @@ it('rechaza una regresión del contador de firmas', function () {
     $request2 = Webauthn::requestOptions();
     Webauthn::verifyAssertion($updated, $request2, $auth->assert($request2, counter: 3));
 })->throws(PasskeyVerificationFailed::class);
+
+it('acepta un subdominio del origen cuando allow_subdomains está activo', function () {
+    config(['innertia.passkeys.rp_id' => 'pomely.cl', 'innertia.passkeys.origins' => ['https://pomely.cl'], 'innertia.passkeys.allow_subdomains' => true]);
+    $auth = new FakeAuthenticator('pomely.cl');
+    $creation = Webauthn::creationOptions(random_bytes(16), 'a@b.cl', 'A B', []);
+
+    $registered = Webauthn::verifyRegistration($creation, $auth->register($creation, 'https://acme.pomely.cl'));
+
+    expect($registered['credential_id'])->toBe($auth->id());
+});
+
+it('rechaza un subdominio cuando allow_subdomains está apagado', function () {
+    config(['innertia.passkeys.rp_id' => 'pomely.cl', 'innertia.passkeys.origins' => ['https://pomely.cl'], 'innertia.passkeys.allow_subdomains' => false]);
+    $auth = new FakeAuthenticator('pomely.cl');
+    $creation = Webauthn::creationOptions(random_bytes(16), 'a@b.cl', 'A B', []);
+
+    Webauthn::verifyRegistration($creation, $auth->register($creation, 'https://acme.pomely.cl'));
+})->throws(PasskeyVerificationFailed::class);

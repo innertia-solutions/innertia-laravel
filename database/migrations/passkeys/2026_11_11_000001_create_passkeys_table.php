@@ -13,7 +13,7 @@ return new class extends Migration
             // string: los productos usan users.id bigint o uuid.
             $table->string('user_id')->index();
             $table->string('name', 120);
-            $table->string('credential_id', 512)->unique();
+            $table->string('credential_id', 1400)->unique();
             // CredentialRecord serializado por web-auth (clave pública, contador, transports, flags).
             $table->json('credential');
             $table->string('aaguid', 36)->nullable();

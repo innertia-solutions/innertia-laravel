@@ -138,7 +138,7 @@ final class Webauthn
     private static function factory(): CeremonyStepManagerFactory
     {
         $factory = new CeremonyStepManagerFactory();
-        $factory->setAllowedOrigins(PasskeyConfig::origins());
+        $factory->setAllowedOrigins(PasskeyConfig::origins(), PasskeyConfig::allowSubdomains());
         $factory->setAttestationStatementSupportManager(self::attestationManager());
 
         return $factory;

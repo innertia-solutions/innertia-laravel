@@ -24,12 +24,20 @@ Detalle completo en `src/Passkeys/README.md` del paquete. Front: `usePasskeys` +
 
 1. Setear `PASSKEYS_ENABLED=true` (y `PASSKEYS_RP_ID` si hay subdominios por tenant: dominio padre).
 2. Usar el front de innertia-nuxt; el BFF sella el token en la sesión httpOnly.
-3. Nada más en el backend: las rutas se montan solas.
+3. Correr `php artisan migrate` (crea `passkeys`; la migración solo se registra con `PASSKEYS_ENABLED=true`).
+   En QA/prod, si el deploy no migra, correrlo a mano. Las rutas se montan solas.
+4. El cache store por defecto guarda los challenges y debe ser compartido entre réplicas (redis/database;
+   `array` no sirve).
+5. Front/BFF: sellar la sesión solo si la respuesta trae `token` (puede venir `requires_password_change` /
+   `requires_email_verification` + `context`). El login de plataforma devuelve token con
+   `force_password_change` pendiente y `Authenticate` responde 403 `password_change_required`: redirigir
+   al cambio de contraseña como en el login con contraseña.
 
 ## Gotchas
 
 - `rp_id` debe coincidir con el host del front (o ser su dominio padre). En dev: `localhost`.
-- Productos con subdominios por tenant: `rp_id` = dominio padre.
+- Productos con subdominios por tenant: `PASSKEYS_RP_ID` = dominio padre + `PASSKEYS_ALLOW_SUBDOMAINS=true`
+  (con `PASSKEYS_ORIGINS` = origen padre).
 - Passkey salta OTP y 2FA, pero respeta cambio forzado de contraseña, verificación de correo y
   `separate_identity`.
 - Cuenta de plataforma con cambio forzado pendiente no puede registrar passkeys.
