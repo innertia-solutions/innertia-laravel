@@ -83,3 +83,5 @@ if (! function_exists('bootOrgOpenMode')) {
         \Innertia\Facades\Innertia::activate('rancagua');
     }
 }
+
+require_once __DIR__ . '/Passkeys/Support/passkeys-helpers.php';
