@@ -139,3 +139,77 @@ it('configures the queue job from config', function () {
     expect($job->timeout)->toBe(1234);
     expect($job->tries)->toBe(1);
 });
+
+it('scopes the root dedupe by owner: another owner importing the same Drive file gets its own File', function () {
+    $this->drive->file('f1', 'a.txt', 'uno');
+    $ownerA = ['owner_type' => 'team', 'owner_id' => '11111111-1111-1111-1111-111111111111'];
+    $ownerB = ['owner_type' => 'team', 'owner_id' => '22222222-2222-2222-2222-222222222222'];
+
+    $first = runImport(['f1'], ['file_attributes' => $ownerA]);
+    $this->drive->edit('f1', 'dos');
+    $second = runImport(['f1'], ['file_attributes' => $ownerB]);
+    $third = runImport(['f1']);
+
+    expect([$first->imported, $second->imported, $second->updated, $third->imported])->toBe([1, 1, 0, 1]);
+    expect(File::count())->toBe(3);
+    $a = File::where('owner_id', $ownerA['owner_id'])->sole();
+    expect($a->version)->toBe(1);
+    expect(Storage::disk('local')->get($a->path))->toBe('uno');
+    expect(File::whereNull('owner_type')->count())->toBe(1);
+});
+
+it('scopes the root folder dedupe by owner', function () {
+    $this->drive->folder('A', 'A');
+    $this->drive->file('a1', 'a.txt', 'x', 'A');
+    $ownerA = ['owner_type' => 'team', 'owner_id' => '11111111-1111-1111-1111-111111111111'];
+    $ownerB = ['owner_type' => 'team', 'owner_id' => '22222222-2222-2222-2222-222222222222'];
+
+    runImport(['A'], ['file_attributes' => $ownerA]);
+    $second = runImport(['A'], ['file_attributes' => $ownerB]);
+    $again = runImport(['A'], ['file_attributes' => $ownerA]);
+
+    expect($second->imported)->toBe(1);
+    expect([$again->imported, $again->unchanged])->toBe([0, 1]);
+    expect(Directory::count())->toBe(2);
+    expect(Directory::where('owner_id', $ownerB['owner_id'])->sole()->external_id)->toBe('A');
+    expect(File::count())->toBe(2);
+});
+
+it('applies the import owner and author to every created folder and to the creation event', function () {
+    $events = [];
+    \Illuminate\Support\Facades\Event::listen(\Innertia\Files\Directories\Events\DirectoryCreated::class, function ($e) use (&$events) {
+        $events[] = [$e->directory->owner_type, $e->directory->owner_id, $e->performedBy?->getAuthIdentifier()];
+    });
+    $target = (new \Innertia\Files\Directories\UseCases\CreateDirectory(null, 'Destino'))->execute();
+    $target->forceFill(['owner_type' => 'team', 'owner_id' => '33333333-3333-3333-3333-333333333333'])->save();
+    $events = [];
+
+    $this->drive->folder('A', 'A');
+    $this->drive->folder('B', 'B', 'A');
+    $this->drive->file('b1', 'b.txt', 'x', 'B');
+    $owner = ['owner_type' => 'platform', 'owner_id' => '44444444-4444-4444-4444-444444444444'];
+
+    runImport(['A'], ['target_directory_id' => $target->id, 'file_attributes' => $owner]);
+
+    foreach (['A', 'B'] as $id) {
+        $dir = Directory::where('external_id', $id)->sole();
+        expect([$dir->owner_type, $dir->owner_id, $dir->created_by])->toBe(['platform', $owner['owner_id'], 'u-1']);
+    }
+    expect($events)->toBe([
+        ['platform', $owner['owner_id'], 'u-1'],
+        ['platform', $owner['owner_id'], 'u-1'],
+    ]);
+});
+
+it('inherits the parent owner on folders when the import has no owner attributes', function () {
+    $target = (new \Innertia\Files\Directories\UseCases\CreateDirectory(null, 'Destino'))->execute();
+    $target->forceFill(['owner_type' => 'team', 'owner_id' => '33333333-3333-3333-3333-333333333333'])->save();
+    $this->drive->folder('A', 'A');
+    $this->drive->file('a1', 'a.txt', 'x', 'A');
+
+    runImport(['A'], ['target_directory_id' => $target->id]);
+    $again = runImport(['A'], ['target_directory_id' => $target->id]);
+
+    expect(Directory::where('external_id', 'A')->sole()->owner_id)->toBe('33333333-3333-3333-3333-333333333333');
+    expect($again->unchanged)->toBe(1);
+});

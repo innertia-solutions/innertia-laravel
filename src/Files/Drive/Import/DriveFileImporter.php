@@ -18,7 +18,7 @@ use Innertia\Files\Support\FileVersioning;
 
 /**
  * Importa UN ítem de Drive a un directorio. Si ese mismo ítem ya fue importado en ese
- * directorio, lo refresca (versión nueva o sin cambios) en vez de duplicarlo. Un lock por
+ * directorio por el mismo dueño (File no tiene tenant: el dueño aísla), lo refresca (versión nueva o sin cambios) en vez de duplicarlo. Un lock por
  * ítem+directorio evita duplicados entre imports concurrentes; si no se obtiene a tiempo,
  * `LockTimeoutException` se propaga y el llamador anota el ítem como fallido.
  */
@@ -35,10 +35,11 @@ final class DriveFileImporter
     /** @return array{0: 'imported'|'updated'|'unchanged', 1: string} resultado e id del File */
     public function import(DriveItem $item, ?Directory $directory, FileImport $import): array
     {
-        $key = 'innertia.files.drive.import:' . $item->id . ':' . ($directory?->id ?? 'root');
+        $owner = ImportOwner::from(FileImport::filterAttributes($import->file_attributes ?? []));
+        $key = 'innertia.files.drive.import:' . $item->id . ':' . ($directory?->id ?? 'root') . ':' . $owner->key();
 
-        return Cache::lock($key, self::LOCK_SECONDS)->block(self::LOCK_WAIT, function () use ($item, $directory, $import) {
-            $existing = File::query()
+        return Cache::lock($key, self::LOCK_SECONDS)->block(self::LOCK_WAIT, function () use ($item, $directory, $import, $owner) {
+            $existing = $owner->scope(File::query())
                 ->where('provider', DriveDirectoryMapper::PROVIDER)
                 ->where('external_id', $item->id)
                 ->where('directory_id', $directory?->id)
@@ -65,7 +66,7 @@ final class DriveFileImporter
             try {
                 $this->write($disk, $path, $fetched->localPath);
 
-                $attributes = array_merge(FileImport::filterAttributes($import->file_attributes ?? []), [
+                $attributes = array_merge(ImportOwner::from(FileImport::filterAttributes($import->file_attributes ?? []))->attributes(), [
                     'disk'          => $disk,
                     'path'          => $path,
                     'original_name' => $fetched->name,

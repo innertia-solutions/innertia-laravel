@@ -40,8 +40,8 @@ class CreateDirectory
                 'parent_id'       => $this->parent?->id,
                 'depth'           => $this->parent ? $this->parent->depth + 1 : 1,
                 'path'            => '/',  // overwritten after save() to get the UUID
-                'owner_type'      => $this->owner ? $this->owner::class : $this->parent?->owner_type,
-                'owner_id'        => $this->owner?->getKey() ?? $this->parent?->owner_id,
+                'owner_type'      => $this->owner ? $this->ownerType() : $this->parent?->owner_type,
+                'owner_id'        => $this->owner ? $this->owner->getKey() : $this->parent?->owner_id,
                 'created_by'      => $this->performedBy?->getAuthIdentifier(),
             ]);
             $dir->save();
@@ -53,6 +53,17 @@ class CreateDirectory
 
             return $dir;
         });
+    }
+
+    /**
+     * Clase del dueño. Un stub anónimo (dueño por owner_type/owner_id sin cargar la entidad)
+     * declara su tipo vía getMorphClass(); un modelo real conserva `::class`.
+     */
+    private function ownerType(): string
+    {
+        return (new \ReflectionClass($this->owner))->isAnonymous()
+            ? $this->owner->getMorphClass()
+            : $this->owner::class;
     }
 
     private function validateName(): void
