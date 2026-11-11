@@ -15,4 +15,13 @@ final class FilesLog
             // la observabilidad nunca debe tumbar una operación de archivos
         }
     }
+
+    public static function info(string $message, array $context = []): void
+    {
+        try {
+            Telemetry::log('operational', 'info', $message, ['module' => 'files'] + $context);
+        } catch (\Throwable) {
+            // la observabilidad nunca debe tumbar una operación de archivos
+        }
+    }
 }

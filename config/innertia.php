@@ -268,6 +268,37 @@ return [
             'keep' => env('INNERTIA_FILES_VERSIONS_KEEP'),
         ],
 
+        // Importación desde Google Drive (Routes::registerDriveImport). El proceso corre en cola:
+        // usar una cola/worker dedicado con retry_after MAYOR que job_timeout.
+        'drive' => [
+            'queue'           => env('INNERTIA_FILES_DRIVE_QUEUE'),
+            'job_timeout'     => (int) env('INNERTIA_FILES_DRIVE_JOB_TIMEOUT', 3600),
+            'max_items'       => (int) env('INNERTIA_FILES_DRIVE_MAX_ITEMS', 2000),
+            'max_file_size'   => (int) env('INNERTIA_FILES_DRIVE_MAX_FILE_MB', 200) * 1024 * 1024,
+            'list_max'        => (int) env('INNERTIA_FILES_DRIVE_LIST_MAX', 5000),
+            'disk'            => env('INNERTIA_FILES_DRIVE_DISK'),      // null = filesystems.default
+            // Key de Settings con el usuario a impersonar (vacío → workspace.google.admin_email).
+            'subject_setting' => 'integrations.google.drive_subject',
+            'native_exports'  => [
+                'application/vnd.google-apps.document' => [
+                    'office' => ['application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'docx'],
+                    'pdf'    => ['application/pdf', 'pdf'],
+                ],
+                'application/vnd.google-apps.spreadsheet' => [
+                    'office' => ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'xlsx'],
+                    'pdf'    => ['application/pdf', 'pdf'],
+                ],
+                'application/vnd.google-apps.presentation' => [
+                    'office' => ['application/vnd.openxmlformats-officedocument.presentationml.presentation', 'pptx'],
+                    'pdf'    => ['application/pdf', 'pdf'],
+                ],
+                'application/vnd.google-apps.drawing' => [
+                    'office' => ['application/pdf', 'pdf'],
+                    'pdf'    => ['application/pdf', 'pdf'],
+                ],
+            ],
+        ],
+
         'providers' => [
             'google_drive' => [
                 'enabled'          => env('INNERTIA_GDRIVE_ENABLED', false),
