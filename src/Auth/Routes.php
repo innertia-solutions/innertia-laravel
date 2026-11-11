@@ -71,6 +71,8 @@ class Routes
 
             Route::get('{provider}/redirect', [$socialController, 'redirect'])->where('provider', $oauthProviders);
             Route::get('{provider}/callback', [$socialController, 'callback'])->where('provider', $oauthProviders);
+
+            \Innertia\Passkeys\Routes::login();
         });
     }
 
@@ -98,6 +100,8 @@ class Routes
             Route::get   ('me/preferences/{key}', [$preferencesController, 'show']);
             Route::put   ('me/preferences/{key}', [$preferencesController, 'update']);
             Route::delete('me/preferences/{key}', [$preferencesController, 'destroy']);
+
+            \Innertia\Passkeys\Routes::account();
         });
     }
 
@@ -116,5 +120,13 @@ class Routes
         Route::post($prefix.'/auth/password', [
             \Innertia\Auth\Http\Controllers\PlatformPasswordController::class, 'update',
         ])->middleware([\Innertia\Auth\Middleware\Authenticate::class, 'throttle:10,1']);
+
+        \Innertia\Passkeys\Routes::platformLogin($prefix);
+        // Gestión propia de passkeys de la cuenta de plataforma (token platform).
+        if (\Innertia\Passkeys\Support\PasskeyConfig::enabled()) {
+            Route::prefix($prefix . '/auth')
+                ->middleware(\Innertia\Auth\Middleware\Authenticate::class)
+                ->group(fn () => \Innertia\Passkeys\Routes::account());
+        }
     }
 }
