@@ -13,9 +13,16 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 trait ServesFiles
 {
-    protected function authorizeFile(Request $request, File $file): void
+    /**
+     * $treatPublicAs: visibilidad efectiva si el archivo es `public` (p. ej. 'auth'
+     * para versiones superadas: el historial de un archivo público no es público).
+     * null = sin cambio.
+     */
+    protected function authorizeFile(Request $request, File $file, ?string $treatPublicAs = null): void
     {
-        if ($file->visibility === 'public') {
+        $visibility = $file->visibility === 'public' && $treatPublicAs !== null ? $treatPublicAs : $file->visibility;
+
+        if ($visibility === 'public') {
             return;
         }
 
@@ -37,7 +44,7 @@ trait ServesFiles
             abort(401, 'Authentication required.');
         }
 
-        if ($file->visibility === 'auth') {
+        if ($visibility === 'auth') {
             return;
         }
 

@@ -14,6 +14,10 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 /**
  * GET /files/{id}/versions/{version}/view|download — la versión hereda el acceso
  * de su archivo. {version} igual al número vigente sirve la fila files.
+ *
+ * Solo la versión VIGENTE sigue la visibilidad `public` del archivo; las
+ * superadas exigen firma válida o usuario (public se trata como `auth`) y nunca
+ * se sirven con caché pública.
  */
 class FileVersionServingController extends Controller
 {
@@ -22,10 +26,10 @@ class FileVersionServingController extends Controller
     public function view(Request $request, string $id, int $version): StreamedResponse
     {
         [$file, $target] = $this->resolve($id, $version);
-        $this->authorizeFile($request, $file);
+        $visibility = $this->authorizeTarget($request, $file, $target);
 
         return $this->streamStored(
-            $target->disk, $target->path, $target->mime_type, $target->original_name, $file->visibility,
+            $target->disk, $target->path, $target->mime_type, $target->original_name, $visibility,
             $this->inlineSafe($target->mime_type, $target->extension) ? 'inline' : 'attachment',
         );
     }
@@ -33,9 +37,23 @@ class FileVersionServingController extends Controller
     public function download(Request $request, string $id, int $version): StreamedResponse
     {
         [$file, $target] = $this->resolve($id, $version);
-        $this->authorizeFile($request, $file);
+        $visibility = $this->authorizeTarget($request, $file, $target);
 
-        return $this->streamStored($target->disk, $target->path, $target->mime_type, $target->original_name, $file->visibility, 'attachment');
+        return $this->streamStored($target->disk, $target->path, $target->mime_type, $target->original_name, $visibility, 'attachment');
+    }
+
+    /** Autoriza y devuelve la visibilidad efectiva (para el header de caché). */
+    private function authorizeTarget(Request $request, File $file, File|FileVersion $target): string
+    {
+        if ($target instanceof File) {
+            $this->authorizeFile($request, $file);
+
+            return $file->visibility;
+        }
+
+        $this->authorizeFile($request, $file, treatPublicAs: 'auth');
+
+        return $file->visibility === 'public' ? 'auth' : $file->visibility;
     }
 
     /** @return array{0: File, 1: File|FileVersion} */

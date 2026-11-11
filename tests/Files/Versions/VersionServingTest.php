@@ -104,3 +104,27 @@ it('answers 404 for an out-of-range version number', function () {
     test()->get("/files/{$file->id}/versions/99999999999999999999/download")->assertNotFound();
     test()->get("/files/{$file->id}/versions/99999999999999999999/view")->assertNotFound();
 });
+
+it('does not make the history of a public file public', function () {
+    $file = servedTwoVersions('public');
+    $v1 = FileVersion::where('file_id', $file->id)->sole();
+
+    test()->get("/files/{$file->id}/versions/1/download")->assertStatus(401);
+    test()->get("/files/{$file->id}/versions/1/view")->assertStatus(401);
+
+    $signed = test()->get($v1->signedDownloadPath());
+    $signed->assertOk();
+    expect($signed->headers->get('Cache-Control'))->not->toContain('public');
+
+    $current = test()->get("/files/{$file->id}/versions/2/download");
+    $current->assertOk();
+    expect($current->headers->get('Cache-Control'))->toContain('public');
+});
+
+it('serves an old version of a public file to any authenticated user', function () {
+    $file = servedTwoVersions('public');
+    $user = new \Illuminate\Foundation\Auth\User();
+    $user->forceFill(['id' => 1]);
+
+    test()->actingAs($user)->get("/files/{$file->id}/versions/1/download")->assertOk();
+});
