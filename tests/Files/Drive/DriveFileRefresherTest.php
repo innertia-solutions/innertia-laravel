@@ -63,14 +63,24 @@ it('is unchanged when the revision moved but the bytes are identical (and stores
     expect($file->fresh()->version)->toBe(1);
 });
 
+it('does not re-export a native whose revision did not change', function () {
+    $item = $this->drive->native('d1', 'Acta', 'document', [DOCX => 'v1-docx', 'application/pdf' => 'v1-pdf']);
+    $file = importedFile('d1', 'v1-pdf', $item->revision(), 'application/pdf', 'Acta.pdf');
+
+    expect($this->refresher->refresh($file, $this->drive->metadata('d1')))->toBe('unchanged');
+    expect(array_filter($this->drive->calls, fn ($c) => str_starts_with($c, 'export:')))->toBe([]);
+});
+
 it('refreshes natives in the same export format', function () {
-    $this->drive->native('d1', 'Acta', 'document', [DOCX => 'v1-docx', 'application/pdf' => 'v1-pdf']);
-    $file = importedFile('d1', 'v1-pdf', '1', 'application/pdf', 'Acta.pdf');
+    $item = $this->drive->native('d1', 'Acta', 'document', [DOCX => 'v1-docx', 'application/pdf' => 'v1-pdf']);
+    $file = importedFile('d1', 'v1-pdf', $item->revision(), 'application/pdf', 'Acta.pdf');
     $this->drive->edit('d1', 'v2');
 
     expect($this->refresher->refresh($file, $this->drive->metadata('d1')))->toBe('updated');
     expect(in_array('export:d1:application/pdf', $this->drive->calls, true))->toBeTrue();
     expect($file->fresh()->external_export_mime)->toBe('application/pdf');
+    expect($file->fresh()->external_revision)->toBe($this->drive->metadata('d1')->modifiedTime)
+        ->not->toBe($item->revision());
 });
 
 it('leaves no temp files behind', function () {

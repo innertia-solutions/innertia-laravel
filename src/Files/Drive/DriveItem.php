@@ -9,7 +9,7 @@ final class DriveItem
     public const SHORTCUT_MIME = 'application/vnd.google-apps.shortcut';
 
     /** Campos pedidos a la API (files.get / files.list). */
-    public const API_FIELDS = 'id,name,mimeType,size,md5Checksum,modifiedTime,version,webViewLink,driveId,parents';
+    public const API_FIELDS = 'id,name,mimeType,size,md5Checksum,modifiedTime,version,headRevisionId,webViewLink,driveId,parents';
 
     public function __construct(
         public readonly string $id,
@@ -23,6 +23,7 @@ final class DriveItem
         public readonly ?string $driveId = null,
         /** @var list<string> */
         public readonly array $parents = [],
+        public readonly ?string $headRevisionId = null,
     ) {}
 
     public static function fromApi(array $f): self
@@ -38,6 +39,7 @@ final class DriveItem
             webUrl:       $f['webViewLink'] ?? null,
             driveId:      $f['driveId'] ?? null,
             parents:      array_values($f['parents'] ?? []),
+            headRevisionId: $f['headRevisionId'] ?? null,
         );
     }
 
@@ -54,15 +56,22 @@ final class DriveItem
     /** Documento nativo de Google (Docs/Sheets/Slides/…): no tiene bytes, se exporta. */
     public function isNative(): bool
     {
-        return str_starts_with($this->mime, 'application/vnd.google-apps.') && ! $this->isFolder();
+        return str_starts_with($this->mime, 'application/vnd.google-apps.') && ! $this->isFolder() && ! $this->isShortcut();
     }
 
-    /** Identifica el contenido: md5 para binarios, `version` para nativos. */
+    /**
+     * Identifica el contenido: md5 (o headRevisionId) para binarios, `modifiedTime` para nativos.
+     *
+     * No se usa `version` de Drive como señal principal: sube también con cambios de
+     * metadatos (compartir, mover, renombrar), y los PDF/DOCX exportados de un nativo no son
+     * byte-deterministas, así que cada cambio de `version` terminaría en una versión espuria.
+     * `version` queda solo como último recurso para nativos sin modifiedTime.
+     */
     public function revision(): ?string
     {
         return $this->isNative()
-            ? ($this->version ?? $this->modifiedTime)
-            : ($this->md5 ?? $this->version ?? $this->modifiedTime);
+            ? ($this->modifiedTime ?? $this->version)
+            : ($this->md5 ?? $this->headRevisionId ?? $this->modifiedTime);
     }
 
     public function toArray(): array

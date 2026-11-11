@@ -45,17 +45,24 @@ final class FakeDriveSource implements DriveSource
     {
         $this->exports[$id] = $exports;
 
-        return $this->put(new DriveItem($id, $name, "application/vnd.google-apps.{$kind}", version: $version, webUrl: "https://docs/{$id}", parents: [$parent]), $parent);
+        return $this->put(new DriveItem($id, $name, "application/vnd.google-apps.{$kind}", modifiedTime: self::stamp((int) $version), version: $version, webUrl: "https://docs/{$id}", parents: [$parent]), $parent);
     }
 
-    /** Simula una edición en Drive: nuevo contenido y nueva revisión. */
+    /** modifiedTime determinista a partir del número de versión del fake. */
+    private static function stamp(int $version): string
+    {
+        return gmdate('Y-m-d\\TH:i:s\\Z', 1767225600 + $version * 60);
+    }
+
+    /** Simula una edición en Drive: nuevo contenido y nueva revisión (nativos: sube modifiedTime y version). */
     public function edit(string $id, string $bytes): void
     {
         $old = $this->items[$id];
 
         if ($old->isNative()) {
             $this->exports[$id] = array_map(fn () => $bytes, $this->exports[$id]);
-            $this->items[$id] = new DriveItem($old->id, $old->name, $old->mime, version: (string) ((int) $old->version + 1), webUrl: $old->webUrl, parents: $old->parents);
+            $version = (int) $old->version + 1;
+            $this->items[$id] = new DriveItem($old->id, $old->name, $old->mime, modifiedTime: self::stamp($version), version: (string) $version, webUrl: $old->webUrl, parents: $old->parents);
 
             return;
         }
