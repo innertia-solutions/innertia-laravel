@@ -56,6 +56,7 @@ if (! function_exists('passkeysSetUp')) {
         config()->set('auth.providers.users.model', PasskeyTestUser::class);
         config()->set('innertia.auth.user_model', PasskeyTestUser::class);
         config()->set('innertia.contexts', ['backoffice' => [], 'portal' => []]);
+        config()->set('jwt.secret', str_repeat('k', 64));
         config()->set('innertia.passkeys.enabled', true);
         config()->set('innertia.passkeys.rp_id', 'localhost');
         config()->set('innertia.passkeys.origins', ['http://localhost']);

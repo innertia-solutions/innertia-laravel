@@ -12,7 +12,6 @@ afterEach(fn () => passkeysTearDown());
 it('con autenticación fuerte salta OTP y 2FA', function () {
     config()->set('innertia.auth.otp.enabled', true);
     config()->set('innertia.auth.2fa.enabled', true);
-    config()->set('jwt.secret', str_repeat('k', 64));
     $user = passkeyUser(['two_factor_enabled' => true]);
 
     $result = Login::issueFor($user, 'backoffice', strongAuth: true);

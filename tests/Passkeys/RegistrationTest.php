@@ -29,7 +29,7 @@ it('registra una passkey, la nombra y avisa por correo', function () {
         ->and($passkey->user_id)->toBe((string) $user->id)
         ->and($passkey->name)->toBe('Mac de Ana')
         ->and($passkey->credential_id)->toBe($auth->id());
-    Mail::assertQueued(PasskeyAddedMail::class);
+    Mail::assertQueued(PasskeyAddedMail::class, fn ($m) => $m->hasTo($user->email));
 });
 
 it('excluye las credenciales que el usuario ya tiene', function () {

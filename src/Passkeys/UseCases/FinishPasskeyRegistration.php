@@ -38,9 +38,11 @@ class FinishPasskeyRegistration extends UseCase
             throw $e;
         }
 
+        $name = trim((string) $this->name);
+
         $passkey = Passkey::create([
             'user_id'       => $userId,
-            'name'          => trim((string) $this->name) !== '' ? mb_substr(trim($this->name), 0, 120) : 'Passkey',
+            'name'          => $name !== '' ? mb_substr($name, 0, 120) : 'Passkey',
             'credential_id' => $verified['credential_id'],
             'credential'    => $verified['credential'],
             'aaguid'        => $verified['aaguid'],
@@ -49,7 +51,12 @@ class FinishPasskeyRegistration extends UseCase
         PasskeyLog::info('passkey.registered', ['user_id' => $userId, 'passkey_id' => $passkey->id]);
 
         if (! empty($this->user->email)) {
-            Mail::to($this->user->email)->queue(new PasskeyAddedMail($this->user, $passkey->name));
+            // El correo es solo un aviso: un fallo de la cola no debe romper el registro.
+            try {
+                Mail::to($this->user->email)->queue(new PasskeyAddedMail($this->user, $passkey->name));
+            } catch (\Throwable $e) {
+                report($e);
+            }
         }
 
         return $passkey;
