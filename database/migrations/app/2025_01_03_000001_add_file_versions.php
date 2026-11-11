@@ -1,5 +1,4 @@
 <?php
-// database/migrations/app/2025_01_03_000001_add_file_versions.php
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;

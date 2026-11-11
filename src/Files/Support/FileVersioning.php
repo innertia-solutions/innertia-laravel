@@ -1,5 +1,4 @@
 <?php
-// src/Files/Support/FileVersioning.php
 
 namespace Innertia\Files\Support;
 
@@ -18,7 +17,21 @@ final class FileVersioning
 
     public static function ready(): bool
     {
-        return self::$ready ??= Schema::hasTable('file_versions') && Schema::hasColumn('files', 'version');
+        if (self::$ready === true) {
+            return true;
+        }
+
+        // Solo se cachea el positivo: un worker que arrancó antes de `migrate`
+        // debe ver la migración apenas se aplique, sin reiniciarse.
+        // La sonda usa la conexión por defecto, igual que el modelo File
+        // (files no tiene tenant_id ni conexión por tenant).
+        $ok = Schema::hasTable('file_versions') && Schema::hasColumn('files', 'version');
+
+        if ($ok) {
+            self::$ready = true;
+        }
+
+        return $ok;
     }
 
     public static function ensureReady(): void

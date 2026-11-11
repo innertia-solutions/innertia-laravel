@@ -1,5 +1,4 @@
 <?php
-// src/Files/Exceptions/FileVersioningNotMigratedException.php
 
 namespace Innertia\Files\Exceptions;
 
