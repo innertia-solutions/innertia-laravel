@@ -25,6 +25,8 @@ final class FakeDriveSource implements DriveSource
     public array $exportTooLarge = [];
     /** @var list<string> ids que fallan al bajar con un error genérico */
     public array $broken = [];
+    /** @var list<string> ids cuyo dueño deshabilitó la descarga */
+    public array $downloadDisabled = [];
     /** @var list<string> */
     public array $calls = [];
 
@@ -104,6 +106,9 @@ final class FakeDriveSource implements DriveSource
     public function download(string $id, int $maxBytes): string
     {
         $this->calls[] = "download:{$id}";
+        if (in_array($id, $this->downloadDisabled, true)) {
+            throw \Innertia\Files\Drive\Exceptions\DriveItemNotImportableException::downloadDisabled();
+        }
         if (in_array($id, $this->broken, true)) {
             throw new DriveException('Google Drive no permitió descargar el archivo: boom');
         }
