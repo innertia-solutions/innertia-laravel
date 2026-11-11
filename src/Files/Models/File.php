@@ -410,6 +410,16 @@ class File extends Model
     public function forceDelete(): bool
     {
         $this->revokeAllEntityAccess();
+
+        if (FileVersioning::ready()) {
+            // Bytes de TODAS las versiones superadas, luego sus filas (FK cascade
+            // en BD reales; explícito por motores sin FK como SQLite de tests).
+            $this->versions()->get()->each(
+                fn (FileVersion $v) => Storage::disk($v->disk)->delete($v->path)
+            );
+            $this->versions()->delete();
+        }
+
         Storage::disk($this->disk)->delete($this->path);
         event(new \Innertia\Files\Events\FileHardDeleted($this->id, $this->original_name));
 
