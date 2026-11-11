@@ -8,11 +8,13 @@ use Illuminate\Http\Client\PendingRequest;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Innertia\Facades\Settings;
 use Innertia\Files\Drive\Exceptions\DriveException;
 use Innertia\Files\Drive\Exceptions\DriveExportTooLargeException;
 use Innertia\Files\Drive\Exceptions\DriveFileTooLargeException;
 use Innertia\Files\Drive\Exceptions\DriveItemNotFoundException;
+use Innertia\Files\Drive\Exceptions\DriveItemNotImportableException;
 use Innertia\Files\Drive\Exceptions\DriveNotConfiguredException;
 use Innertia\Files\Support\TempFile;
 
@@ -26,6 +28,14 @@ class ServiceAccountDriveSource implements DriveSource
     private const SCOPE = 'https://www.googleapis.com/auth/drive';
     private const API   = 'https://www.googleapis.com/drive/v3';
     private const CHUNK = 1048576;
+
+    /** Espera (ms) antes de cada reintento ante límites de cuota o fallas transitorias de Google. */
+    private const BACKOFF_MS = [500, 1500, 4000];
+
+    private const RATE_LIMIT_REASONS = ['rateLimitExceeded', 'userRateLimitExceeded'];
+
+    /** 403 por los que el dueño (o Google) impide bajar/exportar el archivo. */
+    private const DOWNLOAD_DISABLED_REASONS = ['cannotDownloadFile', 'cannotExportFile', 'fileNotDownloadable', 'cannotDownloadAbusiveFile'];
 
     /**
      * ¿Hay cuenta de servicio cargada? Se usa al serializar cada FileResource (can_refresh),
@@ -65,7 +75,7 @@ class ServiceAccountDriveSource implements DriveSource
 
         do {
             $res = $this->send(fn () => $this->http()->get(self::API . '/files', $query + ($page ? ['pageToken' => $page] : [])));
-            $this->ensureOk($res, 'listar la carpeta');
+            $this->ensureOk($res, 'listar la carpeta', $folderId);
 
             foreach ($res->json('files', []) as $f) {
                 $items[] = DriveItem::fromApi($f);
@@ -111,19 +121,32 @@ class ServiceAccountDriveSource implements DriveSource
     {
         $item = $this->metadata($id);
         $path = [];
+        $reachedTop = false;
+        $parent = $item->parents[0] ?? null;
 
-        for ($i = 0, $parent = $item->parents[0] ?? null; $parent !== null && $i < 20; $i++) {
+        for ($i = 0; $i < 20; $i++) {
+            if ($parent === null) {
+                $reachedTop = true;
+                break;
+            }
             try {
                 $node = $this->metadata($parent);
-            } catch (DriveException) {
-                break; // padre sin acceso: la ruta queda parcial
+            } catch (DriveItemNotFoundException) {
+                break; // padre inexistente o sin acceso: la ruta queda parcial
+            } catch (DriveException $e) {
+                if (! self::isPermissionDenied($e)) {
+                    throw $e;
+                }
+                break;
             }
             array_unshift($path, ['id' => $node->id, 'name' => $node->name]);
             $parent = $node->parents[0] ?? null;
         }
+        $reachedTop = $reachedTop || $parent === null;
 
-        if ($path === []) {
-            return [];
+        // Solo se nombra la raíz si de verdad se llegó a ella; una ruta cortada se devuelve tal cual.
+        if ($path === [] || ! $reachedTop) {
+            return $path;
         }
 
         if ($item->driveId !== null && $path[0]['id'] === $item->driveId) {
@@ -165,7 +188,7 @@ class ServiceAccountDriveSource implements DriveSource
             'mimeType' => DriveItem::FOLDER_MIME,
             'parents'  => [$parentId],
         ]));
-        $this->ensureOk($res, 'crear la carpeta');
+        $this->ensureOk($res, 'crear la carpeta', $parentId);
 
         return DriveItem::fromApi($res->json());
     }
@@ -176,46 +199,107 @@ class ServiceAccountDriveSource implements DriveSource
     {
         return Http::withToken($this->token())
             ->acceptJson()
-            ->timeout(60)
-            ->retry(2, 300, fn ($e) => $e instanceof ConnectionException, throw: false);
+            ->timeout(60);
     }
 
     /**
-     * Único punto que ejecuta requests a Google: un error de conexión (agotados los
-     * reintentos) sale como DriveException, igual que cualquier otra falla de la API.
+     * Único punto que ejecuta requests a Google. El closure debe construir el request
+     * completo (incluido `$this->http()`), porque se re-ejecuta en cada intento:
+     * - error de conexión, 429, 5xx o 403 de cuota → reintenta con backoff (BACKOFF_MS);
+     * - 401 en la API → olvida el token cacheado y reintenta UNA vez con uno nuevo.
+     * Agotados los reintentos, un error de conexión sale como DriveException('connection');
+     * cualquier otra respuesta se devuelve para que ensureOk la traduzca.
+     *
+     * @param  bool  $tokenRequest  pedido de token: solo reintenta conexión/5xx, sin refresco por 401.
      */
-    private function send(\Closure $request): Response
+    private function send(\Closure $request, bool $tokenRequest = false): Response
     {
-        try {
-            return $request();
-        } catch (ConnectionException $e) {
-            throw new DriveException('No se pudo conectar con Google Drive: ' . $e->getMessage(), 'connection');
+        $attempt = 0;
+        $tokenRefreshed = false;
+
+        while (true) {
+            try {
+                $res = $request();
+            } catch (ConnectionException $e) {
+                if ($attempt < count(self::BACKOFF_MS)) {
+                    Sleep::for(self::BACKOFF_MS[$attempt++])->milliseconds();
+                    continue;
+                }
+                throw new DriveException('No se pudo conectar con Google Drive: ' . $e->getMessage(), 'connection');
+            }
+
+            if (! $tokenRequest && $res->status() === 401 && ! $tokenRefreshed) {
+                $tokenRefreshed = true;
+                Cache::forget($this->tokenKey());
+                continue;
+            }
+
+            if ($attempt < count(self::BACKOFF_MS) && $this->isTransient($res, $tokenRequest)) {
+                Sleep::for(self::BACKOFF_MS[$attempt++])->milliseconds();
+                continue;
+            }
+
+            return $res;
         }
+    }
+
+    private function isTransient(Response $res, bool $tokenRequest): bool
+    {
+        $status = $res->status();
+
+        if (in_array($status, [500, 502, 503, 504], true)) {
+            return true;
+        }
+        if ($tokenRequest) {
+            return false;
+        }
+
+        return $status === 429
+            || ($status === 403 && in_array($res->json('error.errors.0.reason'), self::RATE_LIMIT_REASONS, true));
+    }
+
+    /** 403 por permisos (no por cuota): el elemento existe pero este usuario no lo ve. */
+    private static function isPermissionDenied(DriveException $e): bool
+    {
+        return $e->status === 403 && ! in_array($e->reason, self::RATE_LIMIT_REASONS, true);
     }
 
     private function streamToTemp(Response $res, int $maxBytes): string
     {
-        $tmp = TempFile::create();
-        $out = fopen($tmp, 'wb');
         $body = $res->toPsrResponse()->getBody();
+        $tmp = null;
+        $out = null;
         $written = 0;
 
         try {
+            $tmp = TempFile::create();
+            $out = @fopen($tmp, 'wb');
+            if ($out === false) {
+                $out = null;
+                throw new DriveException('No se pudo crear el archivo temporal.', 'tempWrite');
+            }
+
             while (! $body->eof()) {
                 $chunk = $body->read(self::CHUNK);
                 $written += strlen($chunk);
                 if ($written > $maxBytes) {
                     throw new DriveFileTooLargeException($maxBytes);
                 }
-                fwrite($out, $chunk);
+                if (fwrite($out, $chunk) !== strlen($chunk)) {
+                    throw new DriveException('No se pudo escribir el archivo temporal.', 'tempWrite');
+                }
             }
         } catch (\Throwable $e) {
-            fclose($out);
+            $body->close();
+            if ($out !== null) {
+                fclose($out);
+            }
             TempFile::delete($tmp);
             throw $e;
         }
 
         fclose($out);
+        $body->close();
 
         return $tmp;
     }
@@ -234,38 +318,60 @@ class ServiceAccountDriveSource implements DriveSource
         if ($reason === 'exportSizeLimitExceeded') {
             throw new DriveExportTooLargeException();
         }
+        if ($res->status() === 403 && in_array($reason, self::DOWNLOAD_DISABLED_REASONS, true)) {
+            throw DriveItemNotImportableException::downloadDisabled($reason);
+        }
 
         $message = $res->json('error.message') ?: ('HTTP ' . $res->status());
 
         throw new DriveException("Google Drive no permitió {$what}: {$message}", $reason, $res->status());
     }
 
-    private function token(): string
+    /**
+     * Clave de caché del token: cuenta de servicio + llave + usuario impersonado.
+     * Incluye private_key_id (o md5 de la llave) para que rotar la llave no reuse un token viejo.
+     */
+    private function tokenKey(): string
     {
         $sa = $this->serviceAccount();
+        $keyId = $sa['private_key_id'] ?? md5($sa['private_key']);
+
+        return 'innertia.files.drive.token.' . md5($sa['client_email'] . '|' . $keyId . '|' . $this->subject());
+    }
+
+    private function token(): string
+    {
+        $key = $this->tokenKey();
+
+        if (is_string($cached = Cache::get($key)) && $cached !== '') {
+            return $cached;
+        }
+
+        $sa = $this->serviceAccount();
         $subject = $this->subject();
-        $key = 'innertia.files.drive.token.' . md5($sa['client_email'] . '|' . $subject);
 
-        return Cache::remember($key, 3300, function () use ($sa, $subject) {
-            $tokenUri = $sa['token_uri'] ?? 'https://oauth2.googleapis.com/token';
-            $now = time();
-            $claims = ['iss' => $sa['client_email'], 'scope' => self::SCOPE, 'aud' => $tokenUri, 'iat' => $now, 'exp' => $now + 3600];
-            if ($subject !== '') {
-                $claims['sub'] = $subject;
-            }
+        $tokenUri = $sa['token_uri'] ?? 'https://oauth2.googleapis.com/token';
+        $now = time();
+        $claims = ['iss' => $sa['client_email'], 'scope' => self::SCOPE, 'aud' => $tokenUri, 'iat' => $now, 'exp' => $now + 3600];
+        if ($subject !== '') {
+            $claims['sub'] = $subject;
+        }
 
-            $res = $this->send(fn () => Http::asForm()->timeout(20)->post($tokenUri, [
-                'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-                'assertion'  => JWT::encode($claims, $sa['private_key'], 'RS256'),
-            ]));
+        $res = $this->send(fn () => Http::asForm()->timeout(20)->post($tokenUri, [
+            'grant_type' => 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            'assertion'  => JWT::encode($claims, $sa['private_key'], 'RS256'),
+        ]), tokenRequest: true);
 
-            if ($res->failed() || ! $res->json('access_token')) {
-                $detail = $res->json('error_description') ?: $res->json('error') ?: ('HTTP ' . $res->status());
-                throw new DriveException("Autenticación con Google falló: {$detail}", 'auth', $res->status());
-            }
+        if ($res->failed() || ! $res->json('access_token')) {
+            $detail = $res->json('error_description') ?: $res->json('error') ?: ('HTTP ' . $res->status());
+            throw new DriveException("Autenticación con Google falló: {$detail}", 'auth', $res->status());
+        }
 
-            return (string) $res->json('access_token');
-        });
+        $token = (string) $res->json('access_token');
+        $expiresIn = $res->json('expires_in');
+        Cache::put($key, $token, is_numeric($expiresIn) ? max(60, (int) $expiresIn - 300) : 3300);
+
+        return $token;
     }
 
     private function subject(): string

@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Sleep;
 use Innertia\Facades\Settings;
 use Innertia\Files\Drive\DriveSource;
 use Innertia\Files\Drive\DriveSourceResolver;
@@ -10,6 +11,7 @@ use Innertia\Files\Drive\Exceptions\DriveException;
 use Innertia\Files\Drive\Exceptions\DriveExportTooLargeException;
 use Innertia\Files\Drive\Exceptions\DriveFileTooLargeException;
 use Innertia\Files\Drive\Exceptions\DriveItemNotFoundException;
+use Innertia\Files\Drive\Exceptions\DriveItemNotImportableException;
 use Innertia\Files\Drive\Exceptions\DriveNotConfiguredException;
 use Innertia\Files\Drive\ServiceAccountDriveSource;
 
@@ -17,6 +19,7 @@ uses(RefreshDatabase::class);
 
 beforeEach(function () {
     Cache::flush();
+    Sleep::fake();
     seedServiceAccount();
 });
 
@@ -106,7 +109,9 @@ it('downloads to a temp file and enforces the size limit while streaming', funct
     expect(file_get_contents($path))->toBe(str_repeat('x', 3000));
     @unlink($path);
 
+    $before = glob(sys_get_temp_dir() . '/innertia-*') ?: [];
     expect(fn () => $src->download('bin', 100))->toThrow(DriveFileTooLargeException::class);
+    expect(glob(sys_get_temp_dir() . '/innertia-*') ?: [])->toBe($before);
 });
 
 it('exports natives and maps the 10 MB limit', function () {
@@ -205,4 +210,155 @@ it('keeps the shared drive root name when the drives lookup cannot connect', fun
     ]);
 
     expect(app(ServiceAccountDriveSource::class)->path('s2'))->toBe([['id' => 'sd', 'name' => 'Drive']]);
+});
+
+function apiError(int $status, string $reason): \GuzzleHttp\Promise\PromiseInterface
+{
+    return Http::response(['error' => ['message' => $reason, 'errors' => [['reason' => $reason]]]], $status);
+}
+
+it('returns a partial path without inventing My Drive when a parent is not accessible', function () {
+    Http::fake(tokenFake() + [
+        API . '/files/c?*' => Http::response(['id' => 'c', 'name' => 'C', 'mimeType' => 'application/vnd.google-apps.folder', 'parents' => ['b']]),
+        API . '/files/b?*' => Http::response(['id' => 'b', 'name' => 'B', 'mimeType' => 'application/vnd.google-apps.folder', 'parents' => ['ajeno']]),
+        API . '/files/ajeno?*' => apiError(404, 'notFound'),
+    ]);
+
+    $path = app(ServiceAccountDriveSource::class)->path('c');
+
+    expect($path)->toBe([['id' => 'b', 'name' => 'B']]);
+    expect(array_column($path, 'name'))->not->toContain('Mi unidad');
+});
+
+it('returns a partial path on a 403 permission error', function () {
+    Http::fake(tokenFake() + [
+        API . '/files/c?*' => Http::response(['id' => 'c', 'name' => 'C', 'mimeType' => 'text/plain', 'parents' => ['b']]),
+        API . '/files/b?*' => Http::response(['id' => 'b', 'name' => 'B', 'mimeType' => 'application/vnd.google-apps.folder', 'parents' => ['x']]),
+        API . '/files/x?*' => apiError(403, 'insufficientFilePermissions'),
+    ]);
+    expect(app(ServiceAccountDriveSource::class)->path('c'))->toBe([['id' => 'b', 'name' => 'B']]);
+});
+
+it('rethrows server errors while walking the path instead of cutting it', function () {
+    Http::fake(tokenFake() + [
+        API . '/files/c?*' => Http::response(['id' => 'c', 'name' => 'C', 'mimeType' => 'text/plain', 'parents' => ['b']]),
+        API . '/files/b?*' => apiError(500, 'backendError'),
+    ]);
+    expect(fn () => app(ServiceAccountDriveSource::class)->path('c'))->toThrow(DriveException::class);
+});
+
+it('refreshes the cached token once on a 401 and retries the request', function () {
+    Http::fake([
+        'oauth2.googleapis.com/token' => Http::sequence()
+            ->push(['access_token' => 'tok-1', 'expires_in' => 3600])
+            ->push(['access_token' => 'tok-2', 'expires_in' => 3600]),
+        API . '/files?*' => Http::sequence()
+            ->push(['error' => ['message' => 'Invalid Credentials', 'errors' => [['reason' => 'authError']]]], 401)
+            ->push(['files' => [['id' => 'a', 'name' => 'A', 'mimeType' => 'text/plain']]]),
+    ]);
+
+    $items = app(ServiceAccountDriveSource::class)->listChildren();
+
+    expect($items)->toHaveCount(1);
+    $tokenCalls = collect(Http::recorded())->filter(fn ($pair) => str_contains($pair[0]->url(), 'oauth2.googleapis.com/token'));
+    expect($tokenCalls)->toHaveCount(2);
+    Http::assertSent(fn ($req) => str_contains($req->url(), API . '/files?') && $req->hasHeader('Authorization', 'Bearer tok-2'));
+});
+
+it('does not loop on a persistent 401', function () {
+    Http::fake(tokenFake() + [API . '/files?*' => apiError(401, 'authError')]);
+
+    expect(fn () => app(ServiceAccountDriveSource::class)->listChildren())->toThrow(DriveException::class);
+    Http::assertSentCount(4); // token + 401 + token nuevo + 401
+});
+
+it('uses a different token cache key when the service account key rotates', function () {
+    Http::fake(tokenFake() + [API . '/files?*' => Http::response(['files' => []])]);
+    $src = app(ServiceAccountDriveSource::class);
+
+    $src->listChildren();
+    $src->listChildren();
+    seedServiceAccount(); // nueva private_key, mismo client_email y subject
+    $src->listChildren();
+
+    $tokenCalls = collect(Http::recorded())->filter(fn ($pair) => str_contains($pair[0]->url(), 'oauth2.googleapis.com/token'));
+    expect($tokenCalls)->toHaveCount(2);
+});
+
+it('caches the token for expires_in minus a safety margin', function () {
+    Http::fake(['oauth2.googleapis.com/token' => Http::response(['access_token' => 'tok-1', 'expires_in' => 1000])]
+        + [API . '/files?*' => Http::response(['files' => []])]);
+    $src = app(ServiceAccountDriveSource::class);
+
+    $src->listChildren();
+    $this->travel(701)->seconds();
+    $src->listChildren();
+
+    $tokenCalls = collect(Http::recorded())->filter(fn ($pair) => str_contains($pair[0]->url(), 'oauth2.googleapis.com/token'));
+    expect($tokenCalls)->toHaveCount(2);
+});
+
+it('retries rate limits with backoff and then succeeds', function () {
+    Http::fake(tokenFake() + [
+        API . '/files?*' => Http::sequence()
+            ->push(['error' => ['message' => 'Too many', 'errors' => [['reason' => 'rateLimitExceeded']]]], 429)
+            ->push(['files' => [['id' => 'a', 'name' => 'A', 'mimeType' => 'text/plain']]]),
+    ]);
+
+    expect(app(ServiceAccountDriveSource::class)->listChildren())->toHaveCount(1);
+    Sleep::assertSleptTimes(1);
+});
+
+it('gives up after 3 retries on a 403 userRateLimitExceeded', function () {
+    Http::fake(tokenFake() + [API . '/files?*' => apiError(403, 'userRateLimitExceeded')]);
+
+    try {
+        app(ServiceAccountDriveSource::class)->listChildren();
+        $this->fail('Debió lanzar DriveException');
+    } catch (DriveException $e) {
+        expect($e->reason)->toBe('userRateLimitExceeded');
+    }
+    Http::assertSentCount(5); // token + 4 intentos
+    Sleep::assertSleptTimes(3);
+});
+
+it('does not retry a 403 insufficientPermissions', function () {
+    Http::fake(tokenFake() + [API . '/files?*' => apiError(403, 'insufficientPermissions')]);
+
+    expect(fn () => app(ServiceAccountDriveSource::class)->listChildren())->toThrow(DriveException::class);
+    Http::assertSentCount(2);
+    Sleep::assertNeverSlept();
+});
+
+it('retries the token request on 5xx', function () {
+    Http::fake([
+        'oauth2.googleapis.com/token' => Http::sequence()
+            ->push(['error' => 'backend'], 503)
+            ->push(['access_token' => 'tok-1', 'expires_in' => 3600]),
+        API . '/files?*' => Http::response(['files' => []]),
+    ]);
+
+    expect(app(ServiceAccountDriveSource::class)->listChildren())->toBe([]);
+    Sleep::assertSleptTimes(1);
+});
+
+it('maps a missing folder on list and create to DriveItemNotFoundException', function () {
+    Http::fake(tokenFake() + [
+        API . '/files?*' => apiError(404, 'notFound'),
+    ]);
+    $src = app(ServiceAccountDriveSource::class);
+
+    expect(fn () => $src->listChildren('nope'))->toThrow(DriveItemNotFoundException::class);
+    expect(fn () => $src->createFolder('X', 'nope'))->toThrow(DriveItemNotFoundException::class);
+});
+
+it('maps download-disabled 403s to DriveItemNotImportableException', function () {
+    Http::fake(tokenFake() + [API . '/files/locked?*' => apiError(403, 'cannotDownloadFile')]);
+
+    try {
+        app(ServiceAccountDriveSource::class)->download('locked', 1000);
+        $this->fail('Debió lanzar DriveItemNotImportableException');
+    } catch (DriveItemNotImportableException $e) {
+        expect($e->getMessage())->toBe('El propietario deshabilitó la descarga de este archivo.');
+    }
 });
