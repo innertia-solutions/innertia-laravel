@@ -28,13 +28,16 @@ class FinishPasskeyRegistration extends UseCase
 
         if (($challenge['user_id'] ?? null) !== $userId) {
             PasskeyLog::warning('passkey.register_failed', ['user_id' => $userId, 'reason' => 'challenge de otro usuario']);
-            throw new PasskeyVerificationFailed('challenge de otro usuario');
+            $e = new PasskeyVerificationFailed('challenge de otro usuario');
+            $e->logged = true;
+            throw $e;
         }
 
         try {
             $verified = Webauthn::verifyRegistration($challenge['options'], $this->response);
         } catch (PasskeyVerificationFailed $e) {
             PasskeyLog::warning('passkey.register_failed', ['user_id' => $userId, 'reason' => $e->getMessage()]);
+            $e->logged = true;
             throw $e;
         }
 

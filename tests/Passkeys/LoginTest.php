@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Mail;
 use Innertia\Exceptions\ForbiddenException;
+use Innertia\Exceptions\PlatformAccountException;
 use Innertia\Passkeys\Exceptions\PasskeyVerificationFailed;
 use Innertia\Passkeys\Models\Passkey;
 use Innertia\Passkeys\UseCases\BeginPasskeyLogin;
@@ -111,3 +112,47 @@ it('plataforma: una cuenta común recibe 403', function () {
 
     (new PlatformPasskeyLogin($begin['key'], $auth->assert($begin['options'])))->execute();
 })->throws(ForbiddenException::class);
+
+it('con identidad de plataforma separada rechaza la cuenta de plataforma', function () {
+    config()->set('innertia.platform.separate_identity', true);
+    [, $auth] = pkEnrolled(['is_platform_admin' => true]);
+
+    pkLoginWith($auth, ['backoffice']);
+})->throws(PlatformAccountException::class);
+
+it('con cambio de clave forzado no emite token', function () {
+    [, $auth] = pkEnrolled(['force_password_change' => true]);
+
+    $result = pkLoginWith($auth, ['backoffice']);
+
+    expect($result)->toHaveKey('requires_password_change')->and($result)->not->toHaveKey('token');
+});
+
+it('con verificación de correo pendiente no emite token', function () {
+    config()->set('innertia.auth.email_verification.enabled', true);
+    [, $auth] = pkEnrolled(['email_verified_at' => null]);
+
+    $result = pkLoginWith($auth, ['backoffice']);
+
+    expect($result)->toHaveKey('requires_email_verification')->and($result)->not->toHaveKey('token');
+});
+
+it('rechaza un userHandle que no corresponde a la credencial', function () {
+    [, $auth] = pkEnrolled();
+    $auth->userHandle = 'otro';
+
+    pkLoginWith($auth, ['backoffice']);
+})->throws(PasskeyVerificationFailed::class);
+
+it('rechaza si el usuario ya no existe y no toca la passkey', function () {
+    [$user, $auth] = pkEnrolled();
+    $user->delete();
+
+    try {
+        pkLoginWith($auth, ['backoffice']);
+        $this->fail('debía lanzar');
+    } catch (PasskeyVerificationFailed) {
+    }
+
+    expect(Passkey::first()->last_used_at)->toBeNull();
+});

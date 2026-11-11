@@ -119,7 +119,7 @@ final class Webauthn
             $request = self::serializer()->deserialize(json_encode($options), PublicKeyCredentialRequestOptions::class, 'json');
 
             $updated = AuthenticatorAssertionResponseValidator::create(self::factory()->requestCeremony())
-                ->check($record, $credential->response, $request, PasskeyConfig::rpId(), $credential->response->userHandle);
+                ->check($record, $credential->response, $request, PasskeyConfig::rpId(), null);
         } catch (PasskeyVerificationFailed $e) {
             throw $e;
         } catch (Throwable $e) {

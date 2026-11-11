@@ -12,8 +12,15 @@ use RuntimeException;
  */
 class PasskeyVerificationFailed extends RuntimeException
 {
+    /** true cuando quien lanzó ya registró el fallo con contexto (evita el log doble). */
+    public bool $logged = false;
+
     public function report(): bool
     {
+        if ($this->logged) {
+            return true;
+        }
+
         PasskeyLog::warning('passkey.verification_failed', ['reason' => $this->getMessage()]);
 
         return true;

@@ -99,3 +99,10 @@ it('la cuenta de plataforma gestiona sus passkeys con token platform', function 
 it('valida el body', function () {
     $this->postJson('auth/passkey/login', [])->assertStatus(422)->assertJsonValidationErrors(['key', 'response', 'contexts']);
 });
+
+it('ids no uuid responden 404 al editar o borrar', function () {
+    $user = passkeyUser();
+
+    $this->patchJson('auth/me/passkeys/not-a-uuid', ['name' => 'x'], pkHttpBearer($user))->assertNotFound();
+    $this->deleteJson('auth/me/passkeys/not-a-uuid', [], pkHttpBearer($user))->assertNotFound();
+});

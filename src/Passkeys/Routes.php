@@ -46,7 +46,7 @@ class Routes
         Route::get   ('me/passkeys',         [MyPasskeysController::class, 'index']);
         Route::post  ('me/passkeys/options', [MyPasskeysController::class, 'options'])->middleware('throttle:10,1');
         Route::post  ('me/passkeys',         [MyPasskeysController::class, 'store'])->middleware('throttle:10,1');
-        Route::patch ('me/passkeys/{id}',    [MyPasskeysController::class, 'update']);
-        Route::delete('me/passkeys/{id}',    [MyPasskeysController::class, 'destroy']);
+        Route::patch ('me/passkeys/{id}',    [MyPasskeysController::class, 'update'])->whereUuid('id');
+        Route::delete('me/passkeys/{id}',    [MyPasskeysController::class, 'destroy'])->whereUuid('id');
     }
 }
