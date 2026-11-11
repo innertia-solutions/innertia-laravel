@@ -13,6 +13,7 @@ use Innertia\Files\Exceptions\FileTrashedException;
 use Innertia\Files\Models\File;
 use Innertia\Files\Models\FileVersion;
 use Innertia\Files\Support\Checksum;
+use Innertia\Files\Support\FileExtension;
 use Innertia\Files\Support\FileVersioning;
 use Innertia\Files\Support\FilesLog;
 use Innertia\Files\Versioning\FileVersionResult;
@@ -244,11 +245,7 @@ class ReplaceFileContents
 
     private function normalizedExtension(File $current): ?string
     {
-        $ext = strtolower((string) ($this->extension ?? $current->extension ?? ''));
-        $ext = preg_replace('/[^a-z0-9]/', '', ltrim($ext, '.'));
-        $ext = substr($ext, 0, 20);
-
-        return $ext !== '' ? $ext : null;
+        return FileExtension::normalize($this->extension ?? $current->extension);
     }
 
     private function resolveMimeType(File $current, ?string $extension): ?string

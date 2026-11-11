@@ -92,3 +92,32 @@ it('counts versions without bytes and does not fail', function () {
 
     expect($ghost->fresh()->disk)->toBe('local');
 });
+
+it('skips a row whose path changed while its bytes were being copied', function () {
+    $file = versionsUpload('uno');
+    $oldPath = $file->path;
+
+    // El disco destino simula un reemplazo concurrente: mientras copia, la fila cambia de path.
+    $real = Storage::disk('cloud');
+    $cloud = new class($real->getDriver(), $real->getAdapter(), $real->getConfig()) extends \Illuminate\Filesystem\FilesystemAdapter {
+        public \Closure $onWrite;
+
+        public function writeStream($path, $resource, array $options = [])
+        {
+            ($this->onWrite)();
+
+            return parent::writeStream($path, $resource, $options);
+        }
+    };
+    $cloud->onWrite = fn () => \Innertia\Files\Models\File::withTrashed()->whereKey($file->id)->toBase()->update(['path' => 'files/otro.txt']);
+    Storage::set('cloud', $cloud);
+
+    $this->artisan('innertia:storage:migrate-files --delete-source')
+        ->expectsOutputToContain('Migrados: 0 · sin contenido: 0 · errores: 0 · omitidos por cambio concurrente: 1')
+        ->assertSuccessful();
+
+    $row = $file->fresh();
+    expect($row->disk)->toBe('local')
+        ->and($row->path)->toBe('files/otro.txt')
+        ->and(Storage::disk('local')->exists($oldPath))->toBeTrue();
+});

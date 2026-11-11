@@ -46,13 +46,15 @@ class MigrateFilesToCloudCommand extends Command
         $this->info(($dry ? '[dry-run] ' : '').$totalFiles.' archivo(s)'
             .($versioned ? " y {$totalVersions} versión(es)" : '').' en '.implode(', ', $from)." → {$target}");
 
-        [$moved, $missing, $failed] = $this->migrateRows($filesQuery, $target, $dry);
+        [$moved, $missing, $failed, $skipped] = $this->migrateRows($filesQuery, $target, $dry);
 
-        $this->info(($dry ? 'Se migrarían' : 'Migrados').": {$moved} · sin contenido: {$missing} · errores: {$failed}");
+        $this->info(($dry ? 'Se migrarían' : 'Migrados').": {$moved} · sin contenido: {$missing} · errores: {$failed}"
+            ." · omitidos por cambio concurrente: {$skipped}");
 
         if ($versionsQuery) {
-            [$vMoved, $vMissing, $vFailed] = $this->migrateRows($versionsQuery, $target, $dry);
-            $this->info("Versiones migradas: {$vMoved} · sin contenido: {$vMissing} · errores: {$vFailed}");
+            [$vMoved, $vMissing, $vFailed, $vSkipped] = $this->migrateRows($versionsQuery, $target, $dry);
+            $this->info("Versiones migradas: {$vMoved} · sin contenido: {$vMissing} · errores: {$vFailed}"
+                ." · omitidos por cambio concurrente: {$vSkipped}");
             $failed += $vFailed;
         }
 
@@ -61,15 +63,19 @@ class MigrateFilesToCloudCommand extends Command
 
     /**
      * Migra filas con `disk`/`path` (File o FileVersion) al disco destino.
-     * El borrado del origen ocurre solo después de actualizar la fila.
+     * El borrado del origen ocurre solo después de actualizar la fila. La fila se
+     * actualiza de forma condicional (mismo disk y path que se copió): si otro
+     * proceso la cambió mientras tanto (p. ej. un reemplazo de contenido), se
+     * omite y el origen no se borra.
      *
-     * @return array{int, int, int} [migrados, sin contenido, errores]
+     * @return array{int, int, int, int} [migrados, sin contenido, errores, omitidos por cambio concurrente]
      */
     private function migrateRows(Builder $query, string $target, bool $dry): array
     {
         $moved = 0;
         $missing = 0;
         $failed = 0;
+        $skipped = 0;
 
         foreach ($query->cursor() as $row) {
             $source = Storage::disk($row->disk);
@@ -93,7 +99,17 @@ class MigrateFilesToCloudCommand extends Command
                 }
 
                 $oldDisk = $row->disk;
-                $row->forceFill(['disk' => $target])->saveQuietly();
+                $affected = $row->getConnection()->table($row->getTable())
+                    ->where($row->getKeyName(), $row->getKey())
+                    ->where('disk', $oldDisk)
+                    ->where('path', $row->path)
+                    ->update(['disk' => $target]);
+
+                if ($affected === 0) {
+                    $skipped++;
+                    $this->warn("  omitido (la fila cambió durante la copia): {$row->id}");
+                    continue;
+                }
 
                 if ($this->option('delete-source')) {
                     Storage::disk($oldDisk)->delete($row->path);
@@ -109,6 +125,6 @@ class MigrateFilesToCloudCommand extends Command
             }
         }
 
-        return [$moved, $missing, $failed];
+        return [$moved, $missing, $failed, $skipped];
     }
 }

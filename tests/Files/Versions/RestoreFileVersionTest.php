@@ -90,6 +90,19 @@ it('throws for a trashed file and writes nothing', function () {
     }
 });
 
+it('normalizes a legacy extension when restoring (temp name and new path)', function () {
+    $file = versionsUpload('uno');
+    (new ReplaceFileContents($file, versionsTmpFile('dos'), FileVersionSource::Replace))->execute();
+    FileVersion::where('file_id', $file->id)->where('version', 1)->update(['extension' => '.T/x T']);
+
+    $result = (new RestoreFileVersion($file->fresh(), 1))->execute();
+
+    expect($result->wasCreated())->toBeTrue();
+    expect($result->file->extension)->toBe('txt');
+    expect($result->file->path)->toEndWith('.txt');
+    expect(Storage::disk('local')->get($result->file->path))->toBe('uno');
+});
+
 it('fails clearly when versioning is not migrated', function () {
     $file = versionsUpload('uno');
     innertiaFileVersionsMigration()->down();

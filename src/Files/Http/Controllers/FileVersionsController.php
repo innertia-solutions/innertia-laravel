@@ -34,7 +34,7 @@ class FileVersionsController extends Controller
         }
 
         $entries = collect([FileVersionResource::fromCurrent($file)])
-            ->concat($file->versions()->orderByDesc('version')->get()->map(fn ($v) => new FileVersionResource($v)));
+            ->concat($file->versions()->orderByDesc('version')->get()->map(fn ($v) => new FileVersionResource($v, $file->trashed())));
 
         return response()->json(['data' => $entries->map->toArray($request)->values()]);
     }

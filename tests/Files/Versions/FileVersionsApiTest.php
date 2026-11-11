@@ -146,3 +146,15 @@ it('rejects out-of-range version numbers on restore with 404', function () {
 
     test()->postJson("/files/{$file->id}/versions/99999999999999999999/restore")->assertNotFound();
 });
+
+it('omits download links in the history of a trashed file', function () {
+    $file = versionsUpload('uno');
+    (new ReplaceFileContents($file, versionsTmpFile('dos'), FileVersionSource::Replace))->execute();
+    $file->trash();
+
+    $res = test()->getJson("/files/{$file->id}/versions")->assertOk();
+
+    expect($res->json('data'))->toHaveCount(2);
+    expect($res->json('data.0.download_url'))->toBeNull();
+    expect($res->json('data.1.download_url'))->toBeNull();
+});

@@ -13,6 +13,15 @@ use Innertia\Files\Models\FileVersion;
  */
 class FileVersionResource extends JsonResource
 {
+    /**
+     * $fileTrashed: el archivo dueño está en la papelera → download_url null
+     * (el serving responde 404 para archivos en papelera).
+     */
+    public function __construct($resource, public readonly bool $fileTrashed = false)
+    {
+        parent::__construct($resource);
+    }
+
     public static function fromCurrent(File $file): self
     {
         return new self([
@@ -28,7 +37,7 @@ class FileVersionResource extends JsonResource
             'created_at'            => $file->version_created_at ?? $file->created_at,
             'superseded_at'         => null,
             'is_current'            => true,
-        ]);
+        ], $file->trashed());
     }
 
     public function toArray($request): array
@@ -52,7 +61,7 @@ class FileVersionResource extends JsonResource
             'created_by'            => $row['created_by'],
             'created_at'            => $row['created_at']?->toIso8601String(),
             'superseded_at'         => $row['superseded_at']?->toIso8601String(),
-            'download_url'          => $this->signed($row['file_id'], (int) $row['version']),
+            'download_url'          => $this->fileTrashed ? null : $this->signed($row['file_id'], (int) $row['version']),
         ];
     }
 

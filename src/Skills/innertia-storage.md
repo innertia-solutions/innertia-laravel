@@ -341,8 +341,9 @@ El `File` es la **versión vigente**; `file_versions` guarda las **superadas** (
 nunca cambia: dueños, permisos, tags y URLs firmadas siguen apuntando al archivo y sirven lo vigente.
 
 - Migración del núcleo `2025_01_03_000001_add_file_versions` (app + saas). Productos existentes:
-  `php artisan migrate`. Sin migrar, las subidas siguen funcionando y el reemplazo responde 422
-  (`FileVersioningNotMigratedException`). `FileVersioning::ready()` cachea solo el resultado positivo
+  `php artisan migrate`. Sin migrar, las subidas siguen funcionando; el reemplazo, el historial
+  (`GET files/{id}/versions`) y la restauración responden 422 (`FileVersioningNotMigratedException`)
+  y el serving de versiones responde 404 — nunca 500 ni SQL. `FileVersioning::ready()` cachea solo el resultado positivo
   (un worker iniciado antes de `migrate` lo detecta sin reiniciarse).
 - **Único camino** para cambiar bytes: `ReplaceFileContents($file, $localPath, FileVersionSource::X,
   mimeType:, extension:, performedBy:, meta: [...])` → `FileVersionResult` (`created` | `unchanged`).
@@ -366,14 +367,31 @@ nunca cambia: dueños, permisos, tags y URLs firmadas siguen apuntando al archiv
 - **Eventos:** `FileEvent::VersionCreated`, `FileEvent::VersionRestored`.
 - **Serving:** `GET /files/{id}/versions/{n}/view|download` (mismo acceso y firma que el archivo;
   `FileVersion::signedDownloadPath()`). El filename del `Content-Disposition` se sanitiza.
+  - **El historial de un archivo público NO es público:** solo la versión vigente sigue
+    `visibility=public`. Una versión superada exige firma válida o usuario autenticado (`public` se
+    trata como `auth`; `restricted` sigue exigiendo `isAccessibleBy`) y nunca lleva caché pública.
+  - `{n}` está acotado a 1–9 dígitos (`[0-9]{1,9}`); fuera de rango → 404. Igual en `restore`.
+  - Archivo en papelera → el serving responde 404, y el historial (`GET files/{id}/versions`)
+    devuelve `download_url: null` en todas sus entradas.
 - **API** (en `Routes::register()`): `GET files/{id}/versions`, `POST files/{id}/versions/{n}/restore`,
-  `POST files/{id}/contents` (multipart `file`).
-- **FileResource:** `version`, `versions_count` (con `withCount('versions')`), `version_source`,
-  `provider`, `external_url`, `external_synced_at`, `can_refresh`.
+  `POST files/{id}/contents` (multipart `file`). Errores de dominio → 404/422 con mensaje (bytes de la
+  versión ausentes = `FileVersionBytesMissingException`, 422); errores de BD → 500 genérico (el
+  mensaje SQL nunca llega al cliente).
+- **FileResource:** `version`, `versions_count`, `version_source`, `provider`, `external_url`,
+  `external_synced_at`, `can_refresh`. `versions_count` es el **total incluyendo la vigente**
+  (superadas + 1) y solo aparece si la query usó `withCount('versions')`.
+- **Subclases de `File`** no deben pisar los casts del padre (`size`, `version`,
+  `restored_from_version`, `version_created_at`, `external_synced_at` viven en `File::$casts`).
+  Redeclarar `protected $casts = [...]` **reemplaza** el array entero: repetir ahí los del padre, o
+  mejor declarar los propios en el método `casts()` (Laravel los mergea con el `$casts` heredado;
+  si una clase intermedia define `casts()`, usar `array_merge(parent::casts(), [...])`).
 - `File::versions()` **no tiene orden**: ordenar en el sitio de uso (`->orderByDesc('version')`).
 - **Uso de almacenamiento:** `StorageUsage::totals(?scope)` → `current_bytes`, `versions_bytes`, `total_bytes`
   (incluye archivos en papelera).
 - **Migración de disk:** `innertia:storage:migrate-files` también migra los bytes de `file_versions`.
+  La fila se actualiza condicionalmente (mismo `disk` y `path` copiados): si cambió durante la copia
+  (reemplazo concurrente) se omite, no se borra el origen y se cuenta en "omitidos por cambio
+  concurrente".
 - **Nunca** escribir `files.path`/`size`/`checksum` a mano para cambiar contenido: usar `ReplaceFileContents`.
 
 ## Skills relacionados

@@ -12,6 +12,7 @@ use Innertia\Files\Exceptions\FileVersionBytesMissingException;
 use Innertia\Files\Exceptions\FileVersionNotFoundException;
 use Innertia\Files\Models\File;
 use Innertia\Files\Models\FileVersion;
+use Innertia\Files\Support\FileExtension;
 use Innertia\Files\Support\FileVersioning;
 use Innertia\Files\Versioning\FileVersionResult;
 
@@ -84,8 +85,9 @@ class RestoreFileVersion
             throw new FileVersionBytesMissingException($old->version);
         }
 
+        $extension = FileExtension::normalize($old->extension);
         $tmp = sys_get_temp_dir() . '/innertia-restore-' . bin2hex(random_bytes(8))
-            . ($old->extension ? '.' . $old->extension : '');
+            . ($extension !== null ? '.' . $extension : '');
         $out = @fopen($tmp, 'wb');
 
         if ($out === false) {
