@@ -39,7 +39,7 @@
                         <td align="center" style="padding:0 0 24px;">
                             @if($logoUrl)
                                 <img src="{{ $logoUrl }}" alt="{{ $appName }}" height="40"
-                                     style="height:40px;max-width:180px;display:block;border:0;outline:none;text-decoration:none;" />
+                                     style="height:40px;width:auto;max-width:100%;display:block;border:0;outline:none;text-decoration:none;" />
                             @else
                                 <span style="font-size:22px;font-weight:700;color:{{ $color }};text-decoration:none;display:block;">
                                     {{ $appName }}
