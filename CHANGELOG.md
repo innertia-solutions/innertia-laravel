@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Login social con probing de contextos
+
+- `SocialLogin` acepta `contexts` (lista en orden de preferencia): emite el token para el primer
+  contexto que el usuario posea, igual que el login único con contraseña/passkey. En ese modo un
+  correo no registrado siempre es 404 (no usa el provisioner). Sin `contexts` se mantiene el
+  contexto fijo del `state`.
+- El resultado de `SocialLogin` incluye `context`.
+- Con `innertia.platform.separate_identity`, `SocialLogin` rechaza cuentas de plataforma
+  (`PlatformAccountException`, 409), igual que `Login::issueFor` y `PasskeyLogin`.
+
 ### Changed — Política de respaldos editable desde /platform
 
 - Horarios, zona horaria y retención se guardan en `settings` (nivel plataforma) y se editan con
