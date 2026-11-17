@@ -54,20 +54,20 @@ class Routes
             $authController, $passwordController, $otpController,
             $twoFactorController, $emailController, $socialController, $oauthProviders
         ) {
-            Route::post('login',             [$authController, 'login'])->middleware('throttle:10,1');
+            Route::post('login',             [$authController, 'login'])->middleware('throttle:10,1,auth-login');
 
-            Route::post('otp/send',          [$otpController, 'send'])->middleware('throttle:5,1');
-            Route::post('otp/verify',        [$otpController, 'verify'])->middleware('throttle:5,1');
+            Route::post('otp/send',          [$otpController, 'send'])->middleware('throttle:5,1,auth-otp-send');
+            Route::post('otp/verify',        [$otpController, 'verify'])->middleware('throttle:5,1,auth-otp-verify');
 
-            Route::post('2fa/verify',        [$twoFactorController, 'verify'])->middleware('throttle:5,1');
+            Route::post('2fa/verify',        [$twoFactorController, 'verify'])->middleware('throttle:5,1,auth-2fa-verify');
 
             Route::post('email/verify/send', [$emailController, 'send']);
             Route::get ('email/verify',      [$emailController, 'verify'])->name('auth.email.verify');
 
-            Route::post('password/forgot',   [$passwordController, 'forgot'])->middleware('throttle:5,1');
+            Route::post('password/forgot',   [$passwordController, 'forgot'])->middleware('throttle:5,1,auth-password-forgot');
             Route::post('password/reset',    [$passwordController, 'reset']);
-            Route::post('password/change',   [$passwordController, 'change'])->middleware('throttle:5,1');
-            Route::post('password/set',      [$passwordController, 'set'])->middleware('throttle:5,1');
+            Route::post('password/change',   [$passwordController, 'change'])->middleware('throttle:5,1,auth-password-change');
+            Route::post('password/set',      [$passwordController, 'set'])->middleware('throttle:5,1,auth-password-set');
 
             Route::get('{provider}/redirect', [$socialController, 'redirect'])->where('provider', $oauthProviders);
             Route::get('{provider}/callback', [$socialController, 'callback'])->where('provider', $oauthProviders);
@@ -108,18 +108,21 @@ class Routes
     /**
      * Ruta pública de auth de plataforma (sin contexto ni tenant).
      * Registrar SIN middleware de resolución de tenant.
+     *
+     * Every throttle carries its own prefix: without it Laravel keys guests by IP only, so
+     * all throttled routes share one counter (a few logins used to block password/forgot).
      */
     public static function platformRoutes(string $prefix = 'platform'): void
     {
         Route::post($prefix.'/auth/login', [
             PlatformAuthController::class, 'login',
-        ])->middleware('throttle:10,1');
+        ])->middleware('throttle:10,1,auth-platform-login');
 
         // Cambio de contraseña de la propia cuenta de plataforma. Es la única ruta
         // que Authenticate deja pasar mientras force_password_change esté pendiente.
         Route::post($prefix.'/auth/password', [
             \Innertia\Auth\Http\Controllers\PlatformPasswordController::class, 'update',
-        ])->middleware([\Innertia\Auth\Middleware\Authenticate::class, 'throttle:10,1']);
+        ])->middleware([\Innertia\Auth\Middleware\Authenticate::class, 'throttle:10,1,auth-platform-password']);
 
         // Renovación de la sesión de plataforma (sin contexto ni tenant). Devuelve
         // { token } conservando el claim `platform`; el token anterior queda invalidado.

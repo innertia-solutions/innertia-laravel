@@ -21,7 +21,7 @@ class Routes
 {
     public static function public(string $uri = 'version'): void
     {
-        Route::get($uri, [VersionController::class, 'show'])->middleware('throttle:60,1');
+        Route::get($uri, [VersionController::class, 'show'])->middleware('throttle:60,1,version');
     }
 
     /** $prefix: null → 'platform' (grupo sin prefijo); '' cuando el grupo ya prefija 'platform'. */

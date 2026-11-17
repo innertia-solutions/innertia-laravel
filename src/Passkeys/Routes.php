@@ -19,22 +19,22 @@ class Routes
     /** Públicas, dentro del grupo/prefijo de publicRoutes (default 'auth'). */
     public static function login(): void
     {
-        Route::get('passkey/status', [PasskeySettingsController::class, 'status'])->middleware('throttle:60,1');
+        Route::get('passkey/status', [PasskeySettingsController::class, 'status'])->middleware('throttle:60,1,passkey-status');
 
         Route::middleware(EnsurePasskeysEnabled::class)->group(function () {
-            Route::post('passkey/login/options', [PasskeyLoginController::class, 'options'])->middleware('throttle:20,1');
-            Route::post('passkey/login',         [PasskeyLoginController::class, 'login'])->middleware('throttle:10,1');
+            Route::post('passkey/login/options', [PasskeyLoginController::class, 'options'])->middleware('throttle:20,1,passkey-login-options');
+            Route::post('passkey/login',         [PasskeyLoginController::class, 'login'])->middleware('throttle:10,1,passkey-login');
         });
     }
 
     /** Públicas de plataforma (sin tenant). */
     public static function platformLogin(string $prefix = 'platform'): void
     {
-        Route::get($prefix . '/auth/passkey/status', [PasskeySettingsController::class, 'status'])->middleware('throttle:60,1');
+        Route::get($prefix . '/auth/passkey/status', [PasskeySettingsController::class, 'status'])->middleware('throttle:60,1,passkey-status-platform');
 
         Route::middleware(EnsurePasskeysEnabled::class)->group(function () use ($prefix) {
-            Route::post($prefix . '/auth/passkey/login/options', [PasskeyLoginController::class, 'options'])->middleware('throttle:20,1');
-            Route::post($prefix . '/auth/passkey/login',         [PasskeyLoginController::class, 'platformLogin'])->middleware('throttle:10,1');
+            Route::post($prefix . '/auth/passkey/login/options', [PasskeyLoginController::class, 'options'])->middleware('throttle:20,1,passkey-login-options-platform');
+            Route::post($prefix . '/auth/passkey/login',         [PasskeyLoginController::class, 'platformLogin'])->middleware('throttle:10,1,passkey-login-platform');
         });
     }
 
@@ -43,8 +43,8 @@ class Routes
     {
         Route::middleware(EnsurePasskeysEnabled::class)->group(function () {
             Route::get   ('me/passkeys',         [MyPasskeysController::class, 'index']);
-            Route::post  ('me/passkeys/options', [MyPasskeysController::class, 'options'])->middleware('throttle:10,1');
-            Route::post  ('me/passkeys',         [MyPasskeysController::class, 'store'])->middleware('throttle:10,1');
+            Route::post  ('me/passkeys/options', [MyPasskeysController::class, 'options'])->middleware('throttle:10,1,passkey-me-passkeys-options');
+            Route::post  ('me/passkeys',         [MyPasskeysController::class, 'store'])->middleware('throttle:10,1,passkey-me-passkeys');
             Route::patch ('me/passkeys/{id}',    [MyPasskeysController::class, 'update'])->whereUuid('id');
             Route::delete('me/passkeys/{id}',    [MyPasskeysController::class, 'destroy'])->whereUuid('id');
         });
