@@ -36,10 +36,23 @@ class FileResource extends JsonResource
             // Público → URL absoluta estable sin firma (apta para firmas de correo,
             // web, CDN). Privado → path firmado RELATIVO: el browser lo resuelve
             // contra su origen y la firma relativa valida tras cualquier proxy.
-            'view_url'       => $this->tryFileUrl(fn () => $this->visibility === 'public' ? $this->viewUrl() : $this->signedViewPath()),
-            'download_url'   => $this->tryFileUrl(fn () => $this->visibility === 'public' ? $this->url() : $this->signedDownloadPath()),
+            'view_url'       => $this->tryFileUrl(fn () => $this->visibility === 'public' ? $this->versioned($this->viewUrl()) : $this->signedViewPath()),
+            'download_url'   => $this->tryFileUrl(fn () => $this->visibility === 'public' ? $this->versioned($this->url()) : $this->signedDownloadPath()),
             'tags'           => $this->whenLoaded('tags', fn () => $this->tags->pluck('slug')),
         ];
+    }
+
+    /**
+     * La URL pública es estable y se sirve con `Cache-Control: public, max-age=86400`:
+     * tras subir una versión nueva el navegador seguía mostrando la anterior desde
+     * su caché. Desde la versión 2 se agrega `?v={version}` para que cada versión
+     * tenga su propia URL. La versión 1 conserva la URL sin parámetros.
+     */
+    private function versioned(string $url): string
+    {
+        $version = (int) ($this->version ?? 1);
+
+        return $version > 1 ? $url . '?v=' . $version : $url;
     }
 
     /**

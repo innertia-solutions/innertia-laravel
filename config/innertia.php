@@ -351,6 +351,12 @@ return [
     'ai' => [
         'enabled' => env('INNERTIA_AI_ENABLED', false),
 
+        // Pide el consumo de tokens también en las respuestas en streaming
+        // (`stream_options.include_usage`). Sin esto los turnos en streaming y en
+        // segundo plano registran 0 tokens en ai_usage_events. Apagar solo si un
+        // proveedor rechaza el parámetro.
+        'stream_usage' => env('INNERTIA_AI_STREAM_USAGE', true),
+
         // Presupuesto de pasos (rondas de tools) del asistente. El default de
         // laravel/ai (1.5 × nº de tools) se queda corto para tareas como copiar
         // y clasificar varias preguntas: el loop se corta sin respuesta.
@@ -559,6 +565,13 @@ return [
 
         // Path appended to APP_URL to build the login button in emails (e.g. /login)
         'login_path'  => env('MAIL_LOGIN_PATH', '/login'),
+    ],
+
+    'exceptions' => [
+        // Mensaje de los 404 (registro o ruta inexistente) que responde
+        // InnertiaExceptionHandler. null = texto histórico en inglés
+        // ("<Model> not found." / "Not found."). Ej.: 'No encontramos lo que buscas.'
+        'not_found_message' => null,
     ],
 
     /*

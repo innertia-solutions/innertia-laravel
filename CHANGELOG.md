@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed — Hallazgos menores de QA (sumando)
+
+- **404 configurable:** `innertia.exceptions.not_found_message` reemplaza el texto de los 404 de
+  `InnertiaExceptionHandler` (registro o ruta inexistente). Sin configurar se conserva
+  `"<Model> not found."` / `"Not found."`.
+- **Sesión de plataforma renovable:** `JwtService::refreshToken()` conserva el claim `platform`
+  (y rechaza la renovación si la cuenta dejó de ser de plataforma). `Routes::platformRoutes()`
+  agrega `POST {prefix}/auth/refresh`, sin contexto ni tenant.
+- **Tokens de IA en streaming:** `Ai::configureFor()` configura
+  `stream_options.include_usage` en el proveedor openai-compatible; sin eso los turnos en
+  streaming y en segundo plano registraban 0 tokens. Se apaga con
+  `innertia.ai.stream_usage=false` (`INNERTIA_AI_STREAM_USAGE`).
+- **Vista previa tras una versión nueva:** `FileResource` agrega `?v={version}` a las URLs de
+  archivos públicos desde la versión 2 (la URL estable quedaba en la caché del navegador por 24 h).
+
 ### Added — Login social con probing de contextos
 
 - `SocialLogin` acepta `contexts` (lista en orden de preferencia): emite el token para el primer

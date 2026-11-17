@@ -69,11 +69,18 @@ class JwtService
             throw new \RuntimeException('Usuario no encontrado para refresh.');
         }
 
+        // Un token de plataforma solo se renueva mientras la cuenta siga siéndolo.
+        if (! empty($payload->platform) && ! ($user->is_platform_admin ?? false)) {
+            throw new \RuntimeException('La cuenta ya no tiene acceso de plataforma.');
+        }
+
         $this->invalidateToken($token);
 
-        // Preservar claims de dominio (ej. context) en el token nuevo.
+        // Preservar claims de dominio (context, platform) en el token nuevo. Sin
+        // `platform` la consola /platform recibía un token de otra clase de identidad
+        // y por eso el BFF no renovaba esas sesiones.
         $extra = [];
-        foreach (['context'] as $claim) {
+        foreach (['context', 'platform'] as $claim) {
             if (isset($payload->{$claim})) {
                 $extra[$claim] = $payload->{$claim};
             }

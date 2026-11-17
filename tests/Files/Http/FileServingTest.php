@@ -170,6 +170,22 @@ it('FileResource de un archivo público expone URL estable SIN firma', function 
     expect($data['download_url'])->not->toContain('signature=');
 });
 
+it('FileResource de un archivo público agrega ?v= desde la versión 2 (evita la caché de la versión anterior)', function () {
+    $file = _servingTyped('image/png', 'png', 'public');
+
+    $v1 = (new FileResource($file))->toArray(request());
+    expect($v1['view_url'])->not->toContain('?v=');
+
+    $file->forceFill(['version' => 3])->save();
+    $v3 = (new FileResource($file->fresh()))->toArray(request());
+
+    expect($v3['view_url'])->toEndWith('/files/' . $file->id . '/view?v=3');
+    expect($v3['download_url'])->toEndWith('/files/' . $file->id . '/download?v=3');
+    // La URL versionada sirve el archivo vigente.
+    $res = test()->get(parse_url($v3['view_url'], PHP_URL_PATH) . '?v=3')->assertOk();
+    expect($res->headers->get('cache-control'))->toContain('public');
+});
+
 it('un id malformado (no-uuid) devuelve 404, no un error de SQL', function () {
     test()->get('/files/not-a-valid-uuid/view')->assertStatus(404);
 });

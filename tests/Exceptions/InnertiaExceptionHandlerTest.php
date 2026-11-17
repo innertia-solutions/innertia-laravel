@@ -41,6 +41,34 @@ it('un error inesperado sigue siendo 500 server_error', function () {
     expect($res->getData(true)['error'])->toBe('server_error');
 });
 
+// ── 404: mensaje configurable por el producto ───────────────────────────────────
+
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+
+function _modelNotFound(): NotFoundHttpException
+{
+    $previous = (new ModelNotFoundException)->setModel('App\\Models\\Instrument', ['x']);
+
+    return new NotFoundHttpException($previous->getMessage(), $previous);
+}
+
+it('sin configurar, el 404 de un registro inexistente conserva el texto histórico', function () {
+    expect(_render(_modelNotFound())->getData(true)['message'])->toBe('Instrument not found.');
+    expect(_render(new NotFoundHttpException)->getData(true)['message'])->toBe('Not found.');
+});
+
+it('con not_found_message el 404 responde el mensaje del producto, sin el nombre del modelo', function () {
+    config()->set('innertia.exceptions.not_found_message', 'No encontramos lo que buscas.');
+
+    $res = _render(_modelNotFound());
+    expect($res->getStatusCode())->toBe(404);
+    expect($res->getData(true)['message'])->toBe('No encontramos lo que buscas.');
+    expect($res->getData(true)['error'])->toBe('not_found');
+
+    expect(_render(new NotFoundHttpException)->getData(true)['message'])->toBe('No encontramos lo que buscas.');
+});
+
 // ── Content negotiation: HTML para navegación de browser ────────────────────────
 
 use Illuminate\Http\Request;

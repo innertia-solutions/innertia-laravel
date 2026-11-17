@@ -121,6 +121,11 @@ class Routes
             \Innertia\Auth\Http\Controllers\PlatformPasswordController::class, 'update',
         ])->middleware([\Innertia\Auth\Middleware\Authenticate::class, 'throttle:10,1']);
 
+        // Renovación de la sesión de plataforma (sin contexto ni tenant). Devuelve
+        // { token } conservando el claim `platform`; el token anterior queda invalidado.
+        Route::post($prefix.'/auth/refresh', [AuthController::class, 'refresh'])
+            ->middleware(\Innertia\Auth\Middleware\Authenticate::class);
+
         \Innertia\Passkeys\Routes::platformLogin($prefix);
         // Gestión propia de passkeys de la cuenta de plataforma (token platform).
         Route::prefix($prefix . '/auth')

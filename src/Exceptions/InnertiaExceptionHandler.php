@@ -77,13 +77,17 @@ class InnertiaExceptionHandler
 
         if ($e instanceof NotFoundHttpException) {
             $previous = $e->getPrevious();
+            // Mensaje del producto (p. ej. en español) para todo 404 de recurso o ruta
+            // inexistente. Sin configurar se conserva el texto histórico en inglés.
+            $custom = config('innertia.exceptions.not_found_message');
+            $custom = is_string($custom) && $custom !== '' ? $custom : null;
 
             if ($previous instanceof ModelNotFoundException) {
                 $model = class_basename($previous->getModel());
-                return static::json("{$model} not found.", 'not_found', 404, [], $previous);
+                return static::json($custom ?? "{$model} not found.", 'not_found', 404, [], $previous);
             }
 
-            return static::json('Not found.', 'not_found', 404, [], $e);
+            return static::json($custom ?? 'Not found.', 'not_found', 404, [], $e);
         }
 
         // Cualquier HttpException con status explícito (abort(401/403/404/422/…)).

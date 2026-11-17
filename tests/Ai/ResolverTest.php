@@ -87,6 +87,27 @@ it('configureFor applies the laravel/ai openai-compatible config and returns the
         ->and(config('ai.providers.openai-compatible.key'))->toBe('secret-key');
 });
 
+it('configureFor pide el consumo de tokens en streaming (stream_options.include_usage)', function () {
+    makeChatSetup();
+
+    Ai::configureFor('chat');
+
+    expect(config('ai.providers.openai-compatible.stream_options'))->toBe(['include_usage' => true]);
+});
+
+it('configureFor respeta stream_options del producto y el apagado por stream_usage=false', function () {
+    makeChatSetup();
+
+    config()->set('ai.providers.openai-compatible.stream_options', ['include_usage' => false]);
+    Ai::configureFor('chat');
+    expect(config('ai.providers.openai-compatible.stream_options'))->toBe(['include_usage' => false]);
+
+    config()->set('ai.providers.openai-compatible.stream_options', null);
+    config()->set('innertia.ai.stream_usage', false);
+    Ai::configureFor('chat');
+    expect(config('ai.providers.openai-compatible.stream_options'))->toBeNull();
+});
+
 it('configureFor purga la instancia memoizada de laravel/ai (workers/Octane ven el proveedor nuevo)', function () {
     makeChatSetup();
 

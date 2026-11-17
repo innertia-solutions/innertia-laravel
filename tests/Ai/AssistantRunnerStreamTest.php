@@ -72,3 +72,30 @@ it('continúa una conversación existente pasándole el historial', function () 
     // 2 previos + el nuevo mensaje del usuario = 3 (el del asistente aún no, va en then()).
     expect(Message::where('conversation_id', $conversation->id)->count())->toBe(3);
 });
+
+it('al terminar el stream registra los tokens que informa el proveedor (pide include_usage)', function () {
+    $sse = implode("\n\n", [
+        'data: '.json_encode(['id' => 'c1', 'model' => 'test-model', 'choices' => [['index' => 0, 'delta' => ['role' => 'assistant', 'content' => 'Hola']]]]),
+        'data: '.json_encode(['id' => 'c1', 'model' => 'test-model', 'choices' => [['index' => 0, 'delta' => [], 'finish_reason' => 'stop']]]),
+        // Chunk final que solo llega si el request pidió stream_options.include_usage.
+        'data: '.json_encode(['id' => 'c1', 'model' => 'test-model', 'choices' => [], 'usage' => ['prompt_tokens' => 21, 'completion_tokens' => 7, 'total_tokens' => 28]]),
+        'data: [DONE]',
+    ])."\n\n";
+
+    \Illuminate\Support\Facades\Http::fake([
+        'fake.test/*' => \Illuminate\Support\Facades\Http::response($sse, 200, ['Content-Type' => 'text/event-stream']),
+    ]);
+
+    $turn = (new AssistantRunner)->runStream(user: null, text: 'hola streaming');
+    foreach ($turn->response as $event) {
+        // Consumir el stream dispara then() (mensaje del asistente + log de uso).
+    }
+
+    \Illuminate\Support\Facades\Http::assertSent(fn ($request) => ($request->data()['stream_options'] ?? null) === ['include_usage' => true]);
+
+    $usage = \Innertia\Ai\Models\UsageEvent::first();
+    expect($usage)->not->toBeNull()
+        ->and($usage->prompt_tokens)->toBe(21)
+        ->and($usage->completion_tokens)->toBe(7)
+        ->and($usage->total_tokens)->toBe(28);
+});
