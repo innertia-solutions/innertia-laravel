@@ -17,8 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   agrega `POST {prefix}/auth/refresh`, sin contexto ni tenant.
 - **Tokens de IA en streaming:** `Ai::configureFor()` configura
   `stream_options.include_usage` en el proveedor openai-compatible; sin eso los turnos en
-  streaming y en segundo plano registraban 0 tokens. Se apaga con
-  `innertia.ai.stream_usage=false` (`INNERTIA_AI_STREAM_USAGE`).
+  streaming y en segundo plano registraban 0 tokens. El interruptor vive en BD, por
+  proveedor: `ai_providers.meta.stream_usage` (por defecto encendido; sin variable de entorno).
 - **Vista previa tras una versión nueva:** `FileResource` agrega `?v={version}` a las URLs de
   archivos públicos desde la versión 2 (la URL estable quedaba en la caché del navegador por 24 h).
 

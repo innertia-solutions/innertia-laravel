@@ -95,15 +95,16 @@ it('configureFor pide el consumo de tokens en streaming (stream_options.include_
     expect(config('ai.providers.openai-compatible.stream_options'))->toBe(['include_usage' => true]);
 });
 
-it('configureFor respeta stream_options del producto y el apagado por stream_usage=false', function () {
+it('configureFor apaga el consumo en streaming por proveedor desde BD (meta.stream_usage=false)', function () {
     makeChatSetup();
 
-    config()->set('ai.providers.openai-compatible.stream_options', ['include_usage' => false]);
     Ai::configureFor('chat');
-    expect(config('ai.providers.openai-compatible.stream_options'))->toBe(['include_usage' => false]);
+    expect(config('ai.providers.openai-compatible.stream_options'))->toBe(['include_usage' => true]);
 
-    config()->set('ai.providers.openai-compatible.stream_options', null);
-    config()->set('innertia.ai.stream_usage', false);
+    $provider = \Innertia\Ai\Models\AiProvider::firstOrFail();
+    $provider->meta = ['stream_usage' => false];
+    $provider->save();
+
     Ai::configureFor('chat');
     expect(config('ai.providers.openai-compatible.stream_options'))->toBeNull();
 });

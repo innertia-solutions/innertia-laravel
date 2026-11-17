@@ -47,11 +47,11 @@ class AiManager
         // El gateway openai-compatible de laravel/ai solo manda `stream_options` si
         // viene en la config del proveedor. Sin `include_usage` el stream no trae
         // el consumo y los turnos en streaming/segundo plano registraban 0 tokens.
-        // Se respeta lo que el producto haya configurado; `stream_usage=false` lo apaga.
-        if (config('innertia.ai.stream_usage') !== false
-            && config('ai.providers.openai-compatible.stream_options') === null) {
-            config(['ai.providers.openai-compatible.stream_options' => ['include_usage' => true]]);
-        }
+        // El interruptor vive en BD, por proveedor: `ai_providers.meta.stream_usage`
+        // (por defecto encendido). Apagarlo solo si ese proveedor rechaza el parámetro.
+        // Se fija en cada llamada porque la config se comparte entre proveedores.
+        $streamUsage = ($resolved['provider']->meta['stream_usage'] ?? true) !== false;
+        config(['ai.providers.openai-compatible.stream_options' => $streamUsage ? ['include_usage' => true] : null]);
 
         // laravel/ai memoiza la instancia del proveedor: en workers de cola u Octane (procesos que viven
         // entre jobs/requests) un cambio de proveedor/key en BD no se vería. Se purga tras reconfigurar.
