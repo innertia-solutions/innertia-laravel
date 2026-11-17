@@ -117,8 +117,29 @@ class SocialLogin extends UseCase
         }
     }
 
+    /**
+     * The provider proves control of the email, so a social login counts as activation (like the
+     * activation link): clears a pending forced password change and verifies the email. The
+     * forced-change flow only exists before a session is issued, so a session must not carry it.
+     */
+    private function activate($user): void
+    {
+        $changes = [];
+        if ($user->force_password_change ?? false) {
+            $changes['force_password_change'] = false;
+        }
+        if (array_key_exists('email_verified_at', $user->getAttributes()) && $user->email_verified_at === null) {
+            $changes['email_verified_at'] = now();
+        }
+        if ($changes) {
+            $user->forceFill($changes)->save();
+        }
+    }
+
     private function issue($user, string $context, bool $created): array
     {
+        $this->activate($user);
+
         // Emitir JWT con claims provider + context.
         $token = app(JwtService::class)->generateToken($user, [
             'context'  => $context,

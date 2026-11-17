@@ -120,3 +120,16 @@ it('rechaza cuentas de plataforma con identidad separada (contexto fijo)', funct
 
     socialLogin($admin->email, ['context' => 'backoffice']);
 })->throws(PlatformAccountException::class);
+
+// ── Activation ─────────────────────────────────────────────────────────────
+
+it('activates an account pending a forced password change (Google proves the email)', function () {
+    $user = passkeyUser(['contexts' => 'backoffice']);
+    $user->forceFill(['force_password_change' => true, 'email_verified_at' => null])->save();
+
+    socialLogin($user->email, [], ['backoffice']);
+
+    $fresh = $user->fresh();
+    expect((bool) $fresh->force_password_change)->toBeFalse()
+        ->and($fresh->email_verified_at)->not->toBeNull();
+});
