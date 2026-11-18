@@ -392,6 +392,12 @@ return [
         // ej. 'api.tuproducto.com' → acme.api.tuproducto.com resuelve tenant "acme"
         // null → usa primer segmento de subdominio de cualquier host (menos seguro, OK en dev)
         'api_domain' => env('INNERTIA_API_DOMAIN', null),
+
+        // Clients → spaces: every tenant belongs to a client (contract and billing data).
+        // Opt-in; only applies in saas/open modes.
+        'clients' => [
+            'enabled' => env('INNERTIA_CLIENTS_ENABLED', false),
+        ],
     ],
 
     /*

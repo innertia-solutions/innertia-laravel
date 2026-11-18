@@ -126,6 +126,10 @@ class InnertiaServiceProvider extends ServiceProvider
         // Load from vendor so migrate works out-of-the-box without publishing.
         $this->loadMigrationsFrom($migrationsPath);
 
+        if (\Innertia\Saas\Clients\ClientsFeature::isActive()) {
+            $this->loadMigrationsFrom(__DIR__ . '/../database/migrations/clients');
+        }
+
         // Also publishable — `php artisan vendor:publish --tag=innertia-migrations`
         $publishMap = [];
         foreach (glob($migrationsPath . '/*.php') as $f) {
