@@ -27,12 +27,17 @@ class Tenant extends Model
         'trial_ends_at',
         'configs',
         'data',
+        'client_id',
+        'environment',
+        'billing_profile',
     ];
 
     protected $casts = [
         'configs'       => 'array',
         'data'          => 'array',
         'trial_ends_at' => 'datetime',
+        'billing_profile' => 'array',
+        'environment'   => \Innertia\Saas\Enums\TenantEnvironment::class,
     ];
 
     // ── Route model binding ───────────────────────────────────────────────────
@@ -40,6 +45,27 @@ class Tenant extends Model
     public function getRouteKeyName(): string
     {
         return 'key';
+    }
+
+    // ── Client ────────────────────────────────────────────────────────────────
+
+    public function client(): \Illuminate\Database\Eloquent\Relations\BelongsTo
+    {
+        return $this->belongsTo(Client::class, 'client_id');
+    }
+
+    public function isTesting(): bool
+    {
+        return $this->environment === \Innertia\Saas\Enums\TenantEnvironment::Testing;
+    }
+
+    /** Client billing data with the space's own overrides on top. */
+    public function billingData(): array
+    {
+        return array_merge(
+            $this->client?->billingData() ?? [],
+            array_intersect_key($this->billing_profile ?? [], array_flip(Client::BILLING_FIELDS)),
+        );
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
