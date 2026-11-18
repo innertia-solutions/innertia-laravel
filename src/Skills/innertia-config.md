@@ -43,6 +43,8 @@ Contextos del Login UseCase. El JWT valida que el user tenga acceso al contexto 
 ],
 ```
 
+- `saas.clients.enabled` (`INNERTIA_CLIENTS_ENABLED`, default `false`): Clientes → Espacios. Solo modos saas/open. Ver `Innertia\Saas\Clients`.
+
 ### `organizations` (opt-in)
 
 ```php
