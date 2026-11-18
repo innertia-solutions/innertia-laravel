@@ -3,6 +3,10 @@
 namespace Innertia\Saas\UseCases;
 
 use Innertia\Exceptions\ConflictException;
+use Innertia\Exceptions\NotFoundException;
+use Innertia\Saas\Clients\ClientsFeature;
+use Innertia\Saas\Enums\TenantEnvironment;
+use Innertia\Saas\Models\Client;
 use Innertia\Platform\Contracts\UseCase;
 
 class CreateTenant extends UseCase
@@ -14,6 +18,8 @@ class CreateTenant extends UseCase
         public readonly int     $trialDays = 14,
         public readonly ?string $demoEmail = null,
         public readonly ?string $demoPassword = null,
+        public readonly ?string            $clientId = null,
+        public readonly ?TenantEnvironment $environment = null,
     ) {}
 
     public function execute(): mixed
@@ -44,6 +50,11 @@ class CreateTenant extends UseCase
             ];
         }
 
+        if (ClientsFeature::isActive()) {
+            $data['client_id']   = $this->resolveClientId();
+            $data['environment'] = ($this->environment ?? TenantEnvironment::Production)->value;
+        }
+
         $tenant = $model::create($data);
 
         // Se dispara para TODOS los paths de creación (open, consola, provisioning)
@@ -52,5 +63,16 @@ class CreateTenant extends UseCase
         event(new \Innertia\Saas\Events\TenantCreated($tenant, null));
 
         return $tenant;
+    }
+
+    /** Explicit client, or an implicit one named after the tenant (self-serve and legacy paths). */
+    private function resolveClientId(): string
+    {
+        if ($this->clientId !== null) {
+            return Client::whereKey($this->clientId)->value('id')
+                ?? throw new NotFoundException("Client \"{$this->clientId}\" not found.");
+        }
+
+        return (new CreateClient(name: $this->name, key: CreateClient::uniqueKey($this->key)))->execute()->id;
     }
 }
