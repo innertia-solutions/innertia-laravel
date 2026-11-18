@@ -20,7 +20,9 @@ class ClientsController extends Controller
     public function tree(Request $request): JsonResponse
     {
         $search = mb_strtolower(trim((string) $request->input('search', '')));
-        $like = fn (Builder $q, string $col) => $q->orWhereRaw("LOWER({$col}) LIKE ?", ["%{$search}%"]);
+        // Escape LIKE wildcards; ESCAPE clause is supported by both SQLite and PostgreSQL.
+        $escaped = addcslashes($search, '%_\\');
+        $like = fn (Builder $q, string $col) => $q->orWhereRaw("LOWER({$col}) LIKE ? ESCAPE '\\'", ["%{$escaped}%"]);
 
         $clients = Client::query()
             ->with(['tenants' => fn ($q) => $q->orderBy('name')])
@@ -123,10 +125,10 @@ class ClientsController extends Controller
             'business_activity'  => 'nullable|string|max:200',
             'address'            => 'nullable|string|max:250',
             'billing_email'      => 'nullable|email|max:150',
-            'invoicing_mode'     => ['nullable', Rule::enum(InvoicingMode::class)],
-            'payment_terms_days' => 'nullable|integer|min:0|max:365',
-            'grace_days'         => 'nullable|integer|min:0|max:365',
-            'late_fee_percent'   => 'nullable|numeric|min:0|max:100',
+            'invoicing_mode'     => ['sometimes', Rule::enum(InvoicingMode::class)],
+            'payment_terms_days' => 'sometimes|integer|min:0|max:365',
+            'grace_days'         => 'sometimes|integer|min:0|max:365',
+            'late_fee_percent'   => 'sometimes|numeric|min:0|max:100',
             'notes'              => 'nullable|string|max:2000',
         ];
     }

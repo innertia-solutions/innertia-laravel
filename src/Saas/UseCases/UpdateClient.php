@@ -15,7 +15,7 @@ class UpdateClient extends UseCase
 
     public function execute(): Client
     {
-        $this->client->update(Arr::only($this->attributes, ['name', ...CreateClient::EDITABLE]));
+        $this->client->update(CreateClient::clean(Arr::only($this->attributes, ['name', ...CreateClient::EDITABLE])));
 
         return $this->client;
     }

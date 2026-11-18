@@ -2,6 +2,8 @@
 
 namespace Innertia\Saas\UseCases;
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Innertia\Exceptions\ConflictException;
 use Innertia\Exceptions\NotFoundException;
 use Innertia\Saas\Clients\ClientsFeature;
@@ -50,12 +52,15 @@ class CreateTenant extends UseCase
             ];
         }
 
-        if (ClientsFeature::isActive()) {
-            $data['client_id']   = $this->resolveClientId();
-            $data['environment'] = ($this->environment ?? TenantEnvironment::Production)->value;
-        }
+        // Client resolution + tenant insert are atomic: no orphan implicit client on failure.
+        $tenant = DB::transaction(function () use ($model, $data) {
+            if (ClientsFeature::isActive()) {
+                $data['client_id']   = $this->resolveClientId();
+                $data['environment'] = ($this->environment ?? TenantEnvironment::Production)->value;
+            }
 
-        $tenant = $model::create($data);
+            return $model::create($data);
+        });
 
         // Se dispara para TODOS los paths de creación (open, consola, provisioning)
         // así cualquier tenant nuevo obtiene su suscripción/trial vía listeners.
@@ -69,6 +74,10 @@ class CreateTenant extends UseCase
     private function resolveClientId(): string
     {
         if ($this->clientId !== null) {
+            if (! Str::isUuid($this->clientId)) {
+                throw new NotFoundException("Client \"{$this->clientId}\" not found.");
+            }
+
             return Client::whereKey($this->clientId)->value('id')
                 ?? throw new NotFoundException("Client \"{$this->clientId}\" not found.");
         }

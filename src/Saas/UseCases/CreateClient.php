@@ -16,6 +16,9 @@ class CreateClient extends UseCase
         'invoicing_mode', 'payment_terms_days', 'grace_days', 'late_fee_percent', 'status', 'notes',
     ];
 
+    /** Columns that are NOT NULL: null means "not provided". */
+    public const NON_NULLABLE = ['invoicing_mode', 'payment_terms_days', 'grace_days', 'late_fee_percent'];
+
     public function __construct(
         public readonly string  $name,
         public readonly ?string $key = null,
@@ -31,10 +34,22 @@ class CreateClient extends UseCase
         }
 
         return Client::create([
-            ...Arr::only($this->attributes, self::EDITABLE),
+            ...self::clean(Arr::only($this->attributes, self::EDITABLE)),
             'key'  => $key,
             'name' => $this->name,
         ]);
+    }
+
+    /** Drops null values for NOT NULL columns so defaults apply instead of a DB error. */
+    public static function clean(array $attributes): array
+    {
+        foreach (self::NON_NULLABLE as $col) {
+            if (array_key_exists($col, $attributes) && $attributes[$col] === null) {
+                unset($attributes[$col]);
+            }
+        }
+
+        return $attributes;
     }
 
     public static function uniqueKey(string $name): string

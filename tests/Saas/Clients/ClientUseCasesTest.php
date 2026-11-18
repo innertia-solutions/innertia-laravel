@@ -44,3 +44,16 @@ it('switches a space environment', function () {
 
     expect(Tenant::findByKey('rancagua')->environment)->toBe(TenantEnvironment::Testing);
 });
+
+it('drops nulls for non-nullable columns in CreateClient and UpdateClient', function () {
+    $client = (new \Innertia\Saas\UseCases\CreateClient(name: 'Defensivo', attributes: [
+        'invoicing_mode' => null, 'payment_terms_days' => null, 'grace_days' => null, 'late_fee_percent' => null,
+    ]))->execute();
+
+    (new \Innertia\Saas\UseCases\UpdateClient($client, ['grace_days' => null, 'legal_name' => 'X SpA']))->execute();
+
+    $fresh = $client->fresh();
+    expect($fresh->invoicing_mode)->not->toBeNull()
+        ->and($fresh->grace_days)->not->toBeNull()
+        ->and($fresh->legal_name)->toBe('X SpA');
+});

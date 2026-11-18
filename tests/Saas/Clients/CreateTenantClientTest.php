@@ -49,3 +49,19 @@ it('does not touch client columns when the feature is off', function () {
     expect($tenant->client_id)->toBeNull()
         ->and(Client::where('key', 'sinfeature')->exists())->toBeFalse();
 });
+
+it('fails with not found when the client id is not a uuid', function () {
+    expect(fn () => (new CreateTenant(key: 'y', name: 'Y', clientId: 'not-a-uuid'))->execute())
+        ->toThrow(NotFoundException::class);
+});
+
+it('leaves no orphan implicit client when the tenant insert fails', function () {
+    $before = Client::count();
+    $model = config('innertia.saas.tenant_model', \Innertia\Saas\Models\Tenant::class);
+    $model::creating(fn () => throw new RuntimeException('boom'));
+
+    expect(fn () => (new CreateTenant(key: 'fallo', name: 'Fallo', status: 'active'))->execute())
+        ->toThrow(RuntimeException::class);
+
+    expect(Client::count())->toBe($before);
+});

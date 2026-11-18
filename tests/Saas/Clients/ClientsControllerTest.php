@@ -63,3 +63,21 @@ it('changes a space environment', function () {
     $this->patchJson('/t/spaces/rancagua/environment', ['environment' => 'staging'])->assertUnprocessable();
     $this->patchJson('/t/spaces/noexiste/environment', ['environment' => 'testing'])->assertNotFound();
 });
+
+it('rejects explicit nulls for non-nullable client columns', function () {
+    $this->postJson('/t/clients', ['name' => 'Nulos', 'invoicing_mode' => null, 'grace_days' => null])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['invoicing_mode', 'grace_days']);
+
+    $id = (new CreateClient(name: 'Estable'))->execute()->id;
+    $this->patchJson("/t/clients/{$id}", ['payment_terms_days' => null, 'late_fee_percent' => null])
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['payment_terms_days', 'late_fee_percent']);
+});
+
+it('escapes LIKE wildcards in the tree search', function () {
+    $names = fn ($s) => collect($this->postJson('/t/clients/tree', ['search' => $s])->json('data'))->pluck('name')->all();
+
+    expect($names('_'))->toBe([])
+        ->and($names('%'))->toBe([]);
+});
