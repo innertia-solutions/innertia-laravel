@@ -18,6 +18,7 @@ final class NoticeTypes
     public const ACCOUNT_PASSKEY_ADDED = 'account.passkey_added';
     public const ACCOUNT_EMAIL_CHANGED = 'account.email_changed';
     public const ACCOUNT_INVITATION = 'account.invitation';
+    public const WEBHOOK_DISABLED = 'webhook.disabled';
 
     /** @var array<string, NoticeType> */
     private static array $types = [];
@@ -82,6 +83,17 @@ final class NoticeTypes
             new NoticeType(self::ACCOUNT_PASSKEY_ADDED, 'Passkey agregada', 'Aviso de seguridad cuando se agrega una passkey a tu cuenta.', [NoticeType::BELL, NoticeType::MAIL], critical: true, category: 'account'),
             new NoticeType(self::ACCOUNT_EMAIL_CHANGED, 'Correo cambiado', 'Aviso de seguridad cuando cambia el correo de tu cuenta.', [NoticeType::BELL, NoticeType::MAIL], critical: true, category: 'account'),
             new NoticeType(self::ACCOUNT_INVITATION, 'Invitación de cuenta', 'Link para activar tu cuenta.', [NoticeType::MAIL], critical: true, category: 'account'),
+        ];
+    }
+
+    /**
+     * @return NoticeType[] types emitted by the public API / webhooks engine. Not registered by default
+     * (registered by \Innertia\PublicApi\Routes::manage(), i.e. only in products that adopt the engine).
+     */
+    public static function integrationTypes(): array
+    {
+        return [
+            new NoticeType(self::WEBHOOK_DISABLED, 'Webhook desactivado', 'Cuando un webhook se desactiva tras 24 h de fallas continuas.', [NoticeType::BELL, NoticeType::MAIL], category: 'integrations'),
         ];
     }
 }

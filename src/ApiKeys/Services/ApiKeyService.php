@@ -43,7 +43,8 @@ class ApiKeyService
 
     public function list(?string $tenantId = null): \Illuminate\Database\Eloquent\Collection
     {
-        $query = ApiKey::active()->orderByDesc('created_at');
+        // Integration keys of the public API are managed by \Innertia\PublicApi (not listed here).
+        $query = ApiKey::active()->where('type', '!=', ApiKey::TYPE_INTEGRATION)->orderByDesc('created_at');
 
         if (\Innertia\Facades\Innertia::tenancyEnabled()) {
             $query->forTenant($tenantId ?? $this->currentTenantId());

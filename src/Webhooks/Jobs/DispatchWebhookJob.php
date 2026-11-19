@@ -4,73 +4,91 @@ namespace Innertia\Webhooks\Jobs;
 
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
+use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
+use Illuminate\Queue\Jobs\SyncJob;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Http;
+use Innertia\Facades\Innertia;
 use Innertia\Webhooks\Models\Webhook;
-use Innertia\Webhooks\Models\WebhookLog;
+use Innertia\Webhooks\WebhookDeliverer;
 
+/**
+ * Delivers one webhook message (queue `webhooks`). Every attempt reuses the same `webhook-id` (receivers
+ * dedupe by it). Retries: 1 min, 5 min, 30 min, 2 h, 6 h, 12 h. The last attempt records the final failure
+ * without throwing (no failed_jobs noise); the sync queue never throws into the caller's request.
+ */
 class DispatchWebhookJob implements ShouldQueue
 {
-    use InteractsWithQueue, Queueable, SerializesModels;
+    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public string $queue   = 'webhooks';
-    public int    $tries   = 3;
+    // `$queue` comes from Queueable (redeclaring it typed was a fatal composition error): set in the constructor.
+    public int    $tries   = 7;
     public int    $timeout = 30;
+
+    /** The subscription may be deleted while a retry is pending. */
+    public bool $deleteWhenMissingModels = true;
 
     public function __construct(
         private readonly Webhook $webhook,
         private readonly string  $eventKey,
         private readonly array   $payload,
-    ) {}
+        private readonly ?string $messageId = null,
+        private readonly bool    $isTest = false,
+        private readonly ?string $traceId = null,
+    ) {
+        $this->onQueue((string) config('innertia.webhooks.queue', 'webhooks'));
+    }
 
     public function backoff(): array
     {
-        return [60, 300, 1800]; // 1 min, 5 min, 30 min
+        return WebhookDeliverer::backoff();
     }
 
-    public function handle(): void
+    public function handle(WebhookDeliverer $deliverer): void
     {
-        $body      = json_encode($this->payload, JSON_UNESCAPED_UNICODE);
-        $signature = $this->sign($body);
+        if ($this->traceId) {
+            app()->instance('trace_id', $this->traceId);
+        }
 
-        $log = WebhookLog::create([
-            'webhook_id' => $this->webhook->id,
-            'event_key'  => $this->eventKey,
-            'payload'    => $this->payload,
-            'attempts'   => $this->attempts(),
-        ]);
+        $previous = Innertia::tenant();
+        $tenantKey = $this->tenantKey();
+
+        if ($tenantKey !== null) {
+            Innertia::activate($tenantKey);
+        }
 
         try {
-            $response = Http::timeout(15)
-                ->withHeaders([
-                    'Content-Type'          => 'application/json',
-                    'X-Innertia-Event'      => $this->eventKey,
-                    'X-Innertia-Signature'  => 'sha256=' . $signature,
-                    'X-Innertia-Delivery'   => $log->id,
-                ])
-                ->send('POST', $this->webhook->url, ['body' => $body]);
-
-            $log->update([
-                'response_status' => $response->status(),
-                'response_body'   => substr($response->body(), 0, 2000),
-                'delivered_at'    => $response->successful() ? now() : null,
-                'failed_at'       => $response->successful() ? null : now(),
-            ]);
-
-            if (! $response->successful()) {
-                $this->fail(new \RuntimeException(
-                    "Webhook {$this->webhook->id} returned HTTP {$response->status()}"
-                ));
+            $attempt = max(1, $this->attempts());
+            $result = $deliverer->attempt(
+                $this->webhook,
+                $this->eventKey,
+                $this->payload,
+                $this->messageId ?? 'msg_' . substr(sha1($this->webhook->id . $this->eventKey . json_encode($this->payload)), 0, 26),
+                $attempt,
+                $this->tries,
+                $this->isTest,
+            );
+        } finally {
+            if ($tenantKey !== null) {
+                $previous ? app(\Innertia\Saas\TenantContext::class)->set($previous) : Innertia::deactivate();
             }
-        } catch (\Throwable $e) {
-            $log->update(['failed_at' => now(), 'response_body' => $e->getMessage()]);
-            throw $e;
+        }
+
+        if (! $result['ok'] && $result['retryable'] && $attempt < $this->tries && ! $this->job instanceof SyncJob && $this->job !== null) {
+            throw new \RuntimeException("Webhook {$this->webhook->id} delivery failed (attempt {$attempt}); retrying.");
         }
     }
 
-    private function sign(string $body): string
+    private function tenantKey(): ?string
     {
-        return hash_hmac('sha256', $body, $this->webhook->secret);
+        if (! Innertia::tenancyEnabled() || blank($this->webhook->tenant_id ?? null)) {
+            return null;
+        }
+
+        $model = config('innertia.saas.tenant_model', \Innertia\Saas\Models\Tenant::class);
+        $tenant = $model::query()->whereKey($this->webhook->tenant_id)->first()
+            ?? $model::query()->where('key', $this->webhook->tenant_id)->first();
+
+        return $tenant?->key;
     }
 }

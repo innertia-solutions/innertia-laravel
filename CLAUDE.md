@@ -108,6 +108,7 @@ innertia:team:list [--tenant=]
 innertia:skills:install [--force]    # copia skills del paquete a .claude/skills/innertia/
 innertia:backups:run [--no-prune]    # respaldo pg_dump + poda (agendado 03/11/19 h Chile por defecto)
 innertia:backups:prune [--days=] [--keep=] [--dry-run]
+innertia:integrations:prune [--days=]  # logs de webhooks/API (30 días) + idempotencia vencida (agendado 04:30)
 ```
 
 ### Respaldos automáticos (`Innertia\Backups`)
@@ -128,7 +129,7 @@ El paquete trae skills versionados en `src/Skills/*.md`. Cada proyecto consumido
 - `innertia-tags` — sistema de tags polimórfico, trait HasTags, endpoints CRUD, extensión
 - `innertia-permissions` — las 8 fuentes de permisos, DomainGates, EntityPermission, HasContexts
 - `innertia-events` — Event Bus tipado, DomainEventKey enums, Triggers, EventBusFake, catálogo introspectable
-- `innertia-webhooks` — outbound webhooks con HMAC signing
+- `innertia-webhooks` — webhooks v2 (Standard Webhooks, catálogo, anti-SSRF, salud) + API pública (`api.key`, claves `pk_live_` con scopes, OpenAPI 3.1, `/developers`). Guía: `docs/webhooks-api.md`
 - `innertia-mail` — InnertiaMailable, branding por tenant, NotificationMail fluent builder
 - `innertia-config` — referencia de config/innertia.php
 - `innertia-storage` — File model con soft delete, HasTags, HasEntityPermissions, eventos, papelera, integración con Directorios

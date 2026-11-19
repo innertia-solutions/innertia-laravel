@@ -30,7 +30,8 @@
     },
     "require-dev": {
         "orchestra/testbench": "^10.6|^11.0",
-        "pestphp/pest": "^3.0"
+        "pestphp/pest": "^3.0",
+        "opis/json-schema": "^2.4"
     },
     "autoload": {
         "psr-4": {

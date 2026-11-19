@@ -166,6 +166,27 @@ abstract class DomainEvent implements ShouldBroadcast, IsDomainEvent
     }
 
     /**
+     * Stable, versioned view of the event for webhooks v2 (the `data` of `{type, timestamp, data}`).
+     * Never expose the model: build an explicit array. `$scopes` are the scopes granted to the subscription:
+     * omit or mask sensitive fields the subscription was not granted (e.g. RUT without 'people:pii').
+     *
+     * Returning null falls back to payload() (legacy behaviour).
+     */
+    public function webhookPayload(array $scopes = []): ?array
+    {
+        return null;
+    }
+
+    /**
+     * Sede (organization) of the event: subscriptions limited to a sede only receive events of that sede.
+     * Null = not tied to a sede (only subscriptions without sede receive it).
+     */
+    public function webhookOrganizationId(): ?string
+    {
+        return null;
+    }
+
+    /**
      * Modelos padre que también deben recibir notificación de este evento.
      * Los suscriptores de estos modelos son notificados igual que los del subscribable().
      *

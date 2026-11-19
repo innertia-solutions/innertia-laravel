@@ -39,6 +39,11 @@ class ActivityLogService
             'request_id' => request()->header('X-Request-ID'),
         ];
 
+        // Request authenticated with an integration key and no user: record the integration as actor.
+        if (! $userId && ($actor = \Innertia\PublicApi\ActsAsIntegration::actor())) {
+            $contextMetadata['actor'] = $actor;
+        }
+
         $metadata = array_merge($contextMetadata, $metadata ?: []);
 
         return ActivityLog::create([

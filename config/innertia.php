@@ -746,6 +746,44 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Public API (integration keys pk_live_…) + Webhooks v2
+    |--------------------------------------------------------------------------
+    |
+    | Opt-in: nothing is exposed until the product mounts \Innertia\PublicApi\Routes::manage()/docs()/
+    | developers() and protects its /v1 routes with the `api.key` middleware. Scopes and webhook events
+    | are registered by the product (ApiScopes::register / WebhookEvents::register). See docs/webhooks-api.md.
+    |
+    */
+
+    'public_api' => [
+        'title'                  => env('INNERTIA_PUBLIC_API_TITLE'),        // default "<app.name> API"
+        'version'                => '1.0.0',
+        'description'            => null,
+        'server_url'             => env('INNERTIA_PUBLIC_API_URL'),          // default app.url
+        'key_environment'        => env('INNERTIA_PUBLIC_API_KEY_ENV', 'live'), // live → pk_live_, test → pk_test_
+        'scopes'                 => [],                                      // ['calls:read' => 'Consultar llamadas']
+        'rate_limit'             => ['per_key' => 120, 'per_space' => 600],   // requests per minute
+        'idempotency_hours'      => 24,
+        'rotation_overlap_hours' => 24,
+        'retention_days'         => 30,                                      // api_request_logs + webhook_logs
+        'scalar_url'             => 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@1.76.4/dist/browser/standalone.js',
+    ],
+
+    'webhooks' => [
+        'queue'                  => 'webhooks',
+        'timeout'                => 10,                                      // seconds per delivery
+        'backoff'                => [60, 300, 1800, 7200, 21600, 43200],     // 1 min, 5 min, 30 min, 2 h, 6 h, 12 h
+        'disable_after_hours'    => 24,                                      // continuous failure → disable + notice
+        'rotation_overlap_hours' => 24,                                      // previous secret keeps signing
+        'notify_permission'      => 'settings.manage',                       // who gets `webhook.disabled`
+        'manage_url'             => null,                                    // link in the notice (front route)
+        'allow_http'             => env('INNERTIA_WEBHOOKS_ALLOW_HTTP', false),              // local dev only
+        'allow_private_networks' => env('INNERTIA_WEBHOOKS_ALLOW_PRIVATE_NETWORKS', false),  // local dev only
+        'user_agent'             => 'Innertia-Webhooks/1.0',
+    ],
+
     'backoffice' => [
         'prefix'     => env('BACKOFFICE_PREFIX', 'backoffice'),
         'middleware' => [],  // e.g. ['role:admin'] or ['permission:backoffice.access']

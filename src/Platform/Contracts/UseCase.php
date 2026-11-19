@@ -7,6 +7,9 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Innertia\Facades\Innertia;
 
+// Dynamic properties allowed: delay() stores the queue delay in `$this->delay` (read by the bus dispatcher)
+// without declaring it here, so subclasses that already declare `$delay` (typed or via Queueable) keep working.
+#[\AllowDynamicProperties]
 abstract class UseCase implements ShouldQueue
 {
     use InteractsWithQueue, SerializesModels;
@@ -29,14 +32,23 @@ abstract class UseCase implements ShouldQueue
      */
     public function handle(): void
     {
-        if ($this->__tenantKey) {
-            Innertia::activate($this->__tenantKey);
+        if (! $this->__tenantKey) {
+            $this->execute();
+
+            return;
         }
+
+        // Remember the tenant that was active before (sync queue / nested dispatch) and restore it afterwards,
+        // instead of leaving the context empty.
+        $previous = Innertia::tenant();
+        Innertia::activate($this->__tenantKey);
 
         try {
             $this->execute();
         } finally {
-            if ($this->__tenantKey) {
+            if ($previous) {
+                app(\Innertia\Saas\TenantContext::class)->set($previous);
+            } else {
                 Innertia::deactivate();
             }
         }
@@ -66,6 +78,10 @@ abstract class UseCase implements ShouldQueue
     {
         $this->__tenantKey = Innertia::tenant()?->key;
 
-        dispatch($this)->delay($delay);
+        // Do NOT call PendingDispatch::delay(): it calls $job->delay() back (infinite recursion).
+        // The bus dispatcher reads the `delay` property of the job.
+        $this->delay = $delay;
+
+        dispatch($this);
     }
 }

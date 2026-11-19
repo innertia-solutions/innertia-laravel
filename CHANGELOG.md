@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Webhooks y API pública (opt-in, compatible hacia atrás)
+
+- `Innertia\PublicApi`: middleware `api.key` (claves `pk_live_…` por espacio con scopes, sede, vencimiento,
+  rotación con 24 h de convivencia, rate limit por clave y por espacio, `Idempotency-Key`, log de requests,
+  errores `{error:{code,message,details}}`), `CursorPage`, `ApiException`, `ActsAsIntegration`.
+- OpenAPI 3.1 generado desde descriptores (`->apiDoc()` / `#[ApiOperation]`) + `ApiSchemas` + catálogo de
+  eventos; `Routes::docs()` (`v1/openapi.json`), `Routes::developers()` (Scalar), `Routes::manage()`.
+- Webhooks v2: `WebhookEvents::register()`, firma Standard Webhooks (+ `X-Innertia-Signature`), secreto
+  `whsec_` cifrado con rotación de doble firma, anti-SSRF, reintentos 1 min→12 h, salud con desactivación y
+  aviso `webhook.disabled`, logs con `webhook-id`, reenviar y evento de prueba. `DomainEvent::webhookPayload()`
+  y `webhookOrganizationId()`.
+- Migración idempotente `integrations` y comando `innertia:integrations:prune` (agendado).
+- Guía: `docs/webhooks-api.md`.
+
+### Fixed
+
+- `UseCase::delay()` recursión infinita; tenant previo restaurado tras un UseCase en cola `sync`;
+  `EmailLogging::listen()` idempotente sin marca estática; `ApiKey::revoke()`/`touchLastUsed()` sin efecto;
+  `DispatchWebhookJob` no cargaba (propiedad `$queue` incompatible).
+
 ### Added — Correos y notificaciones con marca (opt-in, compatible hacia atrás)
 
 - `Innertia\Notifications\Notifier` + `Notice` + `NoticeTypes` + `Recipients` + `Preferences`: avisos por

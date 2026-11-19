@@ -27,26 +27,54 @@ use Throwable;
  */
 final class EmailLogging
 {
-    private static bool $listening = false;
+    /**
+     * Engine-columns detection cached per application instance (a fresh app — e.g. each test — re-checks).
+     *
+     * @var \WeakMap<object, bool>|null
+     */
+    private static ?\WeakMap $engineColumns = null;
 
-    private static ?bool $engineColumns = null;
-
+    /**
+     * Idempotent: registers the listeners only when the current event dispatcher does not have them yet.
+     * No per-process flag: a fresh application (new dispatcher) gets them again automatically.
+     */
     public static function listen(): void
     {
-        if (self::$listening) {
-            return;
+        if (! self::hasListener(MessageSent::class, LogSentEmail::class)) {
+            Event::listen(MessageSent::class, LogSentEmail::class);
         }
 
-        self::$listening = true;
-        Event::listen(MessageSent::class, LogSentEmail::class);
-        Event::listen(JobFailed::class, MarkFailedEmail::class);
+        if (! self::hasListener(JobFailed::class, MarkFailedEmail::class)) {
+            Event::listen(JobFailed::class, MarkFailedEmail::class);
+        }
     }
 
-    /** For tests: allows listen() to register again on a fresh dispatcher. */
+    /** Kept for backwards compatibility (no longer required in tests): forgets the cached schema check. */
     public static function reset(): void
     {
-        self::$listening = false;
         self::$engineColumns = null;
+    }
+
+    private static function hasListener(string $event, string $listener): bool
+    {
+        try {
+            $dispatcher = app('events');
+            $raw = method_exists($dispatcher, 'getRawListeners') ? $dispatcher->getRawListeners() : null;
+
+            if ($raw === null) {
+                return false;
+            }
+
+            foreach ($raw[$event] ?? [] as $registered) {
+                if ($registered === $listener || (is_array($registered) && ($registered[0] ?? null) === $listener)) {
+                    return true;
+                }
+            }
+        } catch (Throwable) {
+            return false;
+        }
+
+        return false;
     }
 
     /**
@@ -115,7 +143,10 @@ final class EmailLogging
 
     private static function hasEngineColumns(): bool
     {
-        if (self::$engineColumns === true) {
+        $app = app();
+        self::$engineColumns ??= new \WeakMap;
+
+        if ((self::$engineColumns[$app] ?? false) === true) {
             return true;
         }
 
@@ -126,7 +157,7 @@ final class EmailLogging
         }
 
         if ($has) {
-            self::$engineColumns = true;
+            self::$engineColumns[$app] = true;
         }
 
         return $has;

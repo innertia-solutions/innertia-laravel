@@ -21,6 +21,13 @@ class ApiKey extends Model
         'permissions',
         'created_by_key_id',
         'expires_at',
+        // public API (integration keys)
+        'prefix',
+        'organization_id',
+        'last_used_ip',
+        'created_by',
+        'rotated_to_id',
+        'rotated_at',
     ];
 
     protected $casts = [
@@ -28,7 +35,11 @@ class ApiKey extends Model
         'last_used_at' => 'datetime',
         'expires_at'   => 'datetime',
         'revoked_at'   => 'datetime',
+        'rotated_at'   => 'datetime',
     ];
+
+    /** Integration keys of the public API (pk_live_… / pk_test_…), looked up by indexed prefix + SHA-256. */
+    public const TYPE_INTEGRATION = 'integration';
 
     protected $hidden = ['key'];
 
@@ -70,12 +81,62 @@ class ApiKey extends Model
 
     public function revoke(): void
     {
-        $this->update(['revoked_at' => now()]);
+        // revoked_at is not fillable: update() silently dropped it (keys were never revoked).
+        $this->forceFill(['revoked_at' => now()])->save();
     }
 
     public function touchLastUsed(): void
     {
-        $this->updateQuietly(['last_used_at' => now()]);
+        $this->forceFill(['last_used_at' => now()])->saveQuietly();
+    }
+
+    // ── Integration keys (public API) ─────────────────────────────────────────
+
+    public function isIntegration(): bool
+    {
+        return $this->type === self::TYPE_INTEGRATION;
+    }
+
+    /** Scopes of an integration key (stored in `permissions`). */
+    public function scopes(): array
+    {
+        return array_values(array_filter((array) ($this->permissions ?? []), 'is_string'));
+    }
+
+    public function hasScope(string $scope): bool
+    {
+        return in_array($scope, $this->scopes(), true);
+    }
+
+    public function status(): string
+    {
+        return match (true) {
+            $this->revoked_at !== null                                  => 'revoked',
+            $this->expires_at !== null && $this->expires_at->isPast()   => 'expired',
+            $this->expires_at !== null && $this->expires_at->lte(now()->addDays(7)) => 'expiring',
+            default                                                     => 'active',
+        };
+    }
+
+    /** Serialized for the management API (never the hash). */
+    public function toApiArray(): array
+    {
+        return [
+            'id'              => $this->id,
+            'name'            => $this->name,
+            'prefix'          => $this->prefix,
+            'hint'            => $this->key_hint,
+            'scopes'          => $this->scopes(),
+            'organization_id' => $this->organization_id !== null ? (string) $this->organization_id : null,
+            'expires_at'      => $this->expires_at?->toIso8601String(),
+            'last_used_at'    => $this->last_used_at?->toIso8601String(),
+            'last_used_ip'    => $this->last_used_ip,
+            'created_by'      => $this->created_by,
+            'revoked_at'      => $this->revoked_at?->toIso8601String(),
+            'rotated_to_id'   => $this->rotated_to_id,
+            'status'          => $this->status(),
+            'created_at'      => $this->created_at?->toIso8601String(),
+        ];
     }
 
     // ── Static factory ─────────────────────────────────────────────────────────

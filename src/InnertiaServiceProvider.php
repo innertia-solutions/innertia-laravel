@@ -104,6 +104,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->register(PaymentsServiceProvider::class);
         $this->app->register(\Innertia\Passkeys\PasskeysServiceProvider::class);
         $this->app->register(AiServiceProvider::class);
+        $this->app->register(\Innertia\PublicApi\PublicApiServiceProvider::class);
         $this->app->singleton(WebhookService::class);
         $this->app->singleton(\Innertia\Workflow\WorkflowEngine::class);
         $this->app->singleton(\Innertia\Platform\Events\EventBus::class);

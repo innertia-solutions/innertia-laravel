@@ -113,9 +113,10 @@ class EntityHistoryService
             'changes'     => $changes,
             'old_values'  => $oldValues,
             'new_values'  => $newValues,
-            'user_id'     => $this->getAuthenticatedUserId(),
+            'user_id'     => $userId = $this->getAuthenticatedUserId(),
             'ip_address'  => request()->ip(),
-            'reason'      => $reason,
+            // Without a user, a request made with an integration key is attributed as "Integración: <nombre>".
+            'reason'      => $reason ?? ($userId === null ? \Innertia\PublicApi\ActsAsIntegration::label() : null),
             'created_at'  => now(),
         ]);
     }
