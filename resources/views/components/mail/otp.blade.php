@@ -1,6 +1,6 @@
 @props(['code'])
 @php
-    $color = config('innertia.mail.brand_color', '#6366f1');
+    $color = \Innertia\Mail\Branding::current()->color;
 @endphp
 <table cellpadding="0" cellspacing="0" role="presentation" style="margin:28px auto;">
     <tr>

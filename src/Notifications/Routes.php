@@ -3,6 +3,7 @@
 namespace Innertia\Notifications;
 
 use Illuminate\Support\Facades\Route;
+use Innertia\Notifications\Http\NotificationPreferencesController;
 use Innertia\Notifications\Http\NotificationsController;
 
 /**
@@ -21,5 +22,19 @@ class Routes
             Route::delete('/',          [$controller, 'destroyRead']);
             Route::delete('/{id}',      [$controller, 'destroy']);
         });
+    }
+
+    /**
+     * Per-user notice preferences (GET|PUT {prefix}). Register inside an authenticated group
+     * (backoffice and/or platform).
+     */
+    public static function preferences(
+        string $prefix     = 'me/notification-preferences',
+        string $controller = NotificationPreferencesController::class,
+    ): void {
+        $prefix = trim($prefix, '/');
+
+        Route::get($prefix, [$controller, 'index']);
+        Route::put($prefix, [$controller, 'update']);
     }
 }

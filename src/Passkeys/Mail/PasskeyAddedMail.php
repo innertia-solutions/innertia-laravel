@@ -30,4 +30,15 @@ class PasskeyAddedMail extends InnertiaMailable
             'datetime'    => now()->format('d/m/Y H:i'),
         ];
     }
+
+    public function emailType(): ?string
+    {
+        return \Innertia\Notifications\NoticeTypes::ACCOUNT_PASSKEY_ADDED;
+    }
+
+    /** Account emails carry the platform brand. */
+    public function mailBranding(): ?\Innertia\Mail\Branding
+    {
+        return \Innertia\Mail\Branding::platform();
+    }
 }

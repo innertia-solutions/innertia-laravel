@@ -61,6 +61,8 @@ class Routes
             Route::delete('users/{id}/sessions',            [$usersController, 'revokeAllSessions']);
             Route::post  ('users/{id}/reactivate',          [$usersController, 'reactivate']);
             Route::post  ('users/{id}/reset-password',      [$usersController, 'resetPassword']);
+            // Invitation (own broker, 7 days): status + resend (3/h, invalidates the previous link).
+            \Innertia\Auth\Invitations\Routes::admin('users');
             Route::get   ('users/{id}/activity',            [$usersController, 'activity']);
 
             // ── Roles ──────────────────────────────────────────────────────────

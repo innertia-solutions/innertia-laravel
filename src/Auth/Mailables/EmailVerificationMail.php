@@ -21,4 +21,15 @@ class EmailVerificationMail extends InnertiaMailable
     {
         return 'innertia::mail.email-verification';
     }
+
+    public function emailType(): ?string
+    {
+        return 'account.email_verification';
+    }
+
+    /** Account emails carry the platform brand. */
+    public function mailBranding(): ?\Innertia\Mail\Branding
+    {
+        return \Innertia\Mail\Branding::platform();
+    }
 }

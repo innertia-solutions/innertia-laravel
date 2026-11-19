@@ -31,7 +31,15 @@ class UsersController extends Controller
 
         $statuses = array_filter((array) $request->input('statuses', []));
 
-        return DataTable::create('users')
+        $table = DataTable::create('users');
+
+        // Pending invitation (own broker): invited_at / invitation_expires_at for the list.
+        if (\Innertia\Auth\Invitations\InvitationBroker::supported()) {
+            $table->addCalculatedColumn('"invited_at"', '(SELECT it.created_at FROM invitation_tokens it WHERE it.user_id = CAST(users.id AS TEXT) LIMIT 1)')
+                ->addCalculatedColumn('"invitation_expires_at"', '(SELECT it.expires_at FROM invitation_tokens it WHERE it.user_id = CAST(users.id AS TEXT) LIMIT 1)');
+        }
+
+        return $table
             ->columns(['name', 'email', 'force_password_change', 'two_factor_enabled', 'seen_at', 'created_at', 'created_by'])
             ->addCalculatedColumn('"roles"', "(SELECT COALESCE(jsonb_agg(jsonb_build_object('id', roles.id, 'name', roles.name)), '[]'::jsonb) FROM roles INNER JOIN model_roles ON roles.id::text = model_roles.role_id::text WHERE model_roles.model_id::text = users.id::text AND model_roles.model_type LIKE '%User')")
             ->addCalculatedColumn('"otp_configured"', 'users.two_factor_secret IS NOT NULL')
@@ -67,7 +75,7 @@ class UsersController extends Controller
         $model = config('innertia.auth.user_model');
         $user  = $this->findUser($id);
 
-        $data = $user->toArray();
+        $data = $user->toArray() + (\Innertia\Auth\Invitations\InvitationBroker::status($user) ?? []);
 
         if ($this->modelHasRoles($model)) {
             $data['roles']       = $user->roles()->get(['roles.id', 'roles.name', 'roles.description']);

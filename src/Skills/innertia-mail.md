@@ -187,3 +187,19 @@ Mail::assertQueued(InvoicePaidMail::class, function ($mail) use ($invoice) {
 - `innertia-events` — `toMail()` desde DomainEvents
 - `innertia-config` — bloque `mail` (logo_url, brand_color)
 - `innertia-permissions` — endpoints de auth que disparan WelcomeMail, OtpMail, etc.
+
+## Motor de avisos y marca (2026-11)
+
+Guía completa: `docs/correos-notificaciones.md` del paquete. Resumen:
+
+- `Innertia\Notifications\Notifier::send(new Notice(type, title, body, url, recipients, subjectKey, data, mail))`
+  entrega campanita + correo según `NoticeTypes` (registrados por el producto) y preferencias por
+  usuario; antirrebote, agrupación (`:count llamadas perdidas`) y `Notifier::resolve(type, subjectKey)`.
+- `Recipients::withPermission()/withRole()/users()/platformTeam()` — sin roles fijos.
+- `Branding::platform()` / `Branding::for($tenant)` (con respaldo); `mailBranding()` y `emailType()`
+  en `InnertiaMailable` (por defecto null → comportamiento previo).
+- `MailSettings::boot()` (config de correo de /platform al boot y en `Queue::before`),
+  `EmailLogging::listen()` (email_logs con type/tenant/trace para todo correo).
+- Rutas: `Mail\Routes::platform()`, `Mail\Routes::tenantBranding()`, `Notifications\Routes::preferences()`,
+  `Auth\EmailChange\Routes::account()`, `Auth\Invitations\Routes::admin()`.
+- Invitaciones de 7 días (`SendInvitation`/`ResendInvitation`, 3/h) y `ResetPasswordLinks::register()`.

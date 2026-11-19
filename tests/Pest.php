@@ -85,3 +85,4 @@ if (! function_exists('bootOrgOpenMode')) {
 
 require_once __DIR__ . '/Passkeys/Support/passkeys-helpers.php';
 require_once __DIR__ . '/Saas/Clients/Support/clients-helpers.php';
+require_once __DIR__ . '/Notifications/Support/notice-helpers.php';

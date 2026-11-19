@@ -30,4 +30,15 @@ class WelcomeMail extends InnertiaMailable
             'loginUrl'          => rtrim(config('app.url'), '/') . config('innertia.mail.login_path', '/login'),
         ];
     }
+
+    public function emailType(): ?string
+    {
+        return 'account.welcome';
+    }
+
+    /** Account emails carry the platform brand. */
+    public function mailBranding(): ?\Innertia\Mail\Branding
+    {
+        return \Innertia\Mail\Branding::platform();
+    }
 }

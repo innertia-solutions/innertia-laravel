@@ -1,11 +1,13 @@
 @props([
     'title'    => null,
     'preview'  => null,  // preheader text (hidden, shown in inbox preview)
+    'branding' => null,  // \Innertia\Mail\Branding|null — null = brand bound by the mailable or config
 ])
 @php
-    $color    = config('innertia.mail.brand_color', '#6366f1');
-    $logoUrl  = config('innertia.mail.logo_url', null);
-    $appName  = config('app.name', 'App');
+    $brand    = $branding instanceof \Innertia\Mail\Branding ? $branding : \Innertia\Mail\Branding::current();
+    $color    = $brand->color;
+    $logoUrl  = $brand->logoUrl;
+    $appName  = $brand->name;
 @endphp
 <!DOCTYPE html>
 <html lang="es">
@@ -58,7 +60,13 @@
                     {{-- Footer --}}
                     <tr>
                         <td align="center" style="padding:24px 0 0;font-size:12px;color:#a1a1aa;line-height:1.6;">
+                            @if($brand->footerAddress || $brand->footerPhone)
+                                {{ collect([$brand->footerAddress, $brand->footerPhone])->filter()->implode(' · ') }}<br>
+                            @endif
                             &copy; {{ date('Y') }} {{ $appName }}. Todos los derechos reservados.
+                            @if($brand->via)
+                                <br>Enviado vía {{ $brand->via }}
+                            @endif
                         </td>
                     </tr>
 

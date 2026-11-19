@@ -35,4 +35,15 @@ class OtpMail extends InnertiaMailable
             'action' => $this->action,
         ];
     }
+
+    public function emailType(): ?string
+    {
+        return 'account.otp';
+    }
+
+    /** Account emails carry the platform brand. */
+    public function mailBranding(): ?\Innertia\Mail\Branding
+    {
+        return \Innertia\Mail\Branding::platform();
+    }
 }

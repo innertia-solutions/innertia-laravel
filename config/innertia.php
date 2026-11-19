@@ -565,6 +565,9 @@ return [
 
         // Path appended to APP_URL to build the login button in emails (e.g. /login)
         'login_path'  => env('MAIL_LOGIN_PATH', '/login'),
+
+        // Tenant logos are checked (HEAD, cached 1 h) so a dead logo never renders broken.
+        'verify_logo' => true,
     ],
 
     'exceptions' => [
@@ -650,6 +653,30 @@ return [
         'sessions' => [
             'restrict_concurrent' => false,
         ],
+
+        // Account invitations (own broker, table invitation_tokens). Password reset stays at
+        // auth.passwords.users.expire (60 min). Read with defaults in code: a product that
+        // published an older config/innertia.php keeps working.
+        'invitation_ttl_days'       => 7,
+        'invitation_resend_per_hour' => 3,
+        // Front paths for the emailed links (base: app.frontend_url, else app.url).
+        'frontend_activation_path'  => '/backoffice/auth/set-password',
+        'frontend_reset_path'       => '/backoffice/auth/reset-password',
+        // Email change asks for the current password.
+        'email_change_requires_password' => true,
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Notifications engine (Innertia\Notifications\Notifier)
+    |--------------------------------------------------------------------------
+    | queue: where DeliverNotice runs (workers listen to 'use-cases' by default).
+    | mail_tries / mail_backoff: retries of each notice email before it is 'failed'.
+    */
+    'notifications' => [
+        'queue'        => 'use-cases',
+        'mail_tries'   => 3,
+        'mail_backoff' => [60, 300, 900],
     ],
 
     /*

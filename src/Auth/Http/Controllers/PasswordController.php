@@ -45,6 +45,20 @@ class PasswordController extends Controller
             'password_confirmation' => 'required|string',
         ]);
 
+        // Invitation links (own broker, TTL in days) land on the same set-password page.
+        $invitation = \Innertia\Auth\Invitations\InvitationBroker::check($data['email'], $data['token']);
+
+        if ($invitation === \Innertia\Auth\Invitations\InvitationBroker::EXPIRED) {
+            return response()->json([
+                'message' => 'El link venció, pide uno nuevo.',
+                'code'    => 'invitation_expired',
+            ], 422);
+        }
+
+        if ($invitation === \Innertia\Auth\Invitations\InvitationBroker::VALID) {
+            return $this->acceptInvitation($data);
+        }
+
         $status = Password::reset(
             $data,
             function ($user, string $password) {
@@ -62,6 +76,34 @@ class PasswordController extends Controller
         }
 
         return response()->json(['message' => __($status)], 422);
+    }
+
+    /** Sets the password of an invited user, consumes the token and verifies the email. */
+    protected function acceptInvitation(array $data): JsonResponse
+    {
+        $model = config('innertia.auth.user_model', config('auth.providers.users.model'));
+        $userId = \Innertia\Auth\Invitations\InvitationBroker::userIdFor($data['email']);
+        $user = $userId ? $model::query()->find($userId) : null;
+
+        if (! $user) {
+            return response()->json(['message' => __(Password::INVALID_TOKEN)], 422);
+        }
+
+        $user->forceFill([
+            'password'       => Hash::make($data['password']),
+            'remember_token' => Str::random(60),
+        ]);
+
+        if (\Illuminate\Support\Facades\Schema::hasColumn($user->getTable(), 'email_verified_at') && ! $user->email_verified_at) {
+            $user->forceFill(['email_verified_at' => now()]);
+        }
+
+        $user->save();
+        \Innertia\Auth\Invitations\InvitationBroker::consume($data['email']);
+
+        event(new PasswordReset($user));
+
+        return response()->json(['message' => 'Contraseña creada correctamente.']);
     }
 
     public function change(Request $request): JsonResponse

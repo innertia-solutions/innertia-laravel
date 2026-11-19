@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Correos y notificaciones con marca (opt-in, compatible hacia atrás)
+
+- `Innertia\Notifications\Notifier` + `Notice` + `NoticeTypes` + `Recipients` + `Preferences`: avisos por
+  campanita y correo según preferencias, antirrebote, agrupación y `resolve()`, en cola con `trace_id`.
+- `Innertia\Mail\Branding` / `TenantBranding` / `MailSettings` / `EmailLogging`: marca de plataforma y por
+  espacio con respaldo, configuración de correo de /platform (`MailSettings::boot()`), registro de todo
+  correo con `type`/`tenant_id`/`trace_id`.
+- Layout de correo acepta `$branding` opcional; `InnertiaMailable::mailBranding()` y `emailType()`.
+- Invitaciones con broker propio (7 días, reenvío con throttle 3/h), `ResetPasswordLinks`, cambio de correo
+  con código, middleware `platform.owner`.
+- Migraciones idempotentes: `notification_preferences`, `notice_states`, `invitation_tokens`, columnas en `email_logs`.
+- Guía: `docs/correos-notificaciones.md`.
+
 ### Fixed — Hallazgos menores de QA (sumando)
 
 - **404 configurable:** `innertia.exceptions.not_found_message` reemplaza el texto de los 404 de

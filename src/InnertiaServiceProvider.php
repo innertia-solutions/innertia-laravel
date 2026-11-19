@@ -130,6 +130,11 @@ class InnertiaServiceProvider extends ServiceProvider
             $this->loadMigrationsFrom(__DIR__ . '/../database/migrations/clients');
         }
 
+        // Notifications/branded emails engine: additive, idempotent tables (no users in api mode).
+        if ($mode !== 'api') {
+            $this->loadMigrationsFrom(__DIR__ . '/../database/migrations/notifications');
+        }
+
         // Also publishable — `php artisan vendor:publish --tag=innertia-migrations`
         $publishMap = [];
         foreach (glob($migrationsPath . '/*.php') as $f) {
@@ -238,6 +243,7 @@ class InnertiaServiceProvider extends ServiceProvider
         $router->aliasMiddleware('tenant.require',    \Innertia\Saas\Middleware\RequireTenant::class);
         $router->aliasMiddleware('tenant.member',     \Innertia\Saas\Middleware\ValidateTenantMembership::class);
         $router->aliasMiddleware('apikey',            \Innertia\ApiKeys\Middleware\ApiKeyMiddleware::class);
+        $router->aliasMiddleware('platform.owner',    \Innertia\Http\Middleware\EnsurePlatformOwner::class);
 
         if (OrganizationsFeature::isActive()) {
             $router->aliasMiddleware(

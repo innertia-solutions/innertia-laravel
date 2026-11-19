@@ -27,7 +27,19 @@ namespace Innertia\Mail;
  */
 class NotificationMail extends InnertiaMailable
 {
+    /** Queue retries (null = worker default). The Notifier sets 3 with backoff. */
+    public ?int $tries = null;
+
+    /** Seconds between retries (int|int[]|null). */
+    public $backoff = null;
+
     private string $emailSubject = 'Notificación';
+
+    /** Notice type recorded in email_logs (null = 'notification'). */
+    private ?string $noticeType = null;
+
+    /** Explicit brand (null = tenant brand with platform fallback). */
+    private ?array $brandingOverride = null;
 
     /** @var array<int, array<string, mixed>> */
     private array $blocks = [];
@@ -37,6 +49,58 @@ class NotificationMail extends InnertiaMailable
     public static function make(): static
     {
         return new static();
+    }
+
+    // ── Delivery options ──────────────────────────────────────────────────────
+
+    /** Type recorded in email_logs (e.g. 'voicemail.new'). */
+    public function type(string $type): static
+    {
+        $this->noticeType = $type;
+        return $this;
+    }
+
+    /** Forces a brand (e.g. Branding::platform() for platform-team alerts). */
+    public function withBranding(Branding $branding): static
+    {
+        $this->brandingOverride = $branding->toArray();
+        return $this;
+    }
+
+    /** Queue retries + backoff for the delivery job. */
+    public function retries(int $tries, int|array $backoff = 60): static
+    {
+        $this->tries = $tries;
+        $this->backoff = $backoff;
+        return $this;
+    }
+
+    public function emailType(): ?string
+    {
+        return $this->noticeType ?? 'notification';
+    }
+
+    /**
+     * Business emails carry the brand of the tenant they belong to (captured when queued),
+     * falling back to the platform brand. Without tenant/branding settings this resolves to
+     * the same values the legacy layout used.
+     */
+    public function mailBranding(): ?Branding
+    {
+        if ($this->brandingOverride !== null) {
+            $b = $this->brandingOverride;
+
+            return new Branding(
+                name: (string) $b['name'],
+                logoUrl: $b['logo_url'],
+                color: (string) $b['color'],
+                footerAddress: $b['footer_address'],
+                footerPhone: $b['footer_phone'],
+                via: $b['via'],
+            );
+        }
+
+        return Branding::for($this->mailTenantId());
     }
 
     // ── Fluent block builders ─────────────────────────────────────────────────
