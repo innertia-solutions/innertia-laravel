@@ -111,8 +111,28 @@ class InnertiaServiceProvider extends ServiceProvider
         $this->app->singleton(\Innertia\Storage\StorageManager::class);
     }
 
+    /**
+     * Container key marking that the shared boot already ran for this application.
+     *
+     * Products get InnertiaServiceProvider auto-discovered AND register a mode provider (InnertiaOpenProvider,
+     * InnertiaAppProvider, …) in bootstrap/providers.php. Laravel dedupes providers by exact class name, so a
+     * subclass does not dedupe against its parent and both boot. Without this guard every listener (DomainEvent
+     * router, EventBus bridge), Gate::before, model hook and route was registered twice → each DomainEvent was
+     * routed twice (duplicated webhooks, mails, web notifications, EventBus listeners).
+     *
+     * register() stays safe to run twice (idempotent bindings; the mode provider sets innertia.mode, which is
+     * authoritative by boot time), so the shared boot can run from whichever provider boots first.
+     * Per application instance (container), not static: a fresh app (each test, each Octane worker) boots again.
+     */
+    public const BOOTED_KEY = 'innertia.provider.booted';
+
     public function boot(): void
     {
+        if ($this->app->bound(self::BOOTED_KEY)) {
+            return;
+        }
+        $this->app->instance(self::BOOTED_KEY, static::class);
+
         $isSaas = $this->isSaas() || $this->isOpen();
 
         // ── Migrations ────────────────────────────────────────────────────────

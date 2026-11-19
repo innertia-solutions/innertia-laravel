@@ -14,6 +14,15 @@ use Orchestra\Testbench\TestCase;
 
 class BaseTestCase extends TestCase
 {
+    /**
+     * Innertia providers to register instead of the auto-discovered one (null = default).
+     * Lets a test reproduce real product setups, e.g. auto-discovered InnertiaServiceProvider
+     * + InnertiaOpenProvider in bootstrap/providers.php. Call refreshApplication() after setting it.
+     *
+     * @var array<int, class-string>|null
+     */
+    public static ?array $innertiaProviders = null;
+
     protected function getPackageProviders($app)
     {
         return [
@@ -21,7 +30,7 @@ class BaseTestCase extends TestCase
             // En apps reales laravel/mcp se auto-descubre; en Testbench hay que
             // registrarlo a mano para que el Request de MCP reciba sus argumentos.
             \Laravel\Mcp\Server\McpServiceProvider::class,
-            \Innertia\InnertiaServiceProvider::class,
+            ...(static::$innertiaProviders ?? [\Innertia\InnertiaServiceProvider::class]),
         ];
     }
 

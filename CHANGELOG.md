@@ -23,6 +23,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Ruteo doble de `DomainEvent`: los productos tienen `InnertiaServiceProvider` autodescubierto y además registran
+  el provider de modo (`InnertiaOpenProvider`/`InnertiaAppProvider`/`InnertiaSaasProvider`/`InnertiaApiProvider`)
+  en `bootstrap/providers.php`. Laravel deduplica providers por nombre exacto de clase, así que una subclase no se
+  deduplica contra su padre y ambos bootean: `DomainEventRouter`, el puente al `EventBus`, `Gate::before`, el hook
+  `MigrationsEnded`, `Notification::created` (→ `NotificationSent` doble), el listener `JobProcessing` del disco
+  cloud y las rutas de Platform/Files quedaban registrados dos veces. Cada evento se ruteaba dos veces (webhooks con
+  dos entregas y distinto `webhook-id`, correos y avisos web duplicados, listeners del `EventBus` dos veces). Ahora
+  el boot compartido es idempotente por aplicación (marca `innertia.provider.booted` en el contenedor); `register()`
+  sigue siendo seguro de repetir y el provider de modo fija `innertia.mode`. Los rodeos en productos (p. ej.
+  `resolveChannels()` con bandera de "ya ruteado") dejan de ser necesarios.
 - `UseCase::delay()` recursión infinita; tenant previo restaurado tras un UseCase en cola `sync`;
   `EmailLogging::listen()` idempotente sin marca estática; `ApiKey::revoke()`/`touchLastUsed()` sin efecto;
   `DispatchWebhookJob` no cargaba (propiedad `$queue` incompatible).
