@@ -69,7 +69,7 @@ class AssembleInvoice extends UseCase
             'subtotal'       => (int) $statements->sum('subtotal'),
             'tax'            => (int) $statements->sum('tax'),
             'total'          => $total,
-            'balance'        => $total,
+            'balance'        => max(0, $total - $invoice->allocatedAmount()),
             'period_start'   => $statements->min(fn ($s) => $s->period_start->format('Y-m-d')) ?? $invoice->period_start,
             'period_end'     => $statements->max(fn ($s) => $s->period_end->format('Y-m-d')) ?? $invoice->period_end,
             'payment_method' => $methods->count() === 1 ? $methods->first() : PaymentMethod::Invoice,

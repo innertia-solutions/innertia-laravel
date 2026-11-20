@@ -78,7 +78,9 @@ class ApplyPayment extends UseCase
         if ($paid > 0) {
             $invoice = $invoice->fresh();
             BillingLog::info('payment applied', ['invoice_id' => $invoice->id, 'payment_id' => $payment->id, 'amount' => $paid, 'balance' => $invoice->balance]);
-            \Innertia\Billing\Support\BillingNotices::paymentReceived($invoice, $paid);
+            if ($event !== 'credit_note') {
+                \Innertia\Billing\Support\BillingNotices::paymentReceived($invoice, $paid);
+            }
             if ($invoice->status === InvoiceStatus::Paid) {
                 event(new InvoicePaid($invoice));
             }

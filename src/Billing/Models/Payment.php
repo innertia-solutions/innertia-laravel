@@ -7,14 +7,17 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Innertia\Billing\Enums\PaymentChannel;
 use Innertia\Platform\Traits\HasUuid;
 
-/** Money received from a client. What is not allocated stays as credit (saldo a favor). */
+/**
+ * Money received from a client. What is not allocated stays as credit (saldo a favor).
+ * method `credit` = a credit note (non-cash): excluded from collections reports.
+ */
 class Payment extends Model
 {
     use HasUuid;
 
     protected $table = 'billing_payments';
 
-    protected $fillable = ['client_id', 'amount', 'method', 'reference', 'received_at', 'charge_id', 'unallocated_amount', 'created_by', 'trace_id'];
+    protected $fillable = ['client_id', 'amount', 'method', 'reference', 'received_at', 'charge_id', 'unallocated_amount', 'created_by', 'trace_id', 'bank_transaction_id'];
 
     protected $casts = [
         'amount'             => 'integer',

@@ -103,6 +103,25 @@ return [
         'invoice_view'          => 'innertia::billing.invoice',
         'transfer_instructions' => null,
         'issuer'                => ['name' => null, 'tax_id' => null, 'address' => null],
+
+        // ── Cobranza (etapa 3) ──────────────────────────────────────────────
+        // Cola de las importaciones de cartola y de los recordatorios (UseCase con $timeout propio).
+        'queue' => 'use-cases',
+        // Numeración de notas de crédito (NC-000001).
+        'credit_note_prefix' => 'NC-',
+        // Recordatorios de pago (defaults; se editan en platform, Settings billing.reminder_*).
+        'reminders_at' => '09:00',
+        'reminders' => [
+            'enabled'            => true,
+            'days_before'        => '3',     // días antes del vencimiento, separados por coma ("7,3")
+            'on_due'             => true,    // el día que vence
+            'overdue_every_days' => 7,       // mientras siga vencida, cada N días
+            'overdue_max'        => 6,       // máximo de recordatorios de vencida
+            'escalate_after'     => 2,       // desde el (N+1)-ésimo recordatorio de vencida: copia a cobranza + aviso crítico
+            'escalation_email'   => null,
+        ],
+        // Conciliación de cartolas: puntaje para aplicar solo y mínimo para sugerir.
+        'reconciliation' => ['auto_score' => 85, 'min_score' => 30],
     ],
 
     /*

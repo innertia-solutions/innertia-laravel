@@ -64,6 +64,8 @@ class BackofficeController extends Controller
             $data['statements'] = array_values(array_filter($data['statements'], fn ($s) => $s['tenant_id'] === $tenantId));
         }
         unset($data['events']);
+        $tenantId = (string) $this->tenant()->getKey();
+        $data['late_fees'] = array_values(array_filter($data['late_fees'] ?? [], fn ($f) => $f['tenant_id'] === $tenantId));
 
         return response()->json($data);
     }
@@ -92,6 +94,19 @@ class BackofficeController extends Controller
             'amount'      => (int) $p->allocations->sum('amount'),
             'allocations' => $p->allocations->map(fn ($a) => ['invoice_id' => $a->invoice_id, 'amount' => $a->amount])->values(),
         ])->values()]);
+    }
+
+    /** GET billing/account?from=&to= : account statement of the space (its invoices and what was applied to them). */
+    public function account(\Illuminate\Http\Request $request): JsonResponse
+    {
+        $data = $request->validate(['from' => 'nullable|date_format:Y-m-d', 'to' => 'nullable|date_format:Y-m-d']);
+        $tenant = $this->tenant();
+        if (method_exists($tenant, 'isTesting') && $tenant->isTesting()) {
+            return response()->json(['testing' => true]);
+        }
+        abort_if(blank($tenant->client_id ?? null), 404);
+
+        return response()->json(\Innertia\Billing\Support\AccountStatement::build((string) $tenant->client_id, $data['from'] ?? null, $data['to'] ?? null, (string) $tenant->getKey()));
     }
 
     private function tenant(): object

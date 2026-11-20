@@ -21,6 +21,8 @@ final class BillingNotices
     public const PAST_DUE = 'billing.past_due';
     public const SUSPENDED = 'billing.suspended';
     public const REACTIVATED = 'billing.reactivated';
+    public const PAYMENT_REMINDER = 'billing.payment_reminder';
+    public const COLLECTION_ESCALATED = 'billing.collection_escalated';
 
     /** @return NoticeType[] */
     public static function types(): array
@@ -33,6 +35,8 @@ final class BillingNotices
             new NoticeType(self::PAST_DUE, 'Factura vencida', 'Cuando una factura del espacio vence sin pago.', critical: true, debounceMinutes: 1440, category: $category),
             new NoticeType(self::SUSPENDED, 'Espacio suspendido', 'Cuando el espacio queda en solo lectura por deuda.', critical: true, category: $category),
             new NoticeType(self::REACTIVATED, 'Espacio reactivado', 'Cuando el espacio vuelve a estar al día.', category: $category),
+            new NoticeType(self::PAYMENT_REMINDER, 'Recordatorio de pago', 'Antes del vencimiento, el día que vence y mientras siga vencida.', category: $category),
+            new NoticeType(self::COLLECTION_ESCALATED, 'Aviso de cobranza', 'Cuando una factura sigue vencida tras varios recordatorios.', critical: true, category: $category),
         ];
     }
 
@@ -74,6 +78,14 @@ final class BillingNotices
             } catch (\Throwable $e) {
                 BillingLog::warning('billing notice resolve failed', ['subscription_id' => $subscription->id, 'error' => $e->getMessage()]);
             }
+        }
+    }
+
+    /** Reminder notice to the admins of every space of the invoice (critical when escalated). */
+    public static function reminder(Invoice $invoice, string $title, string $body, bool $escalated): void
+    {
+        foreach (self::tenantIds($invoice) as $tenantId) {
+            self::send($tenantId, $escalated ? self::COLLECTION_ESCALATED : self::PAYMENT_REMINDER, $title, $body, "invoice:{$invoice->id}:reminder");
         }
     }
 

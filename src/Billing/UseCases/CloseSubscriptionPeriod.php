@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Innertia\Billing\Enums\SubscriptionStatus;
 use Innertia\Billing\Models\Adjustment;
+use Innertia\Billing\Models\LateFee;
 use Innertia\Billing\Models\Plan;
 use Innertia\Billing\Models\Statement;
 use Innertia\Billing\Models\Subscription;
@@ -104,6 +105,13 @@ class CloseSubscriptionPeriod extends UseCase
 
                 foreach (array_chunk($result['usage_ids'], 500) as $ids) {
                     UsageRecord::query()->whereIn('id', $ids)->whereNull('statement_id')->update(['statement_id' => $statement->id]);
+                }
+                foreach ($result['late_fees'] as $fee) {
+                    LateFee::create([
+                        'invoice_id' => $fee['invoice_id'], 'tenant_id' => (string) $subscription->tenant_id, 'statement_id' => $statement->id,
+                        'from_date' => $fee['from'], 'to_date' => $fee['to'], 'days' => $fee['days'], 'base' => $fee['base'],
+                        'rate' => $fee['rate'], 'amount' => $fee['amount'], 'trace_id' => traceId() ?: null,
+                    ]);
                 }
                 if ($result['adjustment_ids'] !== []) {
                     Adjustment::query()->whereIn('id', $result['adjustment_ids'])->update(['consumed_at' => now()]);

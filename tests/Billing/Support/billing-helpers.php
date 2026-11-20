@@ -19,6 +19,7 @@ if (! function_exists('bootBillingMode')) {
         \Illuminate\Support\Facades\Cache::flush();
 
         (require __DIR__ . '/../../../database/migrations/billing/2026_11_19_100001_create_billing_tables.php')->up();
+        (require __DIR__ . '/../../../database/migrations/billing/2026_11_20_100001_create_billing_collections_tables.php')->up();
         if (! Schema::hasTable('settings')) {
             (require __DIR__ . '/../../../database/migrations/saas/2025_01_01_000007_create_settings_table.php')->up();
         }

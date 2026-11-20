@@ -15,7 +15,7 @@ use Innertia\Billing\Support\PaymentsLinkProvider;
 
 /**
  * Wiring of Innertia\Billing. Everything below boot() only happens while BillingFeature is active:
- * migrations, schedule (close + dunning, billing time zone), AI cost and payment-link listeners,
+ * migrations, schedule (close + dunning + reminders, billing time zone), AI cost and payment-link listeners,
  * notice types and the `billing.enforce` middleware alias. Products bind their own SeatCounter /
  * PaymentLinkProvider in their providers (bindIf here keeps theirs).
  */
@@ -37,7 +37,7 @@ class BillingServiceProvider extends ServiceProvider
     {
         if ($this->app->runningInConsole()) {
             // Registered always: the commands check the feature themselves.
-            $this->commands([Console\CloseBillingPeriodsCommand::class, Console\RunDunningCommand::class]);
+            $this->commands([Console\CloseBillingPeriodsCommand::class, Console\RunDunningCommand::class, Console\SendPaymentRemindersCommand::class]);
         }
 
         if (! BillingFeature::isActive()) {
@@ -70,6 +70,13 @@ class BillingServiceProvider extends ServiceProvider
             ->dailyAt((string) config('innertia.billing.dunning_at', '08:00'))
             ->timezone($tz)
             ->name('innertia:billing:dunning')
+            ->withoutOverlapping(60)
+            ->onOneServer();
+
+        $schedule->command(Console\SendPaymentRemindersCommand::class)
+            ->dailyAt((string) config('innertia.billing.reminders_at', '09:00'))
+            ->timezone($tz)
+            ->name('innertia:billing:reminders')
             ->withoutOverlapping(60)
             ->onOneServer();
     }

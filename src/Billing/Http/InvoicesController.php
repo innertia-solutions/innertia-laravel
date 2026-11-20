@@ -10,7 +10,10 @@ use Innertia\Billing\Enums\InvoiceStatus;
 use Innertia\Billing\Models\Invoice;
 use Innertia\Billing\Support\InvoicePdf;
 use Innertia\Billing\UseCases\IssueInvoice;
+use Innertia\Billing\UseCases\ReissueInvoice;
 use Innertia\Billing\UseCases\SendInvoice;
+use Innertia\Billing\UseCases\VoidInvoice;
+use Innertia\Billing\UseCases\WaiveLateFees;
 use Innertia\Exceptions\ConflictException;
 use Symfony\Component\HttpFoundation\Response;
 
@@ -76,6 +79,63 @@ class InvoicesController extends Controller
         }
 
         return response()->json(['sent' => (new SendInvoice($model))->execute()]);
+    }
+
+    /** POST billing/invoices/{id}/void {reason} */
+    public function void(Request $request, string $invoice): JsonResponse
+    {
+        $data = $request->validate(['reason' => 'required|string|max:250']);
+
+        return response()->json(Present::invoice((new VoidInvoice(Invoice::findOrFail($invoice), $data['reason']))->execute(), detail: true));
+    }
+
+    /**
+     * POST billing/invoices/{id}/reissue {reason, billing_data?, refresh_billing_data?, lines?: [{description, amount, tenant_key?}],
+     * due_at?, folio?, send?} → the new invoice.
+     */
+    public function reissue(Request $request, string $invoice): JsonResponse
+    {
+        $data = $request->validate([
+            'reason'               => 'required|string|max:250',
+            'billing_data'         => 'nullable|array',
+            'billing_data.*'       => 'nullable|string|max:250',
+            'refresh_billing_data' => 'sometimes|boolean',
+            'lines'                => 'nullable|array|max:20',
+            'lines.*.description'  => 'required|string|max:200',
+            'lines.*.amount'       => 'required|integer|not_in:0',
+            'lines.*.tenant_key'   => 'nullable|string|max:80',
+            'due_at'               => 'nullable|date_format:Y-m-d',
+            'folio'                => 'nullable|string|max:40',
+            'send'                 => 'sometimes|boolean',
+        ]);
+
+        $model = config('innertia.saas.tenant_model') ?? \Innertia\Saas\Models\Tenant::class;
+        $lines = array_map(fn ($l) => [
+            'description' => $l['description'],
+            'amount'      => (int) $l['amount'],
+            'tenant_id'   => ! empty($l['tenant_key']) ? (string) ($model::query()->where('key', $l['tenant_key'])->value('id') ?? '-') : null,
+        ], $data['lines'] ?? []);
+
+        $new = (new ReissueInvoice(
+            invoice: Invoice::findOrFail($invoice),
+            reason: $data['reason'],
+            billingData: $data['billing_data'] ?? null,
+            lines: $lines,
+            refreshBillingData: (bool) ($data['refresh_billing_data'] ?? false),
+            dueAt: ! empty($data['due_at']) ? \Innertia\Billing\Support\BillingClock::date($data['due_at'])->endOfDay() : null,
+            send: (bool) ($data['send'] ?? true),
+            folio: $data['folio'] ?? null,
+        ))->execute();
+
+        return response()->json(Present::invoice($new, detail: true), 201);
+    }
+
+    /** POST billing/invoices/{id}/waive-late-fees {reason} */
+    public function waiveLateFees(Request $request, string $invoice): JsonResponse
+    {
+        $data = $request->validate(['reason' => 'required|string|max:250']);
+
+        return response()->json((new WaiveLateFees(Invoice::findOrFail($invoice), $data['reason']))->execute());
     }
 
     public function pdf(string $invoice): Response

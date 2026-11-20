@@ -82,17 +82,25 @@ class OverviewController extends Controller
             'issuer_name'           => 'sometimes|nullable|string|max:150',
             'issuer_tax_id'         => 'sometimes|nullable|string|max:20',
             'issuer_address'        => 'sometimes|nullable|string|max:250',
+            'reminders_enabled'           => 'sometimes|nullable|boolean',
+            'reminder_days_before'        => ['sometimes', 'nullable', 'string', 'max:40', 'regex:/^\s*\d{1,2}(\s*,\s*\d{1,2})*\s*$/'],
+            'reminder_on_due'             => 'sometimes|nullable|boolean',
+            'reminder_overdue_every_days' => 'sometimes|nullable|integer|min:1|max:90',
+            'reminder_overdue_max'        => 'sometimes|nullable|integer|min:0|max:50',
+            'reminder_escalate_after'     => 'sometimes|nullable|integer|min:0|max:50',
+            'reminder_escalation_email'   => 'sometimes|nullable|email|max:150',
         ]);
 
         return response()->json(BillingSettings::save($data));
     }
 
-    /** POST billing/run/{job}: close | dunning (owner). */
+    /** POST billing/run/{job}: close | dunning | reminders (owner). */
     public function run(string $job): JsonResponse
     {
         return response()->json(match ($job) {
             'close'   => (new CloseBillingPeriods)->execute(),
             'dunning' => (new RunDunning)->execute(),
+            'reminders' => (new \Innertia\Billing\UseCases\SendPaymentReminders)->execute(),
             default   => abort(404),
         });
     }

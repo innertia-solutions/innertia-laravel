@@ -102,6 +102,6 @@ it('registers the billing notice types and the dunning/close schedule in the bil
     (new \Innertia\Billing\BillingServiceProvider($this->app))->schedule($schedule);
     $events = collect($schedule->events())->filter(fn ($e) => str_contains((string) $e->description, 'innertia:billing'));
 
-    expect($events->pluck('description')->unique()->values()->all())->toBe(['innertia:billing:close', 'innertia:billing:dunning'])
+    expect($events->pluck('description')->unique()->values()->all())->toBe(['innertia:billing:close', 'innertia:billing:dunning', 'innertia:billing:reminders'])
         ->and($events->first()->timezone)->toBe('America/Santiago');
 });

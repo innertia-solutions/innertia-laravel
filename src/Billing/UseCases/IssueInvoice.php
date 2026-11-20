@@ -31,6 +31,8 @@ class IssueInvoice extends UseCase
         public readonly ?string $folio = null,
         public readonly ?string $pdfFileId = null,
         public readonly bool $send = true,
+        public readonly ?array $billingData = null,
+        public readonly ?\DateTimeInterface $dueAt = null,
     ) {}
 
     public function execute(): Invoice
@@ -52,15 +54,20 @@ class IssueInvoice extends UseCase
             'status'       => InvoiceStatus::Issued,
             'folio'        => $this->folio ?? $invoice->folio,
             'pdf_file_id'  => $this->pdfFileId ?? $invoice->pdf_file_id,
-            'billing_data' => $invoice->tenant_id !== null ? ($invoice->tenant?->billingData() ?? $client->billingData()) : $client->billingData(),
+            'billing_data' => $this->billingData
+                ?? ($invoice->tenant_id !== null ? ($invoice->tenant?->billingData() ?? $client->billingData()) : $client->billingData()),
             'issued_at'    => $now,
-            'due_at'       => $now->copy()->addDays((int) ($client->payment_terms_days ?? 30)),
-            'balance'      => $invoice->total,
+            'due_at'       => $this->dueAt ?? $now->copy()->addDays((int) ($client->payment_terms_days ?? 30)),
+            // Reissued invoices carry the allocations of the voided one.
+            'balance'      => max(0, $invoice->total - $invoice->allocatedAmount()),
             'trace_id'     => traceId() ?: $invoice->trace_id,
         ]));
 
         $invoice->log('issued', ['number' => $invoice->number, 'folio' => $invoice->folio, 'total' => $invoice->total]);
 
+        if ($invoice->fresh()->balance <= 0) {
+            $invoice->update(['status' => InvoiceStatus::Paid, 'paid_at' => $now]);
+        }
         $this->applyCredit($invoice);
         $invoice->refresh();
 

@@ -21,6 +21,7 @@ class Invoice extends Model
         'client_id', 'tenant_id', 'number', 'period_start', 'period_end', 'currency', 'billing_data', 'subtotal',
         'tax', 'total', 'balance', 'status', 'payment_method', 'folio', 'pdf_file_id', 'payment_link', 'charge_id',
         'issued_at', 'due_at', 'paid_at', 'sent_at', 'replaces_invoice_id', 'void_reason', 'trace_id',
+        'voided_at', 'voided_by', 'replaced_by_invoice_id', 'late_fees_waived_at',
     ];
 
     protected $casts = [
@@ -38,6 +39,8 @@ class Invoice extends Model
         'due_at'         => 'datetime',
         'paid_at'        => 'datetime',
         'sent_at'        => 'datetime',
+        'voided_at'      => 'datetime',
+        'late_fees_waived_at' => 'datetime',
     ];
 
     public function client(): BelongsTo
@@ -63,6 +66,18 @@ class Invoice extends Model
     public function allocations(): HasMany
     {
         return $this->hasMany(Allocation::class, 'invoice_id');
+    }
+
+    /** Amount already settled (payments and credit notes allocated to it). */
+    public function allocatedAmount(): int
+    {
+        return (int) Allocation::query()->where('invoice_id', $this->id)->sum('amount');
+    }
+
+    /** Due date as a local date (billing time zone). */
+    public function dueDate(): ?\Carbon\CarbonImmutable
+    {
+        return $this->due_at ? \Innertia\Billing\Support\BillingClock::date($this->due_at->copy()->timezone(\Innertia\Billing\Support\BillingClock::timezone())) : null;
     }
 
     public function isConsolidated(): bool

@@ -19,14 +19,26 @@ use Innertia\Billing\Models\UsageRecord;
  *
  *   base + extra seats (SeatCounter) + metered consumption over the included quantity
  *   (+ cost-valued meters: cost × (1 + markup%) − included amount) + late usage of previous
- *   periods + current adjustments; VAT by the plan rate. Every line is rounded to the minor unit
+ *   periods + current adjustments (of the space and percent ones of its client) + late fee interest
+ *   over overdue invoices (LateFeeCalculator); VAT by the plan rate. Every line is rounded to the minor unit
  *   (half up); VAT is rounded once over the subtotal. Subtotal never goes below 0.
  *
  * @phpstan-type Line array{kind: string, description: string, meter: ?string, quantity: float, unit_price: int, amount: int, meta: array}
  */
 class StatementCalculator
 {
+    /** Late fees are left out of the backoffice estimate (withoutLateFees()). */
+    private bool $withLateFees = true;
+
     public function __construct(private readonly SeatCounter $seats) {}
+
+    public function withoutLateFees(): static
+    {
+        $copy = clone $this;
+        $copy->withLateFees = false;
+
+        return $copy;
+    }
 
     /**
      * @return array{lines: array<int, array>, subtotal: int, tax: int, total: int, tax_rate: float, usage_ids: string[], adjustment_ids: string[]}
@@ -91,9 +103,12 @@ class StatementCalculator
 
         // ── Adjustments ─────────────────────────────────────────────────────
         $beforeAdjustments = array_sum(array_column($lines, 'amount'));
+        $clientId = $subscription->tenant?->client_id;
         $adjustments = Adjustment::query()
-            ->where('tenant_id', $tenantId)
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)
+                ->when($clientId, fn ($w) => $w->orWhere(fn ($c) => $c->whereNull('tenant_id')->where('client_id', $clientId))))
             ->whereNull('consumed_at')
+            ->whereNull('canceled_at')
             ->where(fn ($q) => $q->whereNull('starts_at')->orWhere('starts_at', '<=', $periodEnd))
             ->where(fn ($q) => $q->whereNull('ends_at')->orWhere('ends_at', '>=', $periodStart))
             ->orderBy('created_at')
@@ -107,6 +122,13 @@ class StatementCalculator
                 $adjustment->type->sign() * $amount, ['adjustment_id' => $adjustment->id, 'type' => $adjustment->type->value]);
         }
 
+        // ── Late fee interest over overdue invoices (not discounted) ─────────
+        $lateFees = $this->withLateFees ? LateFeeCalculator::forSpace($tenantId, $periodEnd) : [];
+        foreach ($lateFees as $fee) {
+            $lines[] = $this->line(LineKind::LateFee, "Interés por mora factura {$fee['display_number']} ({$fee['days']} días)", null,
+                $fee['days'], 0, $fee['amount'], $fee);
+        }
+
         $subtotal = max(0, array_sum(array_column($lines, 'amount')));
         $taxRate = (float) $plan->tax_rate;
         $tax = Money::round($subtotal * $taxRate / 100);
@@ -117,6 +139,7 @@ class StatementCalculator
             'tax'            => $tax,
             'total'          => $subtotal + $tax,
             'tax_rate'       => $taxRate,
+            'late_fees'      => $lateFees,
             'usage_ids'      => array_values(array_unique($usageIds)),
             'adjustment_ids' => $adjustments->filter(fn (Adjustment $a) => ! $a->recurring || in_array($a->type, [AdjustmentType::OneOff, AdjustmentType::Credit], true))
                 ->pluck('id')->all(),
