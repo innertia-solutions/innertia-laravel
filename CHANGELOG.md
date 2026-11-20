@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added — Facturación base y consumo de IA con costo (opt-in, compatible hacia atrás)
+
+- `Innertia\Ai`: `ai_usage_events` + `tenant_id`, `organization_id`, `feature`, `units`, `cost_usd`; `ai_models` +
+  precios USD por unidad (migración aditiva idempotente). `Ai::recordUsage()`, `Ai::usageReport()` (por espacio,
+  función, modelo y día en hora de Chile), evento `AiUsageRecorded`, rutas `\Innertia\Ai\Routes`. Guía `docs/ai-usage.md`.
+- `Innertia\Billing` (`innertia.billing.enabled` + clients): planes, suscripción por espacio, medidores
+  (`Meters::record`, `ai.cost` automático), cierre y mora agendados, facturas por espacio o consolidadas, PDF,
+  correo, pago por enlace o transferencia, saldo a favor, suspensión en solo lectura (`billing.enforce`), rutas de
+  platform y backoffice. Guía `docs/billing.md`.
+
 ### Added — Webhooks y API pública (opt-in, compatible hacia atrás)
 
 - `Innertia\PublicApi`: middleware `api.key` (claves `pk_live_…` por espacio con scopes, sede, vencimiento,

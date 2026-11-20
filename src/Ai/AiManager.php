@@ -79,6 +79,23 @@ class AiManager
     }
 
     /**
+     * Registra un uso de IA con su feature, unidades y costo calculado con el precio vigente del
+     * modelo. Toma tenant y organización activos. Ver UsageLogger::recordUsage().
+     *
+     *   Ai::recordUsage('call_summary', ['input_tokens' => 1200, 'output_tokens' => 300], 'gpt-4.1-mini');
+     */
+    public function recordUsage(string $feature, array $units, string|Models\AiModel|null $model = null, array $context = []): Models\UsageEvent
+    {
+        return $this->usage()->recordUsage($feature, $units, $model, $context);
+    }
+
+    /** Consumo agregado (costo USD y unidades) por tenant/feature/modelo/día en un rango de fechas. */
+    public function usageReport(string|\DateTimeInterface $from, string|\DateTimeInterface $to, ?string $tenantId = null): Usage\UsageReport
+    {
+        return new Usage\UsageReport($from, $to, $tenantId);
+    }
+
+    /**
      * Adaptador de transcripción (audio → texto).
      *  - Sin `$providerKey`: el de la asignación de uso `transcription` (proveedor + modelo).
      *  - Con `$providerKey` (`minimax`, `openai`…): ese proveedor; modelo = el de la asignación si apunta a él, si no

@@ -102,6 +102,11 @@ return new class extends Migration
             $table->string('name');
             $table->json('capabilities')->nullable();
             $table->boolean('active')->default(true);
+            // Prices in USD (null = not priced): per 1M input/output tokens, per audio minute, per 1M TTS chars.
+            $table->decimal('price_input_per_mtok', 14, 6)->nullable();
+            $table->decimal('price_output_per_mtok', 14, 6)->nullable();
+            $table->decimal('price_per_audio_minute', 14, 6)->nullable();
+            $table->decimal('price_per_mchar_tts', 14, 6)->nullable();
             $table->timestamps();
         });
 
@@ -123,6 +128,11 @@ return new class extends Migration
             $table->unsignedInteger('completion_tokens')->default(0);
             $table->unsignedInteger('total_tokens')->default(0);
             $table->uuid('user_id')->nullable();
+            $table->string('tenant_id')->nullable()->index();
+            $table->string('organization_id')->nullable();
+            $table->string('feature')->nullable()->index();
+            $table->json('units')->nullable();
+            $table->decimal('cost_usd', 16, 8)->nullable();
             $table->timestamp('created_at')->nullable()->index();
         });
 

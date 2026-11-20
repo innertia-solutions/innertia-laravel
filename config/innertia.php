@@ -71,6 +71,42 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Billing (facturación de la plataforma a sus clientes)
+    |--------------------------------------------------------------------------
+    | Opt-in. Requiere saas.clients.enabled (modos saas/open). Al activarlo se
+    | cargan las migraciones billing_* y se agendan el cierre de período y la
+    | mora. Montos en enteros de la unidad mínima de la moneda (CLP = pesos).
+    | Ver docs/billing.md.
+    */
+    'billing' => [
+        'enabled'  => env('INNERTIA_BILLING_ENABLED', false),
+        'currency' => 'CLP',
+        // Zona de los períodos (fechas de cierre, vencimientos y días de consumo).
+        'timezone' => 'America/Santiago',
+        // Medidores que el producto activa (null = todos los registrados).
+        'meters' => null,
+        // Plan con el que el autoregistro abre una suscripción en trial (key de billing_plans; null = ninguna).
+        'default_plan' => null,
+        // Horas de los procesos diarios (zona de arriba).
+        'close_at'   => '00:30',
+        'dunning_at' => '08:00',
+        // Proveedor de Innertia\Payments para el enlace de pago (flow | mercadopago; null = solo transferencia).
+        'payment_provider' => null,
+        // Tipo de cambio USD→CLP por defecto (se edita en platform: Settings billing.usd_clp_rate).
+        'usd_clp_rate' => 950,
+        // Rutas que siguen aceptando escrituras con el espacio suspendido (patrones de Request::is()).
+        'suspended_allow' => ['*auth/*', '*billing/*', '*logout*'],
+        // Numeración interna de facturas (F-000123) y ruta del backoffice para los avisos.
+        'number_prefix'   => 'F-',
+        'backoffice_path' => '/backoffice/billing',
+        // Vista del PDF (sobrescribible) y respaldo de los datos editables en platform (Settings billing.*).
+        'invoice_view'          => 'innertia::billing.invoice',
+        'transfer_instructions' => null,
+        'issuer'                => ['name' => null, 'tax_id' => null, 'address' => null],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | Demo mode
     |--------------------------------------------------------------------------
     |

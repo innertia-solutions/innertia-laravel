@@ -49,6 +49,11 @@ Ai::transcriber();             // TranscriptionProvider del uso 'transcription' 
 Ai::transcriber('minimax');    // el de un proveedor concreto (modelo: asignación si apunta a él / capacidad / preset)
 Ai::usage()->record('chat', $providerId, $model, $promptTokens, $completionTokens, $userId);
 Ai::usage()->totalTokens('chat');    // agregado de tokens por uso (o todos)
+
+// Consumo con costo (fase C): feature + unidades + precio vigente del modelo; tenant/org activos.
+Ai::recordUsage('call_summary', ['input_tokens' => 1200, 'output_tokens' => 300], 'gpt-4.1-mini');
+Ai::recordUsage('transcription', ['audio_seconds' => 95], 'whisper-1');
+Ai::usageReport('2026-11-01', '2026-11-30', $tenantId)->summary();   // ver docs/ai-usage.md
 ```
 
 **Multi-proveedor por uso:** `ai_assignments` mapea cada `use` a provider+model; `ProviderResolver::for($use)` resuelve. Así chat/visión/embedding/asistente pueden usar proveedores distintos.

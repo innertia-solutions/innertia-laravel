@@ -1,0 +1,13 @@
+<?php
+
+namespace Innertia\Billing\Events;
+
+use Illuminate\Foundation\Events\Dispatchable;
+use Innertia\Billing\Models\Invoice;
+
+class InvoicePaid
+{
+    use Dispatchable;
+
+    public function __construct(public readonly Invoice $invoice) {}
+}

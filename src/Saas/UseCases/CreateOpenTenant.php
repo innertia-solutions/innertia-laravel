@@ -36,6 +36,9 @@ class CreateOpenTenant extends UseCase
 
         // TenantCreated ya lo dispara CreateTenant (llamado arriba) para todos los paths.
 
+        // Billing activo + plan por defecto: el autoregistro abre la suscripción en trial (§6.2).
+        \Innertia\Billing\UseCases\StartDefaultSubscription::for($tenant);
+
         return ['tenant' => $tenant];
     }
 

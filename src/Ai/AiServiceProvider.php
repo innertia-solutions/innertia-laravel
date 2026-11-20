@@ -25,5 +25,8 @@ class AiServiceProvider extends ServiceProvider
         }
 
         $this->app['router']->aliasMiddleware('ensure.mcp.key', EnsureMcpKey::class);
+
+        // Additive, idempotent columns for usage cost accounting (tenant, feature, units, cost_usd, model prices).
+        $this->loadMigrationsFrom(__DIR__ . '/../../database/migrations/ai');
     }
 }

@@ -96,3 +96,4 @@ require_once __DIR__ . '/Passkeys/Support/passkeys-helpers.php';
 require_once __DIR__ . '/Saas/Clients/Support/clients-helpers.php';
 require_once __DIR__ . '/Notifications/Support/notice-helpers.php';
 require_once __DIR__ . '/PublicApi/Support/public-api-helpers.php';
+require_once __DIR__ . '/Billing/Support/billing-helpers.php';

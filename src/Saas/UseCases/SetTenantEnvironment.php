@@ -18,6 +18,13 @@ class SetTenantEnvironment extends UseCase
         // firstOrFail → ModelNotFoundException → 404 in HTTP.
         $tenant = $model::where('key', $this->tenantKey)->firstOrFail();
 
+        // A production space that was already billed never goes back to testing.
+        if ($this->environment === TenantEnvironment::Testing
+            && \Innertia\Billing\BillingFeature::isActive()
+            && \Innertia\Billing\Models\Statement::query()->where('tenant_id', (string) $tenant->getKey())->exists()) {
+            throw new \Innertia\Exceptions\ConflictException('Un espacio de producción con cobros no puede volver a pruebas.');
+        }
+
         $tenant->update(['environment' => $this->environment]);
 
         return $tenant;
